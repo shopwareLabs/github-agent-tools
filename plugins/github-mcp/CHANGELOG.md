@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Codex plugin support through `.agents/plugins/marketplace.json` and `.codex-plugin/plugin.json`. The Codex manifest registers the existing `gh-tooling` and `gh-tooling-write` servers inline and launches the shared server scripts without replacing the active project working directory.
-- Codex coverage for MCP launching, hook tool namespaces, project `cwd` handling, and `.codex/` configuration discovery.
+- Codex coverage for hook tool namespaces, project `cwd` handling, and `.codex/` configuration discovery.
 
 ### Changed
 - The shared hooks now recognize both Claude Code and Codex input/tool-name formats. Block messages recommend the namespace used by the active host.

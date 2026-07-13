@@ -120,7 +120,7 @@ Captures `__raw` and `__exit` separately; branches on `suppress_errors` for `2>/
 | Add blocked API endpoint | `hooks/scripts/check-api-tools.sh` | - | Endpoint pattern matching |
 | Modify shared hook logic | `hooks/scripts/lib/common.sh` | - | `parse_hook_input()`, `load_mcp_config()`, `block_tool()` |
 | Modify Claude Code registration | `.mcp.json` | `.claude-plugin/plugin.json` | `${CLAUDE_PLUGIN_ROOT}` |
-| Modify Codex registration | `.codex-plugin/plugin.json` | `codex_launcher.bats` | Inline `mcpServers`, inherited project cwd |
+| Modify Codex registration | `.codex-plugin/plugin.json` | - | Inline `mcpServers`, inherited project cwd |
 | Disable hook enforcement | `.mcp-gh-tooling.json` | - | `enforce_mcp_tools: false` |
 | Enable write server | `.mcp-gh-tooling.json` | - | `enable_write_server: true` |
 | Configure label semantics | `.mcp-gh-tooling.json` | - | `labels: {...}` map |
@@ -185,7 +185,6 @@ BATS tests for hook scripts and MCP tool functions are in `plugin-tests/github-m
 | `gh_tools.bats` | GitHub CLI tool blocking (gh pr, gh issue, gh run, gh search, gh label, gh project, gh api) |
 | `check_api_tools.bats` | Dedicated API-tool enforcement for Claude Code and Codex tool namespaces |
 | `session_start.bats` | Shared SessionStart context and host-specific config discovery |
-| `codex_launcher.bats` | Codex cache lookup while preserving the active project cwd |
 | `write_server_gating.bats` | Write-server gating and active-host config priority |
 | `mcp_tool_gh.bats` | MCP tool shared parameters (_gh_validate_jq_filter, _gh_post_process, suppress_errors, fallback) |
 | `extra_log_file.bats` | Extra log file configuration and dual-write log() |
