@@ -1,0 +1,12 @@
+{
+  "name": "plugin-setup",
+  "version": "1.0.0",
+  "description": "Interactive setup skill for the github-mcp plugin. Install it alongside github-mcp, ask Claude to \"set up github-mcp\", then uninstall it once configuration is complete.",
+  "author": {
+    "name": "Shopware Labs"
+  },
+  "license": "MIT",
+  "keywords": ["setup", "configuration", "github-mcp", "gh", "mcp"],
+  "homepage": "https://github.com/shopwareLabs/github-agent-tools/tree/main/plugins/plugin-setup",
+  "repository": "https://github.com/shopwareLabs/github-agent-tools"
+}

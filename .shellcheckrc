@@ -1,0 +1,12 @@
+source-path=SCRIPTDIR
+external-sources=true
+# SC1091: sources use computed paths to sibling plugin dirs (${SHARED_DIR}, ${GH_LIB_DIR});
+#   shellcheck strips a single expansion and resolves to ./file.sh, which misses. set -euo
+#   pipefail makes missing-source failures loud at runtime.
+# SC2034 (unused var) / SC2329 (uninvoked function): the BATS suites define stub functions
+#   (gh, log, git) and setup variables (GH_DEFAULT_REPO, CONFIG_PREFIX, …) consumed indirectly
+#   by the sourced plugin scripts; when shellcheck cannot follow the runtime-computed
+#   ${REPO_ROOT}/plugins/... source paths it reports them as unused. Production scripts under
+#   plugins/ and .github/scripts/ are clean without this — it only silences test-scaffolding
+#   false positives.
+disable=SC1091,SC2034,SC2329

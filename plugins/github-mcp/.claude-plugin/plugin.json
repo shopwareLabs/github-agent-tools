@@ -1,0 +1,12 @@
+{
+  "name": "github-mcp",
+  "version": "3.4.0",
+  "description": "GitHub CLI MCP servers wrapping gh for pull requests, issues, CI runs, jobs, commits, search, labels, projects, and reviews. Read server (always active) with 30 tools and write server (opt-in) with 23 tools. Includes SessionStart hook that injects MCP tool directives and PreToolUse hooks that enforce MCP tool usage. Configuration-optional: works without config when gh is authenticated.",
+  "author": {
+    "name": "Shopware Labs"
+  },
+  "license": "MIT",
+  "keywords": ["github", "gh", "mcp", "hooks", "github-actions", "pull-requests", "ci", "issues", "search"],
+  "homepage": "https://github.com/shopwareLabs/github-agent-tools/tree/main/plugins/github-mcp",
+  "repository": "https://github.com/shopwareLabs/github-agent-tools"
+}

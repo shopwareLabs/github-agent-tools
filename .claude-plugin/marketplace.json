@@ -1,0 +1,18 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "github-agent-tools",
+  "owner": {
+    "name": "Shopware",
+    "email": "info@shopware.com",
+    "url": "https://www.shopware.com"
+  },
+  "metadata": {
+    "description": "GitHub CLI tools for AI coding agents, delivered via MCP",
+    "version": "1.0.0",
+    "pluginRoot": "./plugins"
+  },
+  "plugins": [
+    { "name": "github-mcp", "source": "./plugins/github-mcp" },
+    { "name": "plugin-setup", "source": "./plugins/plugin-setup" }
+  ]
+}
