@@ -30,16 +30,25 @@ GitHub CLI tools via MCP (Model Context Protocol). Wraps the `gh` CLI for pull r
 
 ## Quick Start
 
-### Installation
+### Claude Code
 
 ```bash
+/plugin marketplace add shopwareLabs/github-agent-tools
 /plugin install github-mcp@github-agent-tools
 ```
 
-> [!IMPORTANT]
-> Restart Claude Code after installation for the MCP server to initialize.
+Restart Claude Code after installation for the MCP servers to initialize.
 
-### Interactive Setup
+### Codex
+
+```bash
+codex plugin marketplace add shopwareLabs/github-agent-tools
+codex plugin add github-mcp@github-agent-tools
+```
+
+Start a new Codex task after installation. Open `/hooks` to review and trust the bundled hooks; Codex skips plugin hooks until they are trusted.
+
+### Interactive Setup (Claude Code only)
 
 Install the `plugin-setup` plugin, then ask Claude to help you set up github-mcp:
 
@@ -51,17 +60,13 @@ Install the `plugin-setup` plugin, then ask Claude to help you set up github-mcp
 Help me set up github-mcp
 ```
 
-The `github-mcp-setting-up` skill verifies prerequisites (`gh`, `jq`) and optionally creates a config file with a default repository. You can also configure manually -- see [Configuration](#configuration) below.
+The `github-mcp-setting-up` skill verifies prerequisites (`gh`, `jq`) and optionally creates a config file with a default repository. It uses Claude Code-specific interaction and permission settings, so it is not listed in the Codex marketplace. Codex users configure the plugin manually as described below.
 
 ### Verification
 
-After restarting, verify the MCP server is running:
+After restarting Claude Code or starting a new Codex task, verify the MCP servers with `/mcp`.
 
-```bash
-/mcp
-```
-
-You should see `gh-tooling` listed as a connected server. If you enabled the write server, you should also see `gh-tooling-write`.
+You should see `gh-tooling` listed as a connected server. `gh-tooling-write` is also registered, but exposes no tools until explicitly enabled.
 
 ## Configuration
 
@@ -138,7 +143,7 @@ Configuration is loaded in the following priority order:
    - `.kiro/.mcp-gh-tooling.json` (Kiro)
    - `.windsurf/.mcp-gh-tooling.json` (Windsurf/Codeium)
    - `.zed/.mcp-gh-tooling.json` (Zed editor)
-   - `.claude/.mcp-gh-tooling.json` (override, highest priority)
+   - Host override directories: `.claude/.mcp-gh-tooling.json` and `.codex/.mcp-gh-tooling.json`. When both exist, the active host's directory has highest priority; the other host's file remains a fallback.
 
 **Prerequisites:**
 - `gh` CLI installed: `brew install gh` (macOS) or see [GitHub CLI installation](https://cli.github.com/)
@@ -188,9 +193,9 @@ The write server is **disabled by default**. To enable it, set `enable_write_ser
 }
 ```
 
-When disabled, the write server starts but returns an empty tools list -- Claude cannot discover or invoke write tools. This provides a safe default where read operations work out of the box while write operations require explicit opt-in.
+When disabled, the write server starts but returns an empty tools list, so the agent cannot discover or invoke write tools. This provides a safe default where read operations work out of the box while write operations require explicit opt-in.
 
-After enabling, restart Claude Code. You should see `gh-tooling-write` listed alongside `gh-tooling` in `/mcp`.
+After enabling, restart Claude Code or start a new Codex task. `/mcp` should show tools for `gh-tooling-write` alongside `gh-tooling`.
 
 ## Label Semantics
 
@@ -219,7 +224,7 @@ This plugin enforces MCP tool usage through three layers:
 
 ### Layer 1: SessionStart Hook
 
-Injects a directive at the start of every conversation listing all available MCP tools and instructing Claude to use them instead of bash `gh` commands. The prompt is assembled dynamically from a template, with conditional sections for write tools and label semantics. Maintained in `hooks/prompts/mcp-tool-directives.md`.
+Injects a directive at the start of every conversation listing all available MCP tools and instructing the agent to use them instead of bash `gh` commands. The prompt is assembled dynamically from a template, with conditional sections for write tools and label semantics. Maintained in `hooks/prompts/mcp-tool-directives.md`.
 
 ### Layer 2: Bash Command Blocking (PreToolUse)
 
@@ -245,45 +250,45 @@ To allow direct CLI invocations, set `enforce_mcp_tools` to `false` in your conf
 
 #### Read Commands
 
-| Bash Command             | MCP Tool                                 |
-|--------------------------|------------------------------------------|
-| `gh pr view`             | `mcp__gh-tooling__pr_view`               |
-| `gh pr diff`             | `mcp__gh-tooling__pr_diff`               |
-| `gh pr list`             | `mcp__gh-tooling__pr_list`               |
-| `gh pr checks`           | `mcp__gh-tooling__pr_checks`             |
-| `gh issue view`          | `mcp__gh-tooling__issue_view`            |
-| `gh issue list`          | `mcp__gh-tooling__issue_list`            |
-| `gh run view`            | `mcp__gh-tooling__run_view` / `run_logs` |
-| `gh run list`            | `mcp__gh-tooling__run_list`              |
-| `gh search code`         | `mcp__gh-tooling__search_code`           |
-| `gh search repos`        | `mcp__gh-tooling__search_repos`          |
-| `gh search commits`      | `mcp__gh-tooling__search_commits`        |
-| `gh search` (issues/prs) | `mcp__gh-tooling__search`                |
-| `gh release list`        | `mcp__gh-tooling__release_list`          |
-| `gh release view`        | `mcp__gh-tooling__release_list`          |
-| `gh label list`          | `mcp__gh-tooling__label_list`            |
-| `gh project list`        | `mcp__gh-tooling__project_list`          |
-| `gh project view`        | `mcp__gh-tooling__project_view`          |
+| Bash Command             | Dedicated Tool             |
+|--------------------------|----------------------------|
+| `gh pr view`             | `pr_view`                  |
+| `gh pr diff`             | `pr_diff`                  |
+| `gh pr list`             | `pr_list`                  |
+| `gh pr checks`           | `pr_checks`                |
+| `gh issue view`          | `issue_view`               |
+| `gh issue list`          | `issue_list`               |
+| `gh run view`            | `run_view` / `run_logs`    |
+| `gh run list`            | `run_list`                 |
+| `gh search code`         | `search_code`              |
+| `gh search repos`        | `search_repos`             |
+| `gh search commits`      | `search_commits`           |
+| `gh search` (issues/prs) | `search`                   |
+| `gh release list`        | `release_list`             |
+| `gh release view`        | `release_list`             |
+| `gh label list`          | `label_list`               |
+| `gh project list`        | `project_list`             |
+| `gh project view`        | `project_view`             |
 
 #### Write Commands
 
-| Bash Command             | MCP Tool                                         |
-|--------------------------|--------------------------------------------------|
-| `gh pr create`           | `mcp__gh-tooling-write__pr_create`               |
-| `gh pr edit`             | `mcp__gh-tooling-write__pr_edit`                 |
-| `gh pr ready`            | `mcp__gh-tooling-write__pr_ready`                |
-| `gh pr merge`            | `mcp__gh-tooling-write__pr_merge`                |
-| `gh pr close`            | `mcp__gh-tooling-write__pr_close`                |
-| `gh pr reopen`           | `mcp__gh-tooling-write__pr_reopen`               |
-| `gh pr review`           | `mcp__gh-tooling-write__pr_review_submit`        |
-| `gh pr comment`          | `mcp__gh-tooling-write__pr_comment`              |
-| `gh issue create`        | `mcp__gh-tooling-write__issue_create`            |
-| `gh issue edit`          | `mcp__gh-tooling-write__issue_edit`              |
-| `gh issue close`         | `mcp__gh-tooling-write__issue_close`             |
-| `gh issue reopen`        | `mcp__gh-tooling-write__issue_reopen`            |
-| `gh issue comment`       | `mcp__gh-tooling-write__issue_comment`           |
-| `gh project item-add`    | `mcp__gh-tooling-write__project_item_add`        |
-| `gh project item-edit`   | `mcp__gh-tooling-write__project_status_set`      |
+| Bash Command             | Dedicated Tool       |
+|--------------------------|----------------------|
+| `gh pr create`           | `pr_create`          |
+| `gh pr edit`             | `pr_edit`            |
+| `gh pr ready`            | `pr_ready`           |
+| `gh pr merge`            | `pr_merge`           |
+| `gh pr close`            | `pr_close`           |
+| `gh pr reopen`           | `pr_reopen`          |
+| `gh pr review`           | `pr_review_submit`   |
+| `gh pr comment`          | `pr_comment`         |
+| `gh issue create`        | `issue_create`       |
+| `gh issue edit`          | `issue_edit`         |
+| `gh issue close`         | `issue_close`        |
+| `gh issue reopen`        | `issue_reopen`       |
+| `gh issue comment`       | `issue_comment`      |
+| `gh project item-add`    | `project_item_add`   |
+| `gh project item-edit`   | `project_status_set` |
 
 ### Optional: `gh api` Bash Command Blocking
 
@@ -315,34 +320,24 @@ With `block_api_tool_read: true` and/or `block_api_tool_write: true`, the `api_r
 
 ## Integration with Other Plugins
 
-Other plugins can reference these tools in their tool lists:
+The raw server IDs stay `gh-tooling` and `gh-tooling-write`, but each host renders model-visible tool identifiers differently:
 
-```markdown
----
-tools: mcp__gh-tooling__pr_view, mcp__gh-tooling__run_logs, mcp__gh-tooling__search
----
+| Host | Read tool example | Write tool example |
+|---|---|---|
+| Claude Code | `mcp__plugin_github-mcp_gh-tooling__pr_view` | `mcp__plugin_github-mcp_gh-tooling-write__pr_create` |
+| Codex | `mcp__gh_tooling__pr_view` | `mcp__gh_tooling_write__pr_create` |
 
-After pushing, check PR status and CI results.
-```
-
-Write tools use the `gh-tooling-write` server name:
-
-```markdown
----
-tools: mcp__gh-tooling-write__pr_create, mcp__gh-tooling-write__pr_comment
----
-
-Create a PR and add a comment.
-```
+Use the identifiers exposed by the active host rather than copying the other host's spelling.
 
 ## Troubleshooting
 
 ### MCP Server Not Starting
 
-1. Ensure Claude Code was restarted after plugin installation
+1. Restart Claude Code or start a new Codex task after plugin installation
 2. Check `/mcp` for connection status
-3. Verify `jq` is installed: `which jq`
-4. Verify `gh` is installed and authenticated: `gh auth status`
+3. In Codex, open `/hooks` and confirm the plugin hooks are trusted if enforcement is missing
+4. Verify `jq` is installed: `which jq`
+5. Verify `gh` is installed and authenticated: `gh auth status`
 
 ### gh Not Authenticated
 
@@ -352,7 +347,7 @@ Create a PR and add a comment.
 ### Write Server Not Showing Tools
 
 1. Verify `enable_write_server` is set to `true` in `.mcp-gh-tooling.json`
-2. Restart Claude Code after changing the config
+2. Restart Claude Code or start a new Codex task after changing the config
 3. Check `/mcp` -- `gh-tooling-write` should be listed with tools
 
 ## Dependencies

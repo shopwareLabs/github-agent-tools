@@ -1,12 +1,12 @@
 #!/bin/bash
-# Claude Code Hook: MCP API Tool Enforcer
+# MCP API Tool Enforcer (Claude Code and Codex)
 # =========================================================
 # Blocks MCP api/api_read tool calls when a dedicated tool exists.
 # Controlled by block_api_tool_read and block_api_tool_write in .mcp-gh-tooling.json.
 #
 # Exit codes:
 #   0 - Call allowed
-#   2 - Call blocked (message shown to Claude)
+#   2 - Call blocked (message shown to the agent)
 
 set -euo pipefail
 
@@ -14,6 +14,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/common.sh"
 
 INPUT=$(cat)
+resolve_hook_context "$INPUT"
 IFS=$'\t' read -r TOOL_NAME ENDPOINT METHOD < <(
     printf '%s' "$INPUT" | jq -r '[
         (.tool_name // ""),
@@ -27,23 +28,12 @@ IFS=$'\t' read -r TOOL_NAME ENDPOINT METHOD < <(
 
 # Determine read vs write server
 IS_WRITE="false"
-if [[ "$TOOL_NAME" == *"gh-tooling-write"* ]]; then
+if [[ "$TOOL_NAME" == *"gh-tooling-write"* || "$TOOL_NAME" == *"gh_tooling_write"* ]]; then
     IS_WRITE="true"
 fi
 
 # Load config
-CONFIG_FILE=""
-if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]]; then
-    for location in ".claude/.mcp-gh-tooling.json" ".mcp-gh-tooling.json"; do
-        if [[ -f "${CLAUDE_PROJECT_DIR}/${location}" ]]; then
-            CONFIG_FILE="${CLAUDE_PROJECT_DIR}/${location}"
-            break
-        fi
-    done
-fi
-
-# ENVIRONMENT and COMMAND are read by block_tool() from common.sh
-ENVIRONMENT=""
+load_mcp_config "gh-tooling"
 
 # Check the appropriate config flag
 BLOCK="false"

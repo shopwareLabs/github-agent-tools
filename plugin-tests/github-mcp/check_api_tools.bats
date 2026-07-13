@@ -10,8 +10,12 @@ CONFIG_PREFIX="gh-tooling"
 # Helper: create hook input for an MCP api tool call
 make_api_input() {
     local tool_name="$1" endpoint="$2" method="${3:-GET}"
-    printf '{"tool_name": "%s", "tool_input": {"endpoint": "%s", "method": "%s"}}' \
-        "$tool_name" "$endpoint" "$method"
+    jq -cn \
+        --arg tool_name "$tool_name" \
+        --arg endpoint "$endpoint" \
+        --arg method "$method" \
+        --arg cwd "${HOOK_CWD:-${CLAUDE_PROJECT_DIR:-}}" \
+        '{cwd: $cwd, tool_name: $tool_name, tool_input: {endpoint: $endpoint, method: $method}}'
 }
 
 run_api_hook() {
@@ -23,6 +27,8 @@ run_api_hook() {
 
 READ_TOOL="mcp__plugin_github-mcp_gh-tooling__api_read"
 WRITE_TOOL="mcp__plugin_github-mcp_gh-tooling-write__api"
+CODEX_READ_TOOL="mcp__gh_tooling__api_read"
+CODEX_WRITE_TOOL="mcp__gh_tooling_write__api"
 
 # ============================================================================
 # Read API tool blocking (block_api_tool_read: true)
@@ -76,6 +82,19 @@ setup_read_blocking() {
     setup_config "gh-tooling" '{}'
     run_api_hook "$READ_TOOL" "repos/shopware/shopware/pulls/123/comments"
     assert_success
+}
+
+@test "read api: enforce_mcp_tools false overrides API blocking" {
+    setup_config "gh-tooling" '{"enforce_mcp_tools": false, "block_api_tool_read": true}'
+    run_api_hook "$READ_TOOL" "repos/shopware/shopware/pulls/123/comments"
+    assert_success
+}
+
+@test "Codex read api: loads .codex config from cwd and blocks dedicated endpoint" {
+    setup_codex_config "gh-tooling" '{"block_api_tool_read": true}'
+    run_api_hook "$CODEX_READ_TOOL" "repos/shopware/shopware/pulls/123/comments"
+    assert_failure 2
+    assert_output --partial "pr_comments"
 }
 
 # ============================================================================
@@ -145,4 +164,11 @@ setup_write_blocking() {
     run_api_hook "$WRITE_TOOL" "repos/shopware/shopware/pulls/123/comments" "GET"
     assert_failure 2
     assert_output --partial "pr_comments"
+}
+
+@test "Codex write api: recognizes the sanitized write-server namespace" {
+    setup_codex_config "gh-tooling" '{"block_api_tool_write": true}'
+    run_api_hook "$CODEX_WRITE_TOOL" "repos/shopware/shopware/pulls" "POST"
+    assert_failure 2
+    assert_output --partial "pr_create"
 }

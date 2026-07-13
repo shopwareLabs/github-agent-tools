@@ -4,25 +4,35 @@
 
 GitHub CLI tools for AI coding agents. Wraps the GitHub CLI (`gh`) behind MCP servers — pull requests, issues, CI runs, jobs, commits, search, labels, projects, and repository file browsing — as first-class MCP tools, with hook-based enforcement that keeps the agent on the tools instead of raw `gh` bash calls.
 
-Because it is built on the assistant-neutral [Model Context Protocol](https://modelcontextprotocol.io/), it works with any MCP-capable coding agent. It ships today as a [Claude Code plugin marketplace](https://docs.claude.com/en/docs/claude-code/plugins); Codex compatibility is planned.
+Because it is built on the assistant-neutral [Model Context Protocol](https://modelcontextprotocol.io/), it works with any MCP-capable coding agent. This repository ships `github-mcp` through both a [Claude Code plugin marketplace](https://docs.claude.com/en/docs/claude-code/plugins) and a [Codex plugin marketplace](https://learn.chatgpt.com/docs/build-plugins).
 
 > **Origin**: Extracted from its sibling project [shopwareLabs/ai-coding-tools](https://github.com/shopwareLabs/ai-coding-tools) — a broader AI-coding-tools marketplace — into this standalone repository. The GitHub tooling was split out so it can evolve on its own and be used by any MCP-capable agent.
 
 ## ⚡ Quick Start
 
-**Requirements:** [Claude Code](https://docs.claude.com/en/docs/claude-code) installed, `gh` CLI authenticated (`gh auth login`), `jq`.
+**Requirements:** `gh` CLI authenticated (`gh auth login`), `jq`, and either [Claude Code](https://docs.claude.com/en/docs/claude-code) or [Codex](https://developers.openai.com/codex/cli/).
+
+### Claude Code
 
 ```bash
 /plugin marketplace add shopwareLabs/github-agent-tools
 /plugin install github-mcp@github-agent-tools
 ```
 
-> [!IMPORTANT]
-> Restart Claude Code after installation for the MCP servers to initialize.
+Restart Claude Code after installation for the MCP servers to initialize.
+
+### Codex
+
+```bash
+codex plugin marketplace add shopwareLabs/github-agent-tools
+codex plugin add github-mcp@github-agent-tools
+```
+
+Start a new Codex task after installation. Open `/hooks` to review and trust the bundled enforcement hooks; Codex skips untrusted plugin hooks.
 
 The read server (`gh-tooling`) is always active. The write server (`gh-tooling-write`) is opt-in via `enable_write_server: true` in a `.mcp-gh-tooling.json` config file. Configuration is optional — the read server works out of the box when `gh` is authenticated.
 
-**Optional interactive setup:** install the companion `plugin-setup` plugin (`/plugin install plugin-setup@github-agent-tools`) and ask Claude to *"set up github-mcp"* — it checks `gh`/`jq`, optionally writes a config, and pre-approves the MCP tool permissions. Uninstall it once you're done.
+**Optional Claude Code setup:** the companion `plugin-setup` plugin remains Claude Code-only because it uses Claude Code interaction and permission settings. Install it with `/plugin install plugin-setup@github-agent-tools`, ask Claude to *"set up github-mcp"*, then uninstall it when setup is complete. Codex users configure `.mcp-gh-tooling.json` manually as described in the plugin guide.
 
 ## 🧩 What's Inside
 

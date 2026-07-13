@@ -139,6 +139,19 @@ bats_test_function --description "blocks gh run view in ; chain → suggests run
     assert_success
 }
 
+@test "Claude hook suggestions use the plugin-qualified tool namespace" {
+    run_hook "check-gh-tools.sh" "gh pr view 14642"
+    assert_failure 2
+    assert_output --partial "mcp__plugin_github-mcp_gh-tooling__pr_view"
+}
+
+@test "Codex cwd loads .codex enforcement config and uses sanitized tool name" {
+    setup_codex_config "gh-tooling" '{"enforce_mcp_tools": true}'
+    run_hook "check-gh-tools.sh" "gh pr view 14642"
+    assert_failure 2
+    assert_output --partial "mcp__gh_tooling__pr_view"
+}
+
 # ============================================================================
 # block_api_commands: true — blocks gh api endpoints with dedicated MCP tools
 # ============================================================================

@@ -10,7 +10,9 @@ plugins/github-mcp/
 ├── CLAUDE.md                           # Points to AGENTS.md
 ├── CHANGELOG.md                        # Version history
 │
-├── .mcp.json                           # MCP server registration (gh-tooling + gh-tooling-write)
+├── .claude-plugin/plugin.json          # Claude Code plugin manifest
+├── .codex-plugin/plugin.json           # Codex plugin manifest + inline MCP registrations
+├── .mcp.json                           # Claude Code MCP registrations
 │
 ├── hooks/                              # HOOKS (MCP tool enforcement)
 │   ├── hooks.json                      # Hook configuration (SessionStart + PreToolUse x3)
@@ -57,10 +59,11 @@ plugins/github-mcp/
 ## Component Overview
 
 This plugin provides:
-- **Two MCP Servers** via `.mcp.json`:
+- **Two MCP Servers** via `.mcp.json` in Claude Code and inline `mcpServers` in
+  `.codex-plugin/plugin.json` in Codex:
   - `gh-tooling` (read) - 30 read-only GitHub tools (PRs, issues, CI, commits, search, repo, releases, labels, projects, read-only API)
   - `gh-tooling-write` (write) - 23 write tools (PR lifecycle, reviews, issues, labels, assignees, sub-issues, projects, full API). Gated by `enable_write_server` config flag.
-- **SessionStart Hook** via `hooks/hooks.json`:
+- **SessionStart Hook** via the shared `hooks/hooks.json`:
   - Assembles MCP tool directives dynamically from template with conditional write and label sections
   - Prompt template maintained in `hooks/prompts/mcp-tool-directives.md`
   - Outputs JSON `additionalContext` format
@@ -76,19 +79,21 @@ This plugin provides:
 The gh-tooling servers have their own config loading logic independent of any shared config framework:
 - Config is **optional** (works without any config file if `gh` is authenticated)
 - Provides a default repo so `repo` doesn't need to be passed to every tool call
-- Config discovery checks standard locations (project root, LLM tool directories, `.claude/`)
+- Config discovery checks standard locations, including the project root, `.claude/`, and `.codex/`
+- When both host-specific files exist, the active host's file has the highest priority and the
+  other host's file remains a fallback
 - Write server checks `enable_write_server` flag and returns empty tools list when disabled
 
 ### Protocol Flow
 
 ```
-Claude Code → stdin → server-read.sh → mcpserver_core.sh → tool_* function
+Claude Code / Codex → stdin → server-read.sh → mcpserver_core.sh → tool_* function
                                                                 ↓
-Claude Code ← stdout ← JSON-RPC response ← formatted output
+Claude Code / Codex ← stdout ← JSON-RPC response ← formatted output
 
-Claude Code → stdin → server-write.sh → mcpserver_core.sh → tool_* function
+Claude Code / Codex → stdin → server-write.sh → mcpserver_core.sh → tool_* function
                                                                 ↓
-Claude Code ← stdout ← JSON-RPC response ← formatted output
+Claude Code / Codex ← stdout ← JSON-RPC response ← formatted output
 ```
 
 ### Tool Dispatch Convention
@@ -114,6 +119,8 @@ Captures `__raw` and `__exit` separately; branches on `suppress_errors` for `2>/
 | Add blocked gh command | `hooks/scripts/check-gh-tools.sh` | - | `block_tool()`, grep pattern |
 | Add blocked API endpoint | `hooks/scripts/check-api-tools.sh` | - | Endpoint pattern matching |
 | Modify shared hook logic | `hooks/scripts/lib/common.sh` | - | `parse_hook_input()`, `load_mcp_config()`, `block_tool()` |
+| Modify Claude Code registration | `.mcp.json` | `.claude-plugin/plugin.json` | `${CLAUDE_PLUGIN_ROOT}` |
+| Modify Codex registration | `.codex-plugin/plugin.json` | `codex_launcher.bats` | Inline `mcpServers`, inherited project cwd |
 | Disable hook enforcement | `.mcp-gh-tooling.json` | - | `enforce_mcp_tools: false` |
 | Enable write server | `.mcp-gh-tooling.json` | - | `enable_write_server: true` |
 | Configure label semantics | `.mcp-gh-tooling.json` | - | `labels: {...}` map |
@@ -146,20 +153,27 @@ Captures `__raw` and `__exit` separately; branches on `suppress_errors` for `2>/
 - Config is optional (no config = works with no default repo)
 - Uses bash arrays instead of string eval for injection safety
 - Read/write separation: read server always active, write server gated by config flag
+- Claude Code and Codex launch the same server scripts; do not fork the MCP implementation by host
+- The Codex launcher locates the installed plugin but leaves `cwd` unset so the server inherits the
+  active project directory used for GitHub repository inference and project config discovery
 - Hook has three enforcement layers: `enforce_mcp_tools` (default `true`) blocks high-level subcommands; `block_api_commands` (default `false`, opt-in) blocks `gh api` bash calls; `block_api_tool_read`/`block_api_tool_write` (default `false`, opt-in) blocks MCP API tool bypass
 
 ## Integration with Other Plugins
 
-MCP tool names follow patterns:
-- Read tools: `mcp__gh-tooling__<tool_name>`
-- Write tools: `mcp__gh-tooling-write__<tool_name>`
+The raw server IDs stay `gh-tooling` and `gh-tooling-write`, but model-visible tool names depend on
+the host:
+
+| Host | Read tools | Write tools |
+|------|------------|-------------|
+| Claude Code | `mcp__plugin_github-mcp_gh-tooling__<tool_name>` | `mcp__plugin_github-mcp_gh-tooling-write__<tool_name>` |
+| Codex | `mcp__gh_tooling__<tool_name>` | `mcp__gh_tooling_write__<tool_name>` |
 
 ```yaml
-# Read tools
-tools: mcp__gh-tooling__pr_view, mcp__gh-tooling__run_logs, mcp__gh-tooling__search
+# Codex read tools
+tools: mcp__gh_tooling__pr_view, mcp__gh_tooling__run_logs, mcp__gh_tooling__search
 
-# Write tools
-tools: mcp__gh-tooling-write__pr_create, mcp__gh-tooling-write__pr_comment, mcp__gh-tooling-write__label_add
+# Codex write tools
+tools: mcp__gh_tooling_write__pr_create, mcp__gh_tooling_write__pr_comment, mcp__gh_tooling_write__label_add
 ```
 
 ## Testing
@@ -169,6 +183,10 @@ BATS tests for hook scripts and MCP tool functions are in `plugin-tests/github-m
 | Test File | Coverage |
 |-----------|----------|
 | `gh_tools.bats` | GitHub CLI tool blocking (gh pr, gh issue, gh run, gh search, gh label, gh project, gh api) |
+| `check_api_tools.bats` | Dedicated API-tool enforcement for Claude Code and Codex tool namespaces |
+| `session_start.bats` | Shared SessionStart context and host-specific config discovery |
+| `codex_launcher.bats` | Codex cache lookup while preserving the active project cwd |
+| `write_server_gating.bats` | Write-server gating and active-host config priority |
 | `mcp_tool_gh.bats` | MCP tool shared parameters (_gh_validate_jq_filter, _gh_post_process, suppress_errors, fallback) |
 | `extra_log_file.bats` | Extra log file configuration and dual-write log() |
 

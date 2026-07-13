@@ -5,7 +5,9 @@ bats_require_minimum_version 1.11.0
 load 'test_helper/common_setup'
 
 run_session_start() {
-    run bash -c 'echo "{}" | bash "$1"' _ "$SESSION_SCRIPT"
+    local payload
+    payload=$(jq -cn --arg cwd "${HOOK_CWD:-${CLAUDE_PROJECT_DIR:-}}" '{cwd: $cwd}')
+    run bash -c 'printf "%s" "$1" | bash "$2"' _ "$payload" "$SESSION_SCRIPT"
 }
 
 # ============================================================================
@@ -48,4 +50,11 @@ run_session_start() {
     run_session_start
     assert_success
     echo "$output" | jq -e '.hookSpecificOutput.additionalContext | length > 0'
+}
+
+@test "Codex cwd loads .codex config and disables SessionStart output" {
+    setup_codex_config "gh-tooling" '{"enforce_mcp_tools": false}'
+    run_session_start
+    assert_success
+    assert_output ""
 }

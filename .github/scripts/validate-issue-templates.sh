@@ -64,13 +64,15 @@ validate_dropdown() {
 
   # Sort expected options
   local sorted_expected=()
-  while IFS= read -r line; do
-    sorted_expected+=("$line")
-  done < <(printf '%s\n' "${expected_options[@]}" | sort)
+  if [ ${#expected_options[@]} -gt 0 ]; then
+    while IFS= read -r line; do
+      sorted_expected+=("$line")
+    done < <(printf '%s\n' "${expected_options[@]}" | sort)
+  fi
 
   # Compare arrays
-  local current_str="${current_options[*]}"
-  local expected_str="${sorted_expected[*]}"
+  local current_str="${current_options[*]-}"
+  local expected_str="${sorted_expected[*]-}"
 
   if [ "$current_str" = "$expected_str" ]; then
     log_success "$(basename "$file"):$dropdown_id is up-to-date"
@@ -147,7 +149,7 @@ validate_command_issue_template() {
     commands+=("$line")
   done < <(discover_commands)
 
-  validate_dropdown "$template" "command" "${commands[@]}"
+  validate_dropdown "$template" "command" ${commands[@]+"${commands[@]}"}
   return $?
 }
 
@@ -160,7 +162,7 @@ validate_skill_issue_template() {
     skills+=("$line")
   done < <(discover_skills)
 
-  validate_dropdown "$template" "skill" "${skills[@]}"
+  validate_dropdown "$template" "skill" ${skills[@]+"${skills[@]}"}
   return $?
 }
 
@@ -173,7 +175,7 @@ validate_agent_issue_template() {
     agents+=("$line")
   done < <(discover_agents)
 
-  validate_dropdown "$template" "agent" "${agents[@]}"
+  validate_dropdown "$template" "agent" ${agents[@]+"${agents[@]}"}
   return $?
 }
 
@@ -186,7 +188,7 @@ validate_other_component_template() {
     plugins+=("$line")
   done < <(discover_plugins)
 
-  validate_dropdown "$template" "plugin" "${plugins[@]}"
+  validate_dropdown "$template" "plugin" ${plugins[@]+"${plugins[@]}"}
   return $?
 }
 
@@ -199,7 +201,7 @@ validate_hook_issue_template() {
     plugins+=("$line")
   done < <(discover_plugins_with_hooks)
 
-  validate_dropdown "$template" "plugin" "${plugins[@]}"
+  validate_dropdown "$template" "plugin" ${plugins[@]+"${plugins[@]}"}
   return $?
 }
 
@@ -215,7 +217,7 @@ validate_mcp_issue_template() {
     plugins+=("$line")
   done < <(discover_plugins_with_mcp)
 
-  validate_dropdown "$template" "plugin" "${plugins[@]}" || ((failed++))
+  validate_dropdown "$template" "plugin" ${plugins[@]+"${plugins[@]}"} || ((failed++))
 
   # Validate mcp-server dropdown
   local servers=()
@@ -223,7 +225,7 @@ validate_mcp_issue_template() {
     servers+=("$line")
   done < <(discover_mcp_servers)
 
-  validate_dropdown "$template" "mcp-server" "${servers[@]}" || ((failed++))
+  validate_dropdown "$template" "mcp-server" ${servers[@]+"${servers[@]}"} || ((failed++))
 
   return $failed
 }

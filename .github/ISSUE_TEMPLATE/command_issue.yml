@@ -166,7 +166,7 @@ body:
     attributes:
       label: "Plugin Version"
       description: "Run `/plugin list` and paste the version shown for this plugin"
-      placeholder: "e.g., github-mcp@3.4.0"
+      placeholder: "e.g., github-mcp@3.5.0"
     validations:
       required: true
 

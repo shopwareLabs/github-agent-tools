@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.0] - 2026-07-13
+
+### Added
+- Codex plugin support through `.agents/plugins/marketplace.json` and `.codex-plugin/plugin.json`. The Codex manifest registers the existing `gh-tooling` and `gh-tooling-write` servers inline and launches the shared server scripts without replacing the active project working directory.
+- Codex coverage for MCP launching, hook tool namespaces, project `cwd` handling, and `.codex/` configuration discovery.
+
+### Changed
+- The shared hooks now recognize both Claude Code and Codex input/tool-name formats. Block messages recommend the namespace used by the active host.
+- `.codex/.mcp-gh-tooling.json` is now a supported host-specific override. When `.claude/` and `.codex/` configs both exist, the active host's config has the highest priority.
+- `enforce_mcp_tools: false` now disables dedicated API-tool enforcement as documented, in addition to disabling Bash-command enforcement.
+
 ## [3.4.0] - 2026-06-25
 
 ### Added

@@ -37,7 +37,8 @@ _load_gh_config() {
         return 0
     fi
 
-    # Check standard config locations (last found wins)
+    # Check standard config locations (last found wins). If both supported-host
+    # overrides exist, prefer the active host's directory.
     local -a locations=(
         "${project_root}/${config_name}"
         "${project_root}/.aiassistant/${config_name}"
@@ -47,8 +48,19 @@ _load_gh_config() {
         "${project_root}/.kiro/${config_name}"
         "${project_root}/.windsurf/${config_name}"
         "${project_root}/.zed/${config_name}"
-        "${project_root}/.claude/${config_name}"
     )
+
+    if [[ "${GITHUB_MCP_HOST:-claude}" == "codex" ]]; then
+        locations+=(
+            "${project_root}/.claude/${config_name}"
+            "${project_root}/.codex/${config_name}"
+        )
+    else
+        locations+=(
+            "${project_root}/.codex/${config_name}"
+            "${project_root}/.claude/${config_name}"
+        )
+    fi
 
     for loc in "${locations[@]}"; do
         if [[ -f "${loc}" ]]; then

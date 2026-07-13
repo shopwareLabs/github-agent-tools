@@ -45,8 +45,19 @@ _load_gh_config() {
         "${project_root}/.kiro/${config_name}"
         "${project_root}/.windsurf/${config_name}"
         "${project_root}/.zed/${config_name}"
-        "${project_root}/.claude/${config_name}"
     )
+
+    if [[ "${GITHUB_MCP_HOST:-claude}" == "codex" ]]; then
+        locations+=(
+            "${project_root}/.claude/${config_name}"
+            "${project_root}/.codex/${config_name}"
+        )
+    else
+        locations+=(
+            "${project_root}/.codex/${config_name}"
+            "${project_root}/.claude/${config_name}"
+        )
+    fi
 
     for loc in "${locations[@]}"; do
         if [[ -f "${loc}" ]]; then

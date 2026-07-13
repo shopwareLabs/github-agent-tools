@@ -8,27 +8,29 @@ from [shopwareLabs/ai-coding-tools](https://github.com/shopwareLabs/ai-coding-to
 
 > **Plugin name vs. server names.** The installable plugin is `github-mcp`, but its two MCP
 > servers keep their original IDs `gh-tooling` (read) and `gh-tooling-write` (write). So you
-> install `github-mcp@github-agent-tools`, while `/mcp`, the tool names
-> (`mcp__plugin_github-mcp_gh-tooling__…`), and the `.mcp-gh-tooling.json` config file all use
-> `gh-tooling`. The plugin *name* segment of every tool identifier is `github-mcp`; the server
-> segment is `gh-tooling`.
+> install `github-mcp@github-agent-tools`, while `/mcp` and `.mcp-gh-tooling.json` use the raw
+> server IDs. Claude Code exposes names such as `mcp__plugin_github-mcp_gh-tooling__…`; Codex
+> exposes the same tools as `mcp__gh_tooling__…` after sanitizing the server ID.
 
 ## Dual-target: Claude Code and Codex
 
 The plugin's core is assistant-neutral: `plugins/github-mcp/mcp-server-gh/server-{read,write}.sh`
-are plain stdio [MCP](https://modelcontextprotocol.io/) servers that any MCP-capable client can
-spawn. This file (`AGENTS.md`) is the shared instructions file both Claude Code and Codex read.
+are plain stdio [MCP](https://modelcontextprotocol.io/) servers that both hosts spawn. Claude Code
+uses `.claude-plugin/marketplace.json`, `.claude-plugin/plugin.json`, and `.mcp.json`; Codex uses
+`.agents/plugins/marketplace.json` and `.codex-plugin/plugin.json`. The hook definition and scripts
+are shared. Keep the MCP server scripts and hook behavior as the single core across both hosts.
 
-What is currently Claude-Code-specific: the plugin/marketplace packaging (`.claude-plugin/`)
-and the enforcement hooks (`hooks/`). Codex support is a planned goal. Keep the MCP server
-scripts as the single shared core across both assistants; do not fork them per assistant.
+The separate `plugin-setup` plugin remains Claude Code-only because its skill uses Claude Code
+interaction and permission-setting features. Do not list it in the Codex marketplace unless that
+runtime is ported and tested independently.
 
 ## Runtime files vs developer documentation
 
 **Runtime files are executable code, not documentation.** Editing them changes plugin behavior
 directly — treat them as you would any source file. For `github-mcp` these are:
 
-- `.mcp.json` — MCP server registration
+- `.mcp.json` — Claude Code MCP server registration
+- `.codex-plugin/plugin.json` — Codex manifest and MCP server registration
 - `mcp-server-gh/` — the read/write servers, tool definitions (`tools-*.json`), and `lib/*.sh`
 - `shared/mcpserver_core.sh` — JSON-RPC protocol handler
 - `hooks/` — `hooks.json` plus the SessionStart/PreToolUse scripts
@@ -39,47 +41,52 @@ is a runtime file. If `github-mcp` gains its own `skills/*/SKILL.md`, `commands/
 `agents/*.md` later, those are runtime files too.
 
 **Developer documentation is not runtime.** `README.md`, `AGENTS.md`, `CLAUDE.md`, and
-`CHANGELOG.md` (both at the repo root and inside each plugin) are read by maintainers; Claude Code
-does not load or execute them when the plugin is installed. When changing runtime behavior, edit
-runtime files; when updating guides or architecture notes, edit the docs.
+`CHANGELOG.md` (both at the repo root and inside each plugin) are read by maintainers; neither host
+loads them as installed plugin runtime. When changing runtime behavior, edit runtime files; when
+updating guides or architecture notes, edit the docs.
 
 ## Repository Architecture
 
-Multi-plugin marketplace using the distributed-metadata pattern: the registry
-(`.claude-plugin/marketplace.json`) is minimal and points at each plugin, whose full metadata
-lives in its own `plugin.json`.
+The repository exposes host-specific marketplace registries. Claude Code lists both plugins;
+Codex lists only the compatible `github-mcp` plugin. Each entry points at the shared plugin root,
+where that host's `plugin.json` provides the full metadata and runtime wiring.
 
 ```
-.claude-plugin/marketplace.json          # registry: name "github-agent-tools" → the plugins
+.agents/plugins/marketplace.json         # Codex registry → github-mcp
+.claude-plugin/marketplace.json          # Claude Code registry → github-mcp + plugin-setup
 plugins/
   github-mcp/                            # THE PLUGIN: GitHub CLI MCP servers + enforcement hooks
-    .claude-plugin/plugin.json           # full plugin metadata (name "github-mcp", version, …)
+    .claude-plugin/plugin.json           # Claude Code metadata
+    .codex-plugin/plugin.json            # Codex metadata + MCP registrations
     .mcp.json · hooks/ · mcp-server-gh/ · shared/ · docs
-  plugin-setup/                          # optional: one interactive setup skill (github-mcp-setting-up)
+  plugin-setup/                          # optional Claude Code-only setup skill
     .claude-plugin/plugin.json · skills/
 plugin-tests/                            # BATS suites (mirror the plugin structure)
 .github/ISSUE_TEMPLATE/                  # GitHub issue forms; dropdowns generated from the plugins
 ```
 
-**marketplace.json** — required: `name` (kebab-case), `owner` (at least `name`), `plugins`
-(array of `{name, source}` where `source` starts with `./`). Optional: `metadata.description`,
-`metadata.version`, `metadata.pluginRoot`.
+**Claude Code marketplace** — `.claude-plugin/marketplace.json`; local sources use
+`{"name": "<name>", "source": "./plugins/<name>"}`.
 
-**plugin.json** — required: `name` (kebab-case), `version` (semver). Optional: `description`,
-`author`, `license` (SPDX id), `keywords`, `homepage`, `repository`.
+**Codex marketplace** — `.agents/plugins/marketplace.json`; local sources use
+`{"source": {"source": "local", "path": "./plugins/<name>"}}`. Paths are relative to the
+marketplace root, which is the repository root.
+
+**Plugin manifests** — each supported host has its own `plugin.json`. Keep their shared metadata
+and release version aligned, while allowing host-specific component registration.
 
 ## Plugin Components
 
 `github-mcp` uses two component types:
 
-- **MCP Servers** (`.mcp.json` + `mcp-server-gh/`) — a read server (always active) and a write
-  server (gated by `enable_write_server`).
+- **MCP Servers** (`.mcp.json`, `.codex-plugin/plugin.json`, and `mcp-server-gh/`) — a read server
+  (always active) and a write server (gated by `enable_write_server`).
 - **Hooks** (`hooks/hooks.json` + scripts) — a SessionStart directive plus PreToolUse enforcement
   that redirects `gh` bash calls to the MCP tools.
 
-`plugin-setup` is skill-only: it bundles the `github-mcp-setting-up` skill, whose reference file
-is a byte-identical copy of `plugins/github-mcp/SETUP.md`. It has no MCP servers or hooks and is
-meant to be installed for setup and uninstalled afterward.
+`plugin-setup` is a Claude Code-only skill plugin: it bundles the `github-mcp-setting-up` skill,
+whose reference file is a byte-identical copy of `plugins/github-mcp/SETUP.md`. It has no MCP
+servers or hooks and is meant to be installed for setup and uninstalled afterward.
 
 For adding or modifying tools, the authoritative guide is the plugin's own navigation doc:
 `plugins/github-mcp/AGENTS.md` (tool dispatch convention, where each `tool_*()` lives, how to
@@ -107,10 +114,11 @@ convention. Update `plugins/github-mcp/README.md` and `REFERENCE.md` when tool b
 
 ### Version bumps
 
-Edit the version in `plugins/github-mcp/.claude-plugin/plugin.json` and add a matching
+Edit the version in both `plugins/github-mcp/.claude-plugin/plugin.json` and
+`plugins/github-mcp/.codex-plugin/plugin.json`, then add a matching
 `plugins/github-mcp/CHANGELOG.md` entry. `plugin-setup` is versioned independently in its own
-`plugin.json` and `CHANGELOG.md`; keep the `version` in each of its skills' SKILL.md frontmatter
-equal to that `plugin.json` version.
+Claude Code manifest and `CHANGELOG.md`; keep the `version` in each of its skills' SKILL.md
+frontmatter equal to that manifest version.
 
 ### Issue templates
 
@@ -127,9 +135,10 @@ fails the build if any dropdown is out of date.
 
 ### Adding another plugin
 
-Create `plugins/<name>/.claude-plugin/plugin.json` and its component files, then register it with
-a `{ "name": "<name>", "source": "./plugins/<name>" }` entry in `marketplace.json`. Run
-`claude plugin validate .` and `.github/scripts/update-issue-templates.sh`.
+Choose the supported hosts first. Add the corresponding `.claude-plugin/plugin.json` and/or
+`.codex-plugin/plugin.json`, then register the plugin only in each compatible host marketplace.
+Keep shared runtime files host-neutral and keep host-specific launch wiring in the manifests. Run
+the relevant host validation and `.github/scripts/update-issue-templates.sh`.
 
 ## Testing & Validation
 
@@ -138,6 +147,9 @@ a `{ "name": "<name>", "source": "./plugins/<name>" }` entry in `marketplace.jso
 ```bash
 claude plugin validate .                 # validate marketplace + plugin structure
 /plugin marketplace add /path/to/github-agent-tools   # install locally to smoke-test
+codex plugin marketplace add /path/to/github-agent-tools
+codex plugin list --available --json     # inspect the resolved Codex marketplace
+codex plugin add github-mcp@github-agent-tools
 ```
 
 ### BATS
@@ -155,7 +167,8 @@ BATS over `plugin-tests/`; a separate `validate.yml` checks the issue-template d
 ### Pre-release checklist
 
 - [ ] `claude plugin validate .` passes
-- [ ] Plugin version bumped in `plugins/github-mcp/.claude-plugin/plugin.json` with a CHANGELOG entry
+- [ ] Codex marketplace add, list, and plugin install smoke test passes
+- [ ] Plugin version bumped in both host manifests with a CHANGELOG entry
 - [ ] BATS green (`.bats/bats-core/bin/bats -r plugin-tests/`)
 - [ ] ShellCheck clean
 - [ ] Issue-template dropdowns up to date (`.github/scripts/validate-issue-templates.sh`)
@@ -163,9 +176,11 @@ BATS over `plugin-tests/`; a separate `validate.yml` checks the issue-template d
 
 ## Distribution
 
-The repository must be public with `.claude-plugin/marketplace.json` at its root for GitHub
-distribution. Install: `/plugin marketplace add shopwareLabs/github-agent-tools` then
-`/plugin install github-mcp@github-agent-tools`.
+The repository must be public with both marketplace files at their documented paths for GitHub
+distribution. Claude Code installs with `/plugin marketplace add shopwareLabs/github-agent-tools`
+then `/plugin install github-mcp@github-agent-tools`. Codex installs with
+`codex plugin marketplace add shopwareLabs/github-agent-tools` then
+`codex plugin add github-mcp@github-agent-tools`.
 
 ## Using Anthropic dev plugins
 

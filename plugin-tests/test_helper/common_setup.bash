@@ -16,7 +16,8 @@ REPO_ROOT="$(_get_repo_root)"
 load "${REPO_ROOT}/.bats/bats-support/load"
 load "${REPO_ROOT}/.bats/bats-assert/load"
 
-# Run a hook script with a command and capture output
+# Run a hook script with a command and capture output. HOOK_CWD allows tests to
+# exercise Codex payloads without CLAUDE_PROJECT_DIR.
 # Note: SCRIPTS_DIR must be set by the plugin-specific helper
 run_hook() {
     local script="$1"
@@ -27,7 +28,10 @@ run_hook() {
     fi
 
     local payload
-    payload=$(jq -cn --arg cmd "$command" '{tool_input: {command: $cmd}}')
+    payload=$(jq -cn \
+        --arg cmd "$command" \
+        --arg cwd "${HOOK_CWD:-${CLAUDE_PROJECT_DIR:-}}" \
+        '{cwd: $cwd, tool_input: {command: $cmd}}')
 
     run bash -c 'printf "%s" "$1" | bash "$2"' _ "$payload" "${SCRIPTS_DIR}/${script}"
 }
@@ -51,7 +55,21 @@ setup_config() {
     printf '%s\n' "$content" > "${BATS_TEST_TMPDIR}/.mcp-${prefix}.json"
 }
 
+# Write a temporary config under the Codex project directory and make hook
+# helpers pass that project as cwd.
+setup_codex_config() {
+    local prefix="$1"
+    local content="$2"
+    export CODEX_PROJECT_DIR="${BATS_TEST_TMPDIR}/codex-project"
+    export HOOK_CWD="${CODEX_PROJECT_DIR}"
+    unset CLAUDE_PROJECT_DIR
+    mkdir -p "${CODEX_PROJECT_DIR}/.codex"
+    printf '%s\n' "$content" > "${CODEX_PROJECT_DIR}/.codex/.mcp-${prefix}.json"
+}
+
 # Default teardown for suites using setup_config; test files may override.
 teardown() {
     unset CLAUDE_PROJECT_DIR
+    unset CODEX_PROJECT_DIR
+    unset HOOK_CWD
 }

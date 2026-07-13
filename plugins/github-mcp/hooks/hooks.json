@@ -24,7 +24,7 @@
         ]
       },
       {
-        "matcher": "mcp__plugin_github-mcp_gh-tooling__api_read",
+        "matcher": "^(mcp__plugin_github-mcp_gh-tooling__api_read|mcp__gh_tooling__api_read)$",
         "hooks": [
           {
             "type": "command",
@@ -34,7 +34,7 @@
         ]
       },
       {
-        "matcher": "mcp__plugin_github-mcp_gh-tooling-write__api",
+        "matcher": "^(mcp__plugin_github-mcp_gh-tooling-write__api|mcp__gh_tooling_write__api)$",
         "hooks": [
           {
             "type": "command",

@@ -11,7 +11,7 @@ body:
         **Before submitting:**
         - Search existing issues to avoid duplicates
         - Make sure you're using the latest plugin version
-        - Confirm you restarted Claude Code after installing the MCP plugin
+        - Confirm you restarted Claude Code or started a new Codex task after installing the plugin
         - Check that dependencies (`gh`, `jq`) are installed and `gh` is authenticated
 
   - type: checkboxes
@@ -23,7 +23,7 @@ body:
           required: true
         - label: "I am using the latest plugin version"
           required: true
-        - label: "I restarted Claude Code after installing/updating the plugin"
+        - label: "I restarted Claude Code or started a new Codex task after installing/updating the plugin"
           required: true
         - label: "I have verified `gh` is installed and authenticated (`gh auth status`) and `jq` is installed"
           required: true
@@ -36,6 +36,17 @@ body:
       options:
         - github-mcp
         - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: host
+    attributes:
+      label: "Which host?"
+      description: "Select the coding agent where the issue occurred"
+      options:
+        - Claude Code
+        - Codex
     validations:
       required: true
 
@@ -97,7 +108,7 @@ body:
       description: "What type of problem is this?"
       options:
         - Server not starting/loading
-        - Tool not available in Claude Code
+        - Tool not available in the active host
         - Tool execution failed
         - Tool returned incorrect results
         - Configuration not recognized
@@ -171,10 +182,10 @@ body:
       label: "Steps to Reproduce"
       description: "Provide step-by-step instructions to reproduce the issue"
       placeholder: |
-        1. Install plugin with `/plugin install github-mcp@github-agent-tools`
+        1. Install the plugin in Claude Code or Codex
         2. (Optional) Create `.mcp-gh-tooling.json` with a default `repo`
-        3. Restart Claude Code
-        4. Ask Claude to view a PR / list issues / fetch CI logs
+        3. Restart Claude Code or start a new Codex task
+        4. Ask the coding agent to view a PR / list issues / fetch CI logs
         5. Observe [incorrect behavior]
     validations:
       required: true
@@ -198,8 +209,7 @@ body:
       label: "Server Logs/Debug Output"
       description: "Paste any MCP server logs or debug output"
       placeholder: |
-        Check MCP logs in Claude Code:
-        - Developer Tools (if available)
+        Check `/mcp` and the active host's diagnostics:
         - stderr output from server
         - Any error messages
       render: shell
@@ -212,6 +222,7 @@ body:
       placeholder: |
         - .mcp-gh-tooling.json (project root)
         - .claude/.mcp-gh-tooling.json
+        - .codex/.mcp-gh-tooling.json
         - MCP_GH_TOOLING_CONFIG env var
         - etc.
 
@@ -259,16 +270,16 @@ body:
     id: plugin-version
     attributes:
       label: "Plugin Version"
-      description: "Run `/plugin list` and paste the version shown for this plugin"
-      placeholder: "e.g., github-mcp@3.4.0"
+      description: "Run `/plugin list` in Claude Code or `codex plugin list` in Codex and paste the version shown"
+      placeholder: "e.g., github-mcp@3.5.0"
     validations:
       required: true
 
   - type: input
-    id: claude-version
+    id: host-version
     attributes:
-      label: "Claude Code Version"
-      description: "Run `claude --version` and paste the output"
+      label: "Host Version"
+      description: "Run `claude --version` or `codex --version` and paste the output"
       placeholder: "e.g., 0.1.23"
     validations:
       required: true

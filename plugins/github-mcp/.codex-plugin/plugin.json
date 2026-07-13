@@ -1,0 +1,71 @@
+{
+  "name": "github-mcp",
+  "version": "3.5.0",
+  "description": "GitHub CLI MCP servers for pull requests, issues, CI, repositories, and other GitHub workflows, with shared lifecycle hooks that steer agents to the MCP tools.",
+  "author": {
+    "name": "Shopware Labs"
+  },
+  "license": "MIT",
+  "keywords": [
+    "github",
+    "gh",
+    "mcp",
+    "hooks",
+    "github-actions",
+    "pull-requests",
+    "issues"
+  ],
+  "homepage": "https://github.com/shopwareLabs/github-agent-tools/tree/main/plugins/github-mcp",
+  "repository": "https://github.com/shopwareLabs/github-agent-tools",
+  "mcpServers": {
+    "gh-tooling": {
+      "command": "bash",
+      "args": [
+        "-c",
+        "plugin_base=\"${CODEX_HOME:-$HOME/.codex}/plugins/cache/github-agent-tools/github-mcp\"; plugin_root=; for candidate in \"$plugin_base\"/*; do [[ -x \"$candidate/mcp-server-gh/server-$1.sh\" ]] || continue; if [[ -z \"$plugin_root\" || \"$candidate\" -nt \"$plugin_root\" ]]; then plugin_root=\"$candidate\"; fi; done; if [[ -z \"$plugin_root\" ]]; then printf 'github-mcp: installed plugin runtime not found under %s\\n' \"$plugin_base\" >&2; exit 1; fi; exec \"$plugin_root/mcp-server-gh/server-$1.sh\"",
+        "github-mcp-launcher",
+        "read"
+      ],
+      "env": {
+        "GITHUB_MCP_HOST": "codex"
+      },
+      "env_vars": [
+        "CODEX_HOME"
+      ]
+    },
+    "gh-tooling-write": {
+      "command": "bash",
+      "args": [
+        "-c",
+        "plugin_base=\"${CODEX_HOME:-$HOME/.codex}/plugins/cache/github-agent-tools/github-mcp\"; plugin_root=; for candidate in \"$plugin_base\"/*; do [[ -x \"$candidate/mcp-server-gh/server-$1.sh\" ]] || continue; if [[ -z \"$plugin_root\" || \"$candidate\" -nt \"$plugin_root\" ]]; then plugin_root=\"$candidate\"; fi; done; if [[ -z \"$plugin_root\" ]]; then printf 'github-mcp: installed plugin runtime not found under %s\\n' \"$plugin_base\" >&2; exit 1; fi; exec \"$plugin_root/mcp-server-gh/server-$1.sh\"",
+        "github-mcp-launcher",
+        "write"
+      ],
+      "env": {
+        "GITHUB_MCP_HOST": "codex"
+      },
+      "env_vars": [
+        "CODEX_HOME"
+      ]
+    }
+  },
+  "interface": {
+    "displayName": "GitHub MCP",
+    "shortDescription": "Use GitHub CLI workflows through MCP tools.",
+    "longDescription": "Adds read and opt-in write MCP servers backed by the authenticated GitHub CLI, plus hooks that steer GitHub operations away from raw shell commands.",
+    "developerName": "Shopware Labs",
+    "category": "Development",
+    "capabilities": [
+      "MCP",
+      "GitHub",
+      "Read",
+      "Write",
+      "Hooks"
+    ],
+    "websiteURL": "https://github.com/shopwareLabs/github-agent-tools",
+    "defaultPrompt": [
+      "Use GitHub MCP to inspect the pull request for this branch.",
+      "Use GitHub MCP to diagnose the latest failing CI run."
+    ]
+  }
+}

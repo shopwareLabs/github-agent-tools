@@ -1,5 +1,5 @@
 #!/bin/bash
-# Claude Code Hook: Dev Tooling MCP Enforcer (GitHub CLI)
+# Dev Tooling MCP Enforcer (GitHub CLI, Claude Code and Codex)
 # =========================================================
 # Blocks common gh CLI bash commands in favor of gh-tooling MCP tools.
 # Controlled by two fields in .mcp-gh-tooling.json:
@@ -9,7 +9,7 @@
 #
 # Exit codes:
 #   0 - Command allowed
-#   2 - Command blocked (message shown to Claude)
+#   2 - Command blocked (message shown to the agent)
 
 set -euo pipefail
 

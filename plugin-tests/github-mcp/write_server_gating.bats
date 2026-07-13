@@ -34,6 +34,14 @@ run_server_request() {
     run bash -c 'echo "$1" | bash "$2" 2>/dev/null | tail -1' _ "${requests}" "${SERVER_SCRIPT}"
 }
 
+run_codex_server_request() {
+    local project_root="$1"
+    local requests="$2"
+
+    printf '%s' "$requests" | env PROJECT_ROOT="$project_root" GITHUB_MCP_HOST=codex \
+        bash "$SERVER_SCRIPT" 2>/dev/null | tail -1
+}
+
 @test "write server returns empty tools list when enable_write_server is false" {
     run_server_request '{"enable_write_server": false}' "tools/list"
     assert_success
@@ -71,4 +79,22 @@ run_server_request() {
     local tool_count
     tool_count=$(echo "$output" | jq '.result.tools | length')
     [[ "$tool_count" -eq 0 ]]
+}
+
+@test "Codex server prefers .codex config over .claude config" {
+    local project_root="${BATS_TEST_TMPDIR}/codex-priority"
+    mkdir -p "${project_root}/.claude" "${project_root}/.codex"
+    printf '%s\n' '{"enable_write_server": false}' > "${project_root}/.claude/.mcp-gh-tooling.json"
+    printf '%s\n' '{"enable_write_server": true}' > "${project_root}/.codex/.mcp-gh-tooling.json"
+
+    local requests
+    requests=$(send_jsonrpc "initialize" 1)
+    requests+=$'\n'
+    requests+=$(send_jsonrpc "tools/list" 2)
+    run run_codex_server_request "$project_root" "$requests"
+
+    assert_success
+    local tool_count
+    tool_count=$(echo "$output" | jq '.result.tools | length')
+    [[ "$tool_count" -gt 0 ]]
 }

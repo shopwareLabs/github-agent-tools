@@ -4,28 +4,16 @@
 # from .mcp-gh-tooling.json config, and outputs to stdout as JSON additionalContext.
 set -euo pipefail
 
-cat > /dev/null  # drain stdin
-
 HOOK_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+SCRIPT_DIR="${HOOK_DIR}/scripts"
 PROMPTS_DIR="${HOOK_DIR}/prompts"
 PROMPT_FILE="${PROMPTS_DIR}/mcp-tool-directives.md"
+source "${SCRIPT_DIR}/lib/common.sh"
 
-# Find config file
-config_file=""
-if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]] && command -v jq &>/dev/null; then
-    for location in ".claude/.mcp-gh-tooling.json" ".mcp-gh-tooling.json"; do
-        if [[ -f "${CLAUDE_PROJECT_DIR}/${location}" ]]; then
-            config_file="${CLAUDE_PROJECT_DIR}/${location}"
-            break
-        fi
-    done
-
-    # Check enforcement
-    if [[ -n "$config_file" ]]; then
-        val=$(jq -r 'if .enforce_mcp_tools == false then "false" else "true" end' "$config_file" 2>/dev/null || echo "true")
-        [[ "$val" == "false" ]] && exit 0
-    fi
-fi
+INPUT=$(cat)
+resolve_hook_context "$INPUT"
+load_mcp_config "gh-tooling"
+config_file="$CONFIG_FILE"
 
 [[ ! -f "$PROMPT_FILE" ]] && exit 0
 

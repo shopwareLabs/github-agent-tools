@@ -9,6 +9,10 @@ contact_links:
     url: https://docs.claude.com/en/docs/claude-code
     about: "Official Claude Code documentation and getting started guide"
 
-  - name: 🔧 Plugin Marketplace Guide
+  - name: 🔧 Claude Code Plugin Guide
     url: https://docs.claude.com/en/docs/claude-code/plugins
     about: "Learn how to install and manage Claude Code plugins"
+
+  - name: 🤖 Codex Plugin Guide
+    url: https://learn.chatgpt.com/docs/build-plugins
+    about: "Learn how to install and manage Codex plugins"

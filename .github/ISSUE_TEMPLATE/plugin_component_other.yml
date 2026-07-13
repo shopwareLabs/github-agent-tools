@@ -40,6 +40,17 @@ body:
       required: true
 
   - type: dropdown
+    id: host
+    attributes:
+      label: "Which host?"
+      description: "Select the coding agent where the component issue occurred"
+      options:
+        - Claude Code
+        - Codex
+    validations:
+      required: true
+
+  - type: dropdown
     id: component-type
     attributes:
       label: "Component Type"
@@ -137,8 +148,8 @@ body:
       label: "Steps to Reproduce"
       description: "Provide step-by-step instructions to reproduce the issue"
       placeholder: |
-        1. Run `/plugin install [plugin-name]@github-agent-tools`
-        2. Restart Claude Code (if required)
+        1. Install the plugin in Claude Code or Codex
+        2. Restart Claude Code or start a new Codex task (if required)
         3. Observe [error/unexpected behavior]
         4. Expected [correct behavior]
     validations:
@@ -197,16 +208,16 @@ body:
     id: plugin-version
     attributes:
       label: "Plugin Version"
-      description: "Run `/plugin list` and paste the version shown for this plugin"
-      placeholder: "e.g., github-mcp@3.4.0"
+      description: "Run `/plugin list` in Claude Code or `codex plugin list` in Codex and paste the version shown"
+      placeholder: "e.g., github-mcp@3.5.0"
     validations:
       required: true
 
   - type: input
-    id: claude-version
+    id: host-version
     attributes:
-      label: "Claude Code Version"
-      description: "Run `claude --version` and paste the output"
+      label: "Host Version"
+      description: "Run `claude --version` or `codex --version` and paste the output"
       placeholder: "e.g., 0.1.23"
     validations:
       required: true
