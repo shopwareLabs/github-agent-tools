@@ -1,16 +1,16 @@
 # GitHub Agent Tools
 
-> **Experimental Community Project**: Maintained by Shopware Labs, not an official Shopware product. Not affiliated with, endorsed by, or sponsored by Anthropic, OpenAI, or any other AI provider. "Claude" and "Claude Code" are trademarks of Anthropic. Provided as-is without warranty.
+> **Experimental Community Project**: Maintained by Shopware Labs, not an official Shopware product. Not affiliated with, endorsed by, or sponsored by Anthropic, OpenAI, or any other AI provider. Provider and product names are used only to describe compatibility. Provided as-is without warranty.
 
 GitHub CLI tools for AI coding agents. Wraps the GitHub CLI (`gh`) behind MCP servers — pull requests, issues, CI runs, jobs, commits, search, labels, projects, and repository file browsing — as first-class MCP tools, with hook-based enforcement that keeps the agent on the tools instead of raw `gh` bash calls.
 
-Because it is built on the assistant-neutral [Model Context Protocol](https://modelcontextprotocol.io/), it works with any MCP-capable coding agent. This repository ships `github-mcp` through both a [Claude Code plugin marketplace](https://docs.claude.com/en/docs/claude-code/plugins) and a [Codex plugin marketplace](https://learn.chatgpt.com/docs/build-plugins).
+The MCP servers use the assistant-neutral [Model Context Protocol](https://modelcontextprotocol.io/) and can be integrated with MCP-capable coding agents. This repository provides tested `github-mcp` plugin packaging for both [Claude Code](https://docs.claude.com/en/docs/claude-code/plugins) and [Codex](https://learn.chatgpt.com/docs/build-plugins).
 
-> **Origin**: Extracted from its sibling project [shopwareLabs/ai-coding-tools](https://github.com/shopwareLabs/ai-coding-tools) — a broader AI-coding-tools marketplace — into this standalone repository. The GitHub tooling was split out so it can evolve on its own and be used by any MCP-capable agent.
+> **Origin**: Extracted from its sibling project [shopwareLabs/ai-coding-tools](https://github.com/shopwareLabs/ai-coding-tools) — a broader AI-coding-tools marketplace — into this standalone repository. The GitHub tooling was split out so it can evolve and be installed independently.
 
 ## ⚡ Quick Start
 
-**Requirements:** `gh` CLI authenticated (`gh auth login`), `jq`, and either [Claude Code](https://docs.claude.com/en/docs/claude-code) or [Codex](https://developers.openai.com/codex/cli/).
+**Packaged plugin requirements:** `gh` CLI authenticated (`gh auth login`), `jq`, and either [Claude Code](https://docs.claude.com/en/docs/claude-code) or [Codex](https://developers.openai.com/codex/cli/).
 
 ### Claude Code
 

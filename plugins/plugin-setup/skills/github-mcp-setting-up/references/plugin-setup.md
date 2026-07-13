@@ -1,4 +1,4 @@
-# GH Tooling Setup
+# GH Tooling Setup (Claude Code only)
 
 ## Prerequisites
 

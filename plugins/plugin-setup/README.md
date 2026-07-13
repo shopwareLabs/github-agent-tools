@@ -1,6 +1,6 @@
 # Plugin Setup
 
-Interactive setup skill for the [`github-mcp`](../github-mcp) plugin. Install this plugin alongside `github-mcp` and ask Claude to walk you through configuration. Uninstall it once setup is complete to keep the skill description surface small.
+Claude Code-only interactive setup skill for the [`github-mcp`](../github-mcp) plugin. Install this plugin alongside `github-mcp` and ask Claude to walk you through configuration. Uninstall it once setup is complete to keep the skill description surface small.
 
 ## ⚡ Quick Start
 

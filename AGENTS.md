@@ -40,10 +40,10 @@ The separate `plugin-setup` plugin ships one skill (`github-mcp-setting-up`); it
 is a runtime file. If `github-mcp` gains its own `skills/*/SKILL.md`, `commands/*.md`, or
 `agents/*.md` later, those are runtime files too.
 
-**Developer documentation is not runtime.** `README.md`, `AGENTS.md`, `CLAUDE.md`, and
-`CHANGELOG.md` (both at the repo root and inside each plugin) are read by maintainers; neither host
-loads them as installed plugin runtime. When changing runtime behavior, edit runtime files; when
-updating guides or architecture notes, edit the docs.
+**Developer documentation is not runtime.** Repository and plugin `README.md`, `AGENTS.md`,
+`CLAUDE.md` (where present), and `CHANGELOG.md` files are read by maintainers; neither host loads
+them as installed plugin runtime. When changing runtime behavior, edit runtime files; when updating
+guides or architecture notes, edit the docs.
 
 ## Repository Architecture
 
@@ -101,8 +101,10 @@ when changing the protocol handler.
 ## Commit Messages
 
 Use conventional-commit format. The `commit-message-writer:writing-commit-messages` skill is
-available globally and can generate them. Add a repo-scoped commit overlay under `.claude/` if
-you want project-specific type/scope rules. Do not `git add` or commit until asked.
+available globally and can generate them. If project-specific rules are needed, put the shared
+overlay at `.claude/hook-contexts/writing-commit-messages.md`: Claude Code delivers it through
+project hooks, while Codex requires a root `AGENTS.override.md` reference. Do not `git add` or
+commit until asked.
 
 ## Development Workflow
 
@@ -145,8 +147,11 @@ the relevant host validation and `.github/scripts/update-issue-templates.sh`.
 ### Local
 
 ```bash
+# Claude Code
 claude plugin validate .                 # validate marketplace + plugin structure
 /plugin marketplace add /path/to/github-agent-tools   # install locally to smoke-test
+
+# Codex
 codex plugin marketplace add /path/to/github-agent-tools
 codex plugin list --available --json     # inspect the resolved Codex marketplace
 codex plugin add github-mcp@github-agent-tools

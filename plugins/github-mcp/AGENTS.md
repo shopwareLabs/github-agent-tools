@@ -7,7 +7,6 @@ plugins/github-mcp/
 ├── README.md                           # User documentation (usage, configuration, troubleshooting)
 ├── REFERENCE.md                        # Full tool parameter docs and examples (30 read + 23 write tools)
 ├── AGENTS.md                           # LLM navigation guide (this file)
-├── CLAUDE.md                           # Points to AGENTS.md
 ├── CHANGELOG.md                        # Version history
 │
 ├── .claude-plugin/plugin.json          # Claude Code plugin manifest
