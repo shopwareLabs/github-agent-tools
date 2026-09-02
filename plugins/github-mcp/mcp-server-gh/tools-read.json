@@ -1830,10 +1830,12 @@
         "properties": {
           "org": {
             "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
             "description": "Organization login. Defaults to the owner of the resolved repository."
           },
           "owner": {
             "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
             "description": "Repository owner, used as the organization when 'org' is not set."
           },
           "repo": {
