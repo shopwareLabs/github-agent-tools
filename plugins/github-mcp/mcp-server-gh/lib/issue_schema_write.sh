@@ -100,21 +100,28 @@ _gh_resolve_issue_field_values() {
                      else {field_id: $field.id, value: $matches} end
                    end)
               elif $field.data_type == "date" then
-                  (if ($value | type) == "string" and ($value | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}$"))
+                  (if ($value | type) == "string" and ($value | length) == 10
+                      and ($value | test("^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$"))
                    then {field_id: $field.id, value: $value}
                    else {error: "issue field \($name) takes a date as YYYY-MM-DD, got \($value | tostring)"} end)
               elif $field.data_type == "number" then
                   (if ($value | type) == "number"
                    then {field_id: $field.id, value: $value}
                    else {error: "issue field \($name) takes a number, got \($value | type)"} end)
-              else
+              elif $field.data_type == "text" then
                   (if ($value | type) == "string"
                    then {field_id: $field.id, value: $value}
                    else {error: "issue field \($name) takes a string, got \($value | type)"} end)
+              else
+                  {error: "issue field \($name) has unsupported data type \($field.data_type)"}
               end;
         [$values | to_entries[] | check(.key; .value)] as $entries
         | [$entries[] | select(has("error")) | .error] as $errors
-        | if ($errors | length) > 0 then {errors: $errors} else {values: $entries} end') || {
+        | [$entries[] | select(has("field_id")) | .field_id] as $ids
+        | ([$ids[] | tostring] | group_by(.) | map(select(length > 1)) | length) as $dupes
+        | if ($errors | length) > 0 then {errors: $errors}
+          elif $dupes > 0 then {errors: ["two or more keys in values name the same issue field; pass each field once"]}
+          else {values: $entries} end') || {
         printf '%s\n' "Error: could not read the 'values' object"
         return 1
     }

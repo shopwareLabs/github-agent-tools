@@ -6,7 +6,7 @@ bats_require_minimum_version 1.11.0
 load 'test_helper/common_setup'
 
 TYPES_JSON='[{"id":125714,"name":"Bug"},{"id":25328944,"name":"Improvement"}]'
-FIELDS_JSON='[{"id":8847,"name":"Priority","data_type":"single_select","options":[{"id":12296,"name":"High"},{"id":12298,"name":"Low"}]},{"id":8848,"name":"Start date","data_type":"date"},{"id":8851,"name":"Points","data_type":"number"},{"id":8852,"name":"Owner","data_type":"text"},{"id":8853,"name":"Teams","data_type":"multi_select","options":[{"id":1,"name":"Core"},{"id":2,"name":"Storefront"}]}]'
+FIELDS_JSON='[{"id":8847,"name":"Priority","data_type":"single_select","options":[{"id":12296,"name":"High"},{"id":12298,"name":"Low"}]},{"id":8848,"name":"Start date","data_type":"date"},{"id":8851,"name":"Points","data_type":"number"},{"id":8852,"name":"Owner","data_type":"text"},{"id":8853,"name":"Teams","data_type":"multi_select","options":[{"id":1,"name":"Core"},{"id":2,"name":"Storefront"}]},{"id":8854,"name":"Flag","data_type":"boolean"}]'
 
 setup() {
     log() { :; }
@@ -237,4 +237,27 @@ body() { jq -c "$1" "${GH_BODY_FILE}"; }
     run tool_issue_type_set '{"number": 19952, "type": "Bogus", "fallback": "ok"}'
     assert_failure
     assert_output --partial "Available types"
+}
+
+@test "issue_field_set rejects a date with trailing whitespace or an impossible month" {
+    run tool_issue_field_set '{"number": 19952, "values": {"Start date": "2026-09-30\n"}}'
+    assert_failure
+    assert_output --partial "YYYY-MM-DD"
+
+    run tool_issue_field_set '{"number": 19952, "values": {"Start date": "2026-99-99"}}'
+    assert_failure
+    assert_output --partial "YYYY-MM-DD"
+}
+
+@test "issue_field_set rejects a field whose data type it does not support" {
+    run tool_issue_field_set '{"number": 19952, "values": {"Flag": "yes"}}'
+    assert_failure
+    assert_output --partial "unsupported data type boolean"
+}
+
+@test "issue_field_set rejects two keys that name the same field" {
+    run tool_issue_field_set '{"number": 19952, "values": {"Priority": "High", "priority": "Low"}}'
+    assert_failure
+    assert_output --partial "name the same issue field"
+    [ ! -f "${GH_ARGS_FILE}" ]
 }
