@@ -198,5 +198,5 @@ Run tests:
 
 ## External References
 
-- [Bash MCP SDK](https://github.com/muthuishere/mcp-server-bash-sdk) - SDK this server is based on
+- [Bash MCP SDK](https://github.com/shopwareLabs/bash-mcp-sdk) - source of the vendored `shared/mcpserver_core.sh`; pinned in `.mcp-sdk.lock`
 - [MCP Protocol Specification](https://modelcontextprotocol.io/specification) - JSON-RPC 2.0 protocol details

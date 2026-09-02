@@ -71,11 +71,14 @@ load_validator_for() {
         | select($prop.default != null)
         | select(
             ($prop.enum != null and ($prop.enum | index($prop.default)) == null)
-            or (($prop.type | type) == "string" and (
-                if $prop.type == "integer"
-                then ($prop.default | type) != "number"
-                else ($prop.default | type) != $prop.type
-                end))
+            or ($prop.type != null and (
+                (if ($prop.type | type) == "array" then $prop.type else [$prop.type] end) as $names
+                | all($names[]; type == "string")
+                  and (any($names[];
+                        if . == "integer"
+                        then ($prop.default | type) == "number"
+                        else ($prop.default | type) == .
+                        end) | not)))
           )
         | "\($tool).\($field) default \($prop.default | tojson) violates its own schema"' \
         "$READ_TOOLS" "$WRITE_TOOLS"
