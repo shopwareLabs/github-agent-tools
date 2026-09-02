@@ -93,6 +93,7 @@ _gh_resolve_issue_field_values() {
                    end)
               elif $field.data_type == "multi_select" then
                   (if ($value | type) != "array" then {error: "issue field \($name) takes an array of option names, got \($value | type)"}
+                   elif ([$value[] | type] | any(. != "string")) then {error: "issue field \($name) takes an array of option names as strings"}
                    else ([$value[] | option($field; .)] | if any(. == null) then null else . end) as $matches
                    | if $matches == null
                      then {error: "one or more options not found for issue field \($name). Available options: \([$field.options[].name] | join(", "))"}
@@ -165,6 +166,7 @@ tool_issue_type_set() {
         printf '%s\n' "Error: repo is required for issue_type_set"
         return 1
     fi
+    _gh_validate_repo "${effective_repo}" || return 1
 
     local body
     if [[ "${type_is_null}" == "true" ]]; then
@@ -177,7 +179,6 @@ tool_issue_type_set() {
 
         local canonical
         canonical=$(_gh_resolve_issue_type "${effective_repo%%/*}" "${type}") || {
-            [[ -n "${fallback}" ]] && { printf '%s\n' "${fallback}"; return 0; }
             printf '%s\n' "${canonical}"
             return 1
         }
@@ -204,17 +205,21 @@ tool_issue_type_set() {
 tool_issue_field_set() {
     local args="$1"
 
-    local number has_values values repo suppress_errors fallback
+    local number values_type values repo suppress_errors fallback
     number=$(printf '%s\n' "${args}" | jq -r '.number // empty')
-    has_values=$(printf '%s\n' "${args}" | jq -r 'if has("values") then "true" else "false" end')
-    values=$(printf '%s\n' "${args}" | jq -c '.values // {}')
+    values_type=$(printf '%s\n' "${args}" | jq -r 'if has("values") then (.values | type) else "absent" end')
+    values=$(printf '%s\n' "${args}" | jq -c '.values')
     repo=$(printf '%s\n' "${args}" | jq -r '.repo // empty')
     suppress_errors=$(printf '%s\n' "${args}" | jq -r '.suppress_errors // false')
     fallback=$(printf '%s\n' "${args}" | jq -r '.fallback // empty')
 
     if [[ -z "${number}" ]]; then printf '%s\n' "Error: number is required for issue_field_set"; return 1; fi
-    if [[ "${has_values}" != "true" ]]; then
+    if [[ "${values_type}" == "absent" ]]; then
         printf '%s\n' "Error: values is required for issue_field_set. Pass the complete set of field values, or {} to clear them all."
+        return 1
+    fi
+    if [[ "${values_type}" != "object" ]]; then
+        printf '%s\n' "Error: values must be an object keyed by field name, got ${values_type}. Pass {} to clear every field value."
         return 1
     fi
     _gh_validate_number "${number}" "number" || return 1
@@ -225,16 +230,19 @@ tool_issue_field_set() {
         printf '%s\n' "Error: repo is required for issue_field_set"
         return 1
     fi
+    _gh_validate_repo "${effective_repo}" || return 1
 
     local field_values
     field_values=$(_gh_resolve_issue_field_values "${effective_repo%%/*}" "${values}") || {
-        [[ -n "${fallback}" ]] && { printf '%s\n' "${fallback}"; return 0; }
         printf '%s\n' "${field_values}"
         return 1
     }
 
     local body
-    body=$(jq -nc --argjson entries "${field_values}" '{issue_field_values: $entries}')
+    body=$(jq -nc --argjson entries "${field_values}" '{issue_field_values: $entries}') || {
+        printf '%s\n' "Error: could not build the request body for issue_field_set"
+        return 1
+    }
 
     _gh_issue_schema_write "PUT" "repos/${effective_repo}/issues/${number}/issue-field-values" \
         "${body}" '[.[] | {field: .issue_field_name, value: (.single_select_option.name // .value)}]' \

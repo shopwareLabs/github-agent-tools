@@ -70,6 +70,24 @@ _gh_require_repo_or_git() {
 }
 
 #######################################
+# Reject an organization login that is not one path segment of GitHub's login
+# charset, so it cannot steer the request to a different API path.
+# Arguments:
+#   $1 candidate login, $2 tool name for the error message.
+# Outputs:
+#   An error message on stdout when the login is malformed.
+# Returns:
+#   0 when the login is usable, 1 otherwise.
+#######################################
+_gh_validate_org() {
+    local org="$1" tool="$2"
+    if [[ ! "${org}" =~ ^[A-Za-z0-9][A-Za-z0-9-]*$ ]]; then
+        printf '%s\n' "Error: invalid organization '${org}' for ${tool}. Expected a GitHub organization login."
+        return 1
+    fi
+}
+
+#######################################
 # Resolve the organization owning org-level resources (issue types, issue fields).
 # Priority: org > owner > repo-shaped args > GH_DEFAULT_REPO > git remote.
 # Globals:
@@ -89,10 +107,12 @@ _gh_resolve_org() {
     owner=$(printf '%s\n' "${args}" | jq -r '.owner // empty')
 
     if [[ -n "${org}" ]]; then
+        _gh_validate_org "${org}" "${tool}" || return 1
         printf '%s\n' "${org}"
         return 0
     fi
     if [[ -n "${owner}" ]]; then
+        _gh_validate_org "${owner}" "${tool}" || return 1
         printf '%s\n' "${owner}"
         return 0
     fi
@@ -103,6 +123,7 @@ _gh_resolve_org() {
         return 1
     fi
     if [[ -n "${_GH_OWNER}" ]]; then
+        _gh_validate_org "${_GH_OWNER}" "${tool}" || return 1
         printf '%s\n' "${_GH_OWNER}"
         return 0
     fi
@@ -110,6 +131,7 @@ _gh_resolve_org() {
     local name_with_owner
     name_with_owner=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null) || true
     if [[ -n "${name_with_owner}" ]]; then
+        _gh_validate_org "${name_with_owner%%/*}" "${tool}" || return 1
         printf '%s\n' "${name_with_owner%%/*}"
         return 0
     fi

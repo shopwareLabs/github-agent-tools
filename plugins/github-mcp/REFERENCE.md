@@ -155,7 +155,8 @@ Use gh-tooling issue_list with search "TODO label:component/core" and limit 20
 ### `issue_schema`
 
 List an organization's issue types and issue fields, including each single-select field's options.
-The organization comes from `org`, `owner`, a repository parameter, or the configured default repo.
+The organization comes from `org`, `owner`, a repository parameter, the configured default repo, or the
+current clone's remote.
 
 Types and fields are independent. GitHub lets an organization pin fields to a type, but that pinning
 only drives the web UI: any organization field can be set on an issue of any type, so this tool
@@ -799,8 +800,8 @@ Replace an issue's field values. The `values` object becomes the issue's **compl
 left out is cleared, and `{}` clears them all. To change one field without dropping the others, read
 the current values with `issue_view` first and pass them back alongside the change.
 
-Values are typed by the field: a single-select takes an option name, a date takes `YYYY-MM-DD`, a
-number takes a number, and a text field takes a string.
+Values are typed by the field: a single-select takes an option name, a multi-select takes an array of
+option names, a date takes `YYYY-MM-DD`, a number takes a number, and a text field takes a string.
 
 ```
 Use gh-tooling-write issue_field_set with number 19952 and values {"Priority": "High", "Effort": "Low"}

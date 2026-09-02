@@ -791,7 +791,7 @@
         "required": ["number", "values"],
         "properties": {
           "number": { "type": ["integer", "string"], "description": "Issue number." },
-          "values": { "type": "object", "description": "The complete set of field values, keyed by field name: single-select takes an option name, date takes 'YYYY-MM-DD', number takes a number, text takes a string. Pass {} to clear every field value." },
+          "values": { "type": "object", "description": "The complete set of field values, keyed by field name: single-select takes an option name, multi-select takes an array of option names, date takes 'YYYY-MM-DD', number takes a number, text takes a string. Pass {} to clear every field value." },
           "repo": { "type": "string", "description": "GitHub repository in 'owner/repo' format. Defaults to the repo configured in .mcp-gh-tooling.json." },
           "suppress_errors": { "type": "boolean", "description": "Discard stderr output. When true, gh errors are silenced.", "default": false },
           "fallback": { "type": "string", "description": "Text to return if the gh command fails (non-zero exit)." }

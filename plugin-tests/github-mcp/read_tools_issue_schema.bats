@@ -123,3 +123,43 @@ setup() {
     assert_failure
     assert_output --partial "Invalid jq_filter"
 }
+
+@test "issue_schema prefers org over owner and a repo parameter" {
+    run tool_issue_schema '{"org": "from-org", "owner": "from-owner", "repo": "from-repo/x"}'
+    assert_success
+    assert_equal "$(printf '%s' "${output}" | jq -r '.org')" "from-org"
+}
+
+@test "issue_schema prefers owner over a repo parameter" {
+    run tool_issue_schema '{"owner": "from-owner", "repo": "from-repo/x"}'
+    assert_success
+    assert_equal "$(printf '%s' "${output}" | jq -r '.org')" "from-owner"
+}
+
+@test "issue_schema with suppress_errors returns no error text" {
+    GH_STUB_TYPES_EXIT=1
+    run tool_issue_schema '{"org": "cli", "suppress_errors": true}'
+    assert_failure
+    assert_output ""
+}
+
+@test "issue_schema keeps working when a field carries a null options key" {
+    GH_STUB_FIELDS='[{"id":1,"name":"Priority","data_type":"single_select","options":null}]'
+    run tool_issue_schema '{"org": "acme"}'
+    assert_success
+    assert_equal "$(printf '%s' "${output}" | jq -r '.fields[0] | has("options")')" "false"
+}
+
+@test "issue_schema rejects an org that is not a login" {
+    run tool_issue_schema '{"org": "../../repos/victim/private"}'
+    assert_failure
+    assert_output --partial "invalid organization"
+    [ ! -f "${GH_ARGS_FILE}" ]
+}
+
+@test "fallback does not mask an unresolvable org" {
+    GH_DEFAULT_REPO=""
+    run tool_issue_schema '{"org": "!!", "fallback": "ok"}'
+    assert_failure
+    assert_output --partial "invalid organization"
+}

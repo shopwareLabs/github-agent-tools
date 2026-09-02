@@ -187,6 +187,8 @@ BATS tests for hook scripts and MCP tool functions are in `plugin-tests/github-m
 | `check_api_tools.bats` | Dedicated API-tool enforcement for Claude Code and Codex tool namespaces |
 | `session_start.bats` | Shared SessionStart context and host-specific config discovery |
 | `write_server_gating.bats` | Write-server gating and active-host config priority |
+| `read_tools_issue_schema.bats` | `issue_schema` org resolution, name filters, and merge output |
+| `write_tools_issue_schema.bats` | `issue_type_set` and `issue_field_set` name resolution and value checks |
 | `mcp_tool_gh.bats` | MCP tool shared parameters (_gh_validate_jq_filter, _gh_post_process, suppress_errors, fallback) |
 | `tool_schemas.bats` | Shipped tool schemas against the vendored validator: identifier unions, required fields, defaults, and validation round-trips |
 

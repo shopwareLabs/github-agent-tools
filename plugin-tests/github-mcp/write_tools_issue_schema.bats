@@ -6,7 +6,7 @@ bats_require_minimum_version 1.11.0
 load 'test_helper/common_setup'
 
 TYPES_JSON='[{"id":125714,"name":"Bug"},{"id":25328944,"name":"Improvement"}]'
-FIELDS_JSON='[{"id":8847,"name":"Priority","data_type":"single_select","options":[{"id":12296,"name":"High"},{"id":12298,"name":"Low"}]},{"id":8848,"name":"Start date","data_type":"date"},{"id":8851,"name":"Points","data_type":"number"},{"id":8852,"name":"Owner","data_type":"text"}]'
+FIELDS_JSON='[{"id":8847,"name":"Priority","data_type":"single_select","options":[{"id":12296,"name":"High"},{"id":12298,"name":"Low"}]},{"id":8848,"name":"Start date","data_type":"date"},{"id":8851,"name":"Points","data_type":"number"},{"id":8852,"name":"Owner","data_type":"text"},{"id":8853,"name":"Teams","data_type":"multi_select","options":[{"id":1,"name":"Core"},{"id":2,"name":"Storefront"}]}]'
 
 setup() {
     log() { :; }
@@ -162,4 +162,79 @@ body() { jq -c "$1" "${GH_BODY_FILE}"; }
     run tool_issue_field_set '{"number": 19952, "values": {}, "fallback": "unchanged"}'
     assert_success
     assert_output "unchanged"
+}
+
+@test "issue_field_set shapes the response into field/value pairs" {
+    GH_STUB_OUTPUT='[{"issue_field_name":"Priority","value":12296,"single_select_option":{"id":12296,"name":"High"}},{"issue_field_name":"Start date","value":"2026-09-30"}]'
+    run tool_issue_field_set '{"number": 19952, "values": {"Priority": "High"}}'
+    assert_success
+    assert_equal "$(printf '%s' "${output}" | jq -c '.')" '[{"field":"Priority","value":"High"},{"field":"Start date","value":"2026-09-30"}]'
+}
+
+@test "issue_field_set resolves a multi-select array to canonical option names" {
+    GH_STUB_OUTPUT='[]'
+    run tool_issue_field_set '{"number": 19952, "values": {"Teams": ["core", "Storefront"]}}'
+    assert_success
+    assert_equal "$(body '.issue_field_values')" '[{"field_id":8853,"value":["Core","Storefront"]}]'
+}
+
+@test "issue_field_set rejects a non-array value for a multi-select field" {
+    run tool_issue_field_set '{"number": 19952, "values": {"Teams": "Core"}}'
+    assert_failure
+    assert_output --partial "takes an array of option names"
+}
+
+@test "issue_field_set rejects an unknown option inside a multi-select array" {
+    run tool_issue_field_set '{"number": 19952, "values": {"Teams": ["Core", "Nope"]}}'
+    assert_failure
+    assert_output --partial "Available options: Core, Storefront"
+}
+
+@test "issue_field_set with suppress_errors returns no error text" {
+    GH_STUB_EXIT=1
+    run tool_issue_field_set '{"number": 19952, "values": {}, "suppress_errors": true}'
+    assert_failure
+    assert_output ""
+}
+
+@test "issue_field_set rejects a null or array values argument instead of clearing everything" {
+    run tool_issue_field_set '{"number": 19952, "values": null}'
+    assert_failure
+    assert_output --partial "must be an object"
+    [ ! -f "${GH_ARGS_FILE}" ]
+
+    run tool_issue_field_set '{"number": 19952, "values": []}'
+    assert_failure
+    assert_output --partial "must be an object"
+    [ ! -f "${GH_ARGS_FILE}" ]
+}
+
+@test "issue_field_set rejects non-string elements in a multi-select array" {
+    run tool_issue_field_set '{"number": 19952, "values": {"Teams": [1, 2]}}'
+    assert_failure
+    assert_output --partial "array of option names as strings"
+}
+
+@test "issue_field_set rejects a malformed repo" {
+    run tool_issue_field_set '{"number": 19952, "values": {}, "repo": "widgets"}'
+    assert_failure
+    assert_output --partial "owner/repo"
+}
+
+@test "issue_type_set rejects a malformed repo" {
+    run tool_issue_type_set '{"number": 19952, "type": "Bug", "repo": "widgets"}'
+    assert_failure
+    assert_output --partial "owner/repo"
+}
+
+@test "fallback does not mask an unknown field name" {
+    run tool_issue_field_set '{"number": 19952, "values": {"Ghost": "x"}, "fallback": "ok"}'
+    assert_failure
+    assert_output --partial "not found"
+}
+
+@test "fallback does not mask an unknown issue type" {
+    run tool_issue_type_set '{"number": 19952, "type": "Bogus", "fallback": "ok"}'
+    assert_failure
+    assert_output --partial "Available types"
 }

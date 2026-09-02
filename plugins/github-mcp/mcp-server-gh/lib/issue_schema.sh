@@ -30,7 +30,6 @@ tool_issue_schema() {
 
     local org
     org=$(_gh_resolve_org "${args}" "issue_schema") || {
-        [[ -n "${fallback}" ]] && { printf '%s\n' "${fallback}"; return 0; }
         printf '%s\n' "${org}"
         return 1
     }
@@ -62,7 +61,7 @@ tool_issue_schema() {
             }],
             fields: [$fields[] | select(matches($field)) | {
                 id, name, description, data_type, visibility
-            } + (if has("options") then {options: [.options[] | {id, name, color}]} else {} end)]
+            } + (if (.options | type) == "array" then {options: [.options[] | {id, name, color}]} else {} end)]
         }') || {
         [[ -n "${fallback}" ]] && { printf '%s\n' "${fallback}"; return 0; }
         printf '%s\n' "Error: could not merge issue types and issue fields for '${org}'"
@@ -72,7 +71,6 @@ tool_issue_schema() {
     local unmatched
     unmatched=$(_gh_issue_schema_unmatched "${merged}" "${type}" "${field}")
     if [[ -n "${unmatched}" ]]; then
-        [[ -n "${fallback}" ]] && { printf '%s\n' "${fallback}"; return 0; }
         printf '%s\n' "${unmatched}"
         return 1
     fi
