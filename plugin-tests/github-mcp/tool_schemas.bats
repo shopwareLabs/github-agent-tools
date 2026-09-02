@@ -104,10 +104,28 @@ load_validator_for() {
     assert_output ""
 }
 
+@test "a read tool accepts a project number sent as an integer" {
+    load_validator_for "$READ_TOOLS"
+
+    run validate_tool_arguments "project_view" '{"number": 12, "owner": "shopwareLabs"}'
+
+    assert_success
+    assert_output ""
+}
+
 @test "a write tool accepts sub-issue numbers sent as strings" {
     load_validator_for "$WRITE_TOOLS"
 
     run validate_tool_arguments "sub_issue_add" '{"issue_number": "339", "sub_issue_number": "340"}'
+
+    assert_success
+    assert_output ""
+}
+
+@test "a write tool accepts sub-issue numbers sent as integers" {
+    load_validator_for "$WRITE_TOOLS"
+
+    run validate_tool_arguments "sub_issue_add" '{"issue_number": 339, "sub_issue_number": 340}'
 
     assert_success
     assert_output ""

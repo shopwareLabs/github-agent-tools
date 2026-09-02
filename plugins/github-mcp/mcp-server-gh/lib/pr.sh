@@ -218,7 +218,9 @@ tool_pr_comments() {
 
     local number paginate jq_filter suppress_errors fallback max_lines
     number=$(echo "${args}" | jq -r '.number // empty')
-    paginate=$(echo "${args}" | jq -r '.paginate // true')
+    # jq's // treats false as a fallthrough, so '.paginate // true' would wrongly
+    # yield true when the caller passes false; use has() to read it verbatim.
+    paginate=$(echo "${args}" | jq -r 'if has("paginate") then .paginate else true end')
     jq_filter=$(echo "${args}" | jq -r '.jq_filter // empty')
     suppress_errors=$(echo "${args}" | jq -r '.suppress_errors // false')
     fallback=$(echo "${args}" | jq -r '.fallback // empty')

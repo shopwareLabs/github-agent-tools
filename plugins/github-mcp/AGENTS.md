@@ -186,6 +186,7 @@ BATS tests for hook scripts and MCP tool functions are in `plugin-tests/github-m
 | `session_start.bats` | Shared SessionStart context and host-specific config discovery |
 | `write_server_gating.bats` | Write-server gating and active-host config priority |
 | `mcp_tool_gh.bats` | MCP tool shared parameters (_gh_validate_jq_filter, _gh_post_process, suppress_errors, fallback) |
+| `tool_schemas.bats` | Shipped tool schemas against the vendored validator: identifier unions, required fields, defaults, and validation round-trips |
 
 The vendored SDK's own surface — argument validation and logging — is tested upstream in
 `shopwareLabs/bash-mcp-sdk`, not here.

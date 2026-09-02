@@ -66,23 +66,75 @@ read_pinned_version() {
 }
 
 #######################################
+# Read the pinned SDK file hash from the lock file.
+# Globals:
+#   LOCK_FILE
+# Outputs:
+#   The lowercase SHA-256 hash on stdout; diagnostics on stderr.
+# Returns:
+#   0 on success, 1 when the lock file is missing or its hash is malformed.
+#######################################
+read_pinned_sha256() {
+    if [[ ! -f "$LOCK_FILE" ]]; then
+        printf 'Lock file not found: %s\n' "$LOCK_FILE" >&2
+        return 1
+    fi
+
+    local sha256
+    sha256=$(grep -m 1 -oE '^sha256=[0-9a-f]{64}$' "$LOCK_FILE" 2>/dev/null | cut -d= -f2) || true
+
+    if [[ -z "$sha256" ]]; then
+        printf 'No sha256=<64 lowercase hex characters> line in %s\n' "$LOCK_FILE" >&2
+        return 1
+    fi
+
+    printf '%s\n' "$sha256"
+}
+
+#######################################
+# Calculate the SHA-256 hash of a file.
+# Arguments:
+#   Path to the file to hash.
+# Outputs:
+#   The lowercase SHA-256 hash on stdout; diagnostics on stderr.
+# Returns:
+#   0 on success, non-zero when hashing fails or no supported utility is available.
+#######################################
+sha256_file() {
+    local file
+    file="$1"
+
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum -- "$file" | awk '{print $1}'
+    elif command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 -- "$file" | awk '{print $1}'
+    else
+        printf 'Cannot calculate SHA-256: neither sha256sum nor shasum is available.\n' >&2
+        return 1
+    fi
+}
+
+#######################################
 # Download the SDK file at a tag into a local path.
 # Globals:
 #   SDK_REPO, SDK_FILE
 # Arguments:
 #   Release tag, e.g. v1.0.0.
 #   Destination path.
+#   Expected SHA-256 hash.
 # Outputs:
 #   Diagnostics on stderr.
 # Returns:
-#   0 on success, 1 when the download fails or returns something that is not
-#   the SDK file.
+#   0 on success, 1 when downloading, file validation, or hash validation fails.
 #######################################
 download_sdk() {
-    local version="$1" destination="$2"
-    local url="https://raw.githubusercontent.com/${SDK_REPO}/${version}/${SDK_FILE}"
+    local version destination expected_sha256 url actual_sha256
+    version="$1"
+    destination="$2"
+    expected_sha256="$3"
+    url="https://raw.githubusercontent.com/${SDK_REPO}/${version}/${SDK_FILE}"
 
-    if ! curl -fsSL --retry 3 --retry-delay 2 -o "$destination" -- "$url"; then
+    if ! curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 60 -o "$destination" -- "$url"; then
         printf 'Download failed: %s\n' "$url" >&2
         return 1
     fi
@@ -91,6 +143,13 @@ download_sdk() {
     # arrive as a 200 with the wrong bytes. The SDK is a shell script.
     if [[ ! -s "$destination" ]] || ! head -n 1 -- "$destination" | grep -q '^#!'; then
         printf 'Downloaded file is not a shell script: %s\n' "$url" >&2
+        return 1
+    fi
+
+    actual_sha256=$(sha256_file "$destination") || return 1
+    if [[ "$actual_sha256" != "$expected_sha256" ]]; then
+        printf 'Downloaded file hash mismatch: expected %s, got %s: %s\n' \
+            "$expected_sha256" "$actual_sha256" "$url" >&2
         return 1
     fi
 }
@@ -104,12 +163,13 @@ main() {
         exit 2
     fi
 
-    local version
+    local version expected_sha256
     version=$(read_pinned_version) || exit 1
+    expected_sha256=$(read_pinned_sha256) || exit 1
 
     TMPFILE=$(mktemp "${TMPDIR:-/tmp}/mcpserver_core.XXXXXX")
 
-    download_sdk "$version" "$TMPFILE" || exit 1
+    download_sdk "$version" "$TMPFILE" "$expected_sha256" || exit 1
 
     printf '%s %s at %s\n' \
         "$([[ "$check_only" == true ]] && printf 'Checking' || printf 'Vendoring')" \
@@ -138,6 +198,16 @@ main() {
         chmod 755 "$absolute"
         printf '  wrote    %s\n' "$target"
     done
+
+    if [[ "$check_only" != true ]]; then
+        local lock_tmpfile
+        lock_tmpfile=$(mktemp "${LOCK_FILE}.XXXXXX")
+        awk -v sha256="$expected_sha256" '
+            /^sha256=/ { print "sha256=" sha256; next }
+            { print }
+        ' "$LOCK_FILE" > "$lock_tmpfile"
+        mv -- "$lock_tmpfile" "$LOCK_FILE"
+    fi
 
     if [[ "$check_only" == true && $drifted -gt 0 ]]; then
         printf '\nVendored copies out of date: %d (pinned release %s).\n' \
