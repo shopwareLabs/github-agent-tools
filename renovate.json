@@ -1,0 +1,15 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "enabledManagers": ["custom.regex"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^\\.mcp-sdk\\.lock$/"],
+      "matchStrings": ["version=(?<currentValue>v\\d+\\.\\d+\\.\\d+)"],
+      "depNameTemplate": "shopwareLabs/bash-mcp-sdk",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    }
+  ]
+}

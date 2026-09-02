@@ -676,8 +676,8 @@
         "type": "object",
         "required": ["issue_number", "sub_issue_number"],
         "properties": {
-          "issue_number": { "type": "integer", "description": "Parent issue number." },
-          "sub_issue_number": { "type": "integer", "description": "Issue number to add as sub-issue." },
+          "issue_number": { "type": ["integer", "string"], "description": "Parent issue number." },
+          "sub_issue_number": { "type": ["integer", "string"], "description": "Issue number to add as sub-issue." },
           "repo": { "type": "string", "description": "GitHub repository in 'owner/repo' format." },
           "suppress_errors": { "type": "boolean", "default": false },
           "fallback": { "type": "string" }
@@ -691,8 +691,8 @@
         "type": "object",
         "required": ["issue_number", "sub_issue_number"],
         "properties": {
-          "issue_number": { "type": "integer", "description": "Parent issue number." },
-          "sub_issue_number": { "type": "integer", "description": "Sub-issue number to remove." },
+          "issue_number": { "type": ["integer", "string"], "description": "Parent issue number." },
+          "sub_issue_number": { "type": ["integer", "string"], "description": "Sub-issue number to remove." },
           "repo": { "type": "string", "description": "GitHub repository in 'owner/repo' format." },
           "suppress_errors": { "type": "boolean", "default": false },
           "fallback": { "type": "string" }

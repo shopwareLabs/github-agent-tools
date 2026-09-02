@@ -94,9 +94,15 @@ wire a new read/write tool and its schema). Start there for any change inside th
 
 ## mcpserver_core.sh
 
-`plugins/github-mcp/shared/mcpserver_core.sh` is the JSON-RPC protocol handler.
-`plugin-tests/mcp-shared/mcp_argument_validation.bats` sources it directly. Edit it in place
-when changing the protocol handler.
+`plugins/github-mcp/shared/mcpserver_core.sh` is the JSON-RPC protocol handler. It is vendored
+verbatim from [shopwareLabs/bash-mcp-sdk](https://github.com/shopwareLabs/bash-mcp-sdk)
+(`lib/mcpserver_core.sh`); `.mcp-sdk.lock` records the release it came from, and `renovate.json`
+watches that lock for new releases.
+
+Do not edit it here — a local change is overwritten by the next update. Protocol changes go to
+the SDK repository and arrive as a lock bump plus a refreshed copy of the file. The SDK owns the
+tests for its own surface (argument validation, logging); `plugin-tests/` covers this plugin's
+tools and schemas.
 
 ## Commit Messages
 
