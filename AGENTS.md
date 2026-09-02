@@ -94,9 +94,23 @@ wire a new read/write tool and its schema). Start there for any change inside th
 
 ## mcpserver_core.sh
 
-`plugins/github-mcp/shared/mcpserver_core.sh` is the JSON-RPC protocol handler.
-`plugin-tests/mcp-shared/mcp_argument_validation.bats` sources it directly. Edit it in place
-when changing the protocol handler.
+`plugins/github-mcp/shared/mcpserver_core.sh` is the JSON-RPC protocol handler. It is vendored
+verbatim from [shopwareLabs/bash-mcp-sdk](https://github.com/shopwareLabs/bash-mcp-sdk)
+(`lib/mcpserver_core.sh`); `.mcp-sdk.lock` records the release it came from, and `renovate.json`
+watches that lock for new releases.
+
+Do not edit it here — a local change is overwritten by the next update. Protocol changes go to
+the SDK repository and arrive as a lock bump plus a refreshed copy of the file. The SDK owns the
+tests for its own surface (argument validation, logging); `plugin-tests/` covers this plugin's
+tools and schemas.
+
+```bash
+.github/scripts/vendor-mcp-sdk.sh            # re-vendor at the pinned release
+.github/scripts/vendor-mcp-sdk.sh --check    # compare only; what CI runs
+```
+
+After Renovate bumps `.mcp-sdk.lock`, run the script without `--check` and commit the refreshed
+file in the same PR — the lock and the vendored copy have to move together or CI fails.
 
 ## Commit Messages
 
@@ -166,8 +180,9 @@ codex plugin add github-mcp@github-agent-tools
 
 Tests live in `plugin-tests/<name>/` mirroring the plugin structure and load the shared helper at
 `plugin-tests/test_helper/common_setup.bash` (it resolves the repo root by walking up to `.bats/`).
-CI (`.github/workflows/ci.yml`) runs ShellCheck over `plugins plugin-tests .github/scripts` and
-BATS over `plugin-tests/`; a separate `validate.yml` checks the issue-template dropdowns.
+CI (`.github/workflows/ci.yml`) runs ShellCheck over `plugins plugin-tests .github/scripts`,
+`vendor-mcp-sdk.sh --check` for the vendored SDK copy, and BATS over `plugin-tests/`; a separate
+`validate.yml` checks the issue-template dropdowns.
 
 ### Pre-release checklist
 
@@ -177,6 +192,7 @@ BATS over `plugin-tests/`; a separate `validate.yml` checks the issue-template d
 - [ ] BATS green (`.bats/bats-core/bin/bats -r plugin-tests/`)
 - [ ] ShellCheck clean
 - [ ] Issue-template dropdowns up to date (`.github/scripts/validate-issue-templates.sh`)
+- [ ] Vendored SDK matches its lock (`.github/scripts/vendor-mcp-sdk.sh --check`)
 - [ ] Docs updated (`plugins/github-mcp/README.md`, `REFERENCE.md`)
 
 ## Distribution

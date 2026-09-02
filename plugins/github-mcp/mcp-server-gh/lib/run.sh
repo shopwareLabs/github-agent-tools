@@ -115,7 +115,9 @@ tool_run_logs() {
     local grep_pattern grep_context_before grep_context_after grep_ignore_case grep_invert
     run_id=$(echo "${args}" | jq -r '.run_id // empty')
     repo=$(echo "${args}" | jq -r '.repo // empty')
-    failed_only=$(echo "${args}" | jq -r '.failed_only // true')
+    # jq's // treats false as a fallthrough, so '.failed_only // true' would wrongly
+    # yield true when the caller passes false; use has() to read it verbatim.
+    failed_only=$(echo "${args}" | jq -r 'if has("failed_only") then .failed_only else true end')
     max_lines=$(echo "${args}" | jq -r '.max_lines // empty')
     tail_lines=$(echo "${args}" | jq -r '.tail_lines // empty')
     suppress_errors=$(echo "${args}" | jq -r '.suppress_errors // false')

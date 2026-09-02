@@ -1793,7 +1793,7 @@
         ],
         "properties": {
           "number": {
-            "type": "integer",
+            "type": ["integer", "string"],
             "description": "Project number."
           },
           "owner": {

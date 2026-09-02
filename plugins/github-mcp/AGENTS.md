@@ -123,7 +123,7 @@ Captures `__raw` and `__exit` separately; branches on `suppress_errors` for `2>/
 | Disable hook enforcement | `.mcp-gh-tooling.json` | - | `enforce_mcp_tools: false` |
 | Enable write server | `.mcp-gh-tooling.json` | - | `enable_write_server: true` |
 | Configure label semantics | `.mcp-gh-tooling.json` | - | `labels: {...}` map |
-| Modify protocol | `shared/mcpserver_core.sh` | - | `process_request()`, `handle_*()` |
+| Modify protocol | upstream `shopwareLabs/bash-mcp-sdk` | - | `shared/mcpserver_core.sh` is vendored; see root `AGENTS.md` |
 | Update read tool schemas | `mcp-server-gh/tools-read.json` | - | JSON Schema Draft 7 |
 | Update write tool schemas | `mcp-server-gh/tools-write.json` | - | JSON Schema Draft 7 |
 
@@ -186,7 +186,10 @@ BATS tests for hook scripts and MCP tool functions are in `plugin-tests/github-m
 | `session_start.bats` | Shared SessionStart context and host-specific config discovery |
 | `write_server_gating.bats` | Write-server gating and active-host config priority |
 | `mcp_tool_gh.bats` | MCP tool shared parameters (_gh_validate_jq_filter, _gh_post_process, suppress_errors, fallback) |
-| `extra_log_file.bats` | Extra log file configuration and dual-write log() |
+| `tool_schemas.bats` | Shipped tool schemas against the vendored validator: identifier unions, required fields, defaults, and validation round-trips |
+
+The vendored SDK's own surface — argument validation and logging — is tested upstream in
+`shopwareLabs/bash-mcp-sdk`, not here.
 
 Run tests:
 ```bash

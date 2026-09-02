@@ -1537,13 +1537,35 @@ diff --git a/src/Third.php b/src/Third.php
         echo "$*" > "${BATS_TEST_TMPDIR}/captured_cmd"
         echo '[]'
     }
-    # Note: must use string "false" — jq's // treats boolean false as null
-    run tool_pr_comments '{"number":"42","paginate":"false"}'
+    run tool_pr_comments '{"number":"42","paginate":false}'
     assert_success
     local captured_cmd
     captured_cmd=$(cat "${BATS_TEST_TMPDIR}/captured_cmd")
     [[ "${captured_cmd}" != *"--paginate"* ]] || {
         echo "Unexpected --paginate in command: ${captured_cmd}"
+        return 1
+    }
+}
+
+# =============================================================================
+# run_logs — tool-specific tests
+# =============================================================================
+
+@test "run_logs: failed_only false uses --log" {
+    gh() {
+        echo "$*" > "${BATS_TEST_TMPDIR}/captured_cmd"
+        echo 'logs'
+    }
+    run tool_run_logs '{"run_id":"42","failed_only":false}'
+    assert_success
+    local captured_cmd
+    captured_cmd=$(cat "${BATS_TEST_TMPDIR}/captured_cmd")
+    [[ "${captured_cmd}" == *"--log"* ]] || {
+        echo "Expected --log in command: ${captured_cmd}"
+        return 1
+    }
+    [[ "${captured_cmd}" != *"--log-failed"* ]] || {
+        echo "Unexpected --log-failed in command: ${captured_cmd}"
         return 1
     }
 }
