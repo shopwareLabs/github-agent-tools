@@ -5,7 +5,7 @@
 ```
 plugins/github-mcp/
 ├── README.md                           # User documentation (usage, configuration, troubleshooting)
-├── REFERENCE.md                        # Full tool parameter docs and examples (30 read + 23 write tools)
+├── REFERENCE.md                        # Full tool parameter docs and examples (31 read + 23 write tools)
 ├── AGENTS.md                           # LLM navigation guide (this file)
 ├── CHANGELOG.md                        # Version history
 │
@@ -32,7 +32,7 @@ plugins/github-mcp/
     ├── server-write.sh                # Write server entry point - gated by enable_write_server config
     ├── config-read.json               # Read server metadata (name="gh-tooling")
     ├── config-write.json              # Write server metadata (name="gh-tooling-write")
-    ├── tools-read.json                # 30 read tools (PR, issue, CI, commit, search, repo, release, label, project, api_read)
+    ├── tools-read.json                # 31 read tools (PR, issue, CI, commit, search, repo, release, label, project, api_read)
     ├── tools-write.json               # 23 write tools (PR lifecycle, reviews, issues, labels, assignees, sub-issues, projects, api)
     ├── mcp-gh-tooling.schema.json     # JSON Schema for .mcp-gh-tooling.json
     └── lib/
@@ -40,6 +40,7 @@ plugins/github-mcp/
         ├── pr.sh                      # tool_pr_view/diff/list/checks/comments/reviews/files/commits()
         ├── pr_write.sh                # tool_pr_create/edit/ready/merge/close/reopen()
         ├── issue.sh                   # tool_issue_view(), tool_issue_list()
+        ├── issue_schema.sh            # tool_issue_schema() (org issue types + issue fields, name filters)
         ├── issue_write.sh             # tool_issue_create/edit/close/reopen/comment()
         ├── review_write.sh            # tool_pr_review_submit(), tool_pr_comment(), tool_pr_review_reply()
         ├── run.sh                     # tool_run_view(), tool_run_list(), tool_run_logs(), tool_workflow_jobs()
@@ -60,7 +61,7 @@ plugins/github-mcp/
 This plugin provides:
 - **Two MCP Servers** via `.mcp.json` in Claude Code and inline `mcpServers` in
   `.codex-plugin/plugin.json` in Codex:
-  - `gh-tooling` (read) - 30 read-only GitHub tools (PRs, issues, CI, commits, search, repo, releases, labels, projects, read-only API)
+  - `gh-tooling` (read) - 31 read-only GitHub tools (PRs, issues, CI, commits, search, repo, releases, labels, projects, read-only API)
   - `gh-tooling-write` (write) - 23 write tools (PR lifecycle, reviews, issues, labels, assignees, sub-issues, projects, full API). Gated by `enable_write_server` config flag.
 - **SessionStart Hook** via the shared `hooks/hooks.json`:
   - Assembles MCP tool directives dynamically from template with conditional write and label sections

@@ -2,7 +2,7 @@
 
 ## Read Server (gh-tooling)
 
-30 tools available via the `gh-tooling` MCP server. Requires `gh` CLI installed and authenticated.
+31 tools available via the `gh-tooling` MCP server. Requires `gh` CLI installed and authenticated.
 
 ### Shared Tool Parameters
 
@@ -150,6 +150,24 @@ List issues with filters.
 
 ```
 Use gh-tooling issue_list with search "TODO label:component/core" and limit 20
+```
+
+### `issue_schema`
+
+List an organization's issue types and issue fields, including each single-select field's options.
+The organization comes from `org`, `owner`, a repository parameter, or the configured default repo.
+
+Types and fields are independent. GitHub lets an organization pin fields to a type, but that pinning
+only drives the web UI: any organization field can be set on an issue of any type, so this tool
+reports the two lists side by side instead of nesting fields under types.
+
+`type` and `field` match one name exactly, case-insensitively, and each narrows only its own list. A
+name that matches nothing is an error rather than an empty list.
+
+```
+Use gh-tooling issue_schema with repo "shopware/shopware"
+Use gh-tooling issue_schema with org "shopware" and type "Bug"
+Use gh-tooling issue_schema with field "Priority" and jq_filter "[.fields[0].options[].name]"
 ```
 
 ### `run_view`

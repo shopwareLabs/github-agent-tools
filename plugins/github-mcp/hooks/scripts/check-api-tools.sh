@@ -107,6 +107,11 @@ if echo "$ENDPOINT" | grep -qE 'labels(\?|$)'; then
     block_tool "label_list" "Use label_list with optional repo and filter parameters."
 fi
 
+# Organization issue types and issue fields
+if echo "$ENDPOINT" | grep -qE 'orgs/[^/]+/issue-(types|fields)'; then
+    block_tool "issue_schema" "Use issue_schema with optional org and type/field name filters. It returns both collections in one call."
+fi
+
 fi  # end GET-only read endpoint mapping
 
 # ============================================================================

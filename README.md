@@ -38,7 +38,7 @@ The read server (`gh-tooling`) is always active. The write server (`gh-tooling-w
 
 | Component  | Description                                                                                          |
 |------------|------------------------------------------------------------------------------------------------------|
-| 🔌 MCP     | Two servers — `gh-tooling` (30 read tools) and `gh-tooling-write` (23 write tools, gated)             |
+| 🔌 MCP     | Two servers — `gh-tooling` (31 read tools) and `gh-tooling-write` (23 write tools, gated)             |
 | 🪝 Hooks   | SessionStart directive + PreToolUse enforcement that redirects `gh` bash calls to the MCP tools       |
 
 See [plugins/github-mcp/README.md](./plugins/github-mcp/README.md) for full configuration, the complete tool reference, and troubleshooting. See [plugins/github-mcp/REFERENCE.md](./plugins/github-mcp/REFERENCE.md) for per-tool parameter docs.

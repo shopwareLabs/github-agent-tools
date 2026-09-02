@@ -66,6 +66,20 @@ setup_read_blocking() {
     assert_output --partial "repo_tree"
 }
 
+@test "read api: blocks orgs/N/issue-types → suggests issue_schema" {
+    setup_read_blocking
+    run_api_hook "$READ_TOOL" "orgs/shopware/issue-types"
+    assert_failure 2
+    assert_output --partial "issue_schema"
+}
+
+@test "read api: blocks orgs/N/issue-fields → suggests issue_schema" {
+    setup_read_blocking
+    run_api_hook "$READ_TOOL" "orgs/shopware/issue-fields"
+    assert_failure 2
+    assert_output --partial "issue_schema"
+}
+
 @test "read api: allows unknown endpoint" {
     setup_read_blocking
     run_api_hook "$READ_TOOL" "repos/shopware/shopware/actions/runs/123/jobs"

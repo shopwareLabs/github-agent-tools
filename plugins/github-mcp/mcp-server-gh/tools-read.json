@@ -1821,6 +1821,58 @@
         },
         "additionalProperties": false
       }
+    },
+    {
+      "name": "issue_schema",
+      "description": "List the issue types and issue fields available for an organization, including each single-select field's options. Use before setting an issue type or a field value to discover the exact names the write tools expect. Types and fields are independent: any organization field can be set on an issue of any type.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "org": {
+            "type": "string",
+            "description": "Organization login. Defaults to the owner of the resolved repository."
+          },
+          "owner": {
+            "type": "string",
+            "description": "Repository owner, used as the organization when 'org' is not set."
+          },
+          "repo": {
+            "type": "string",
+            "description": "GitHub repository in 'owner/repo' format, used to derive the organization."
+          },
+          "repository": {
+            "type": "string",
+            "description": "GitHub repository in 'owner/repo' format. Alias of `repo`."
+          },
+          "type": {
+            "type": "string",
+            "description": "Return only the issue type with this exact name (case-insensitive). Errors when no type matches."
+          },
+          "field": {
+            "type": "string",
+            "description": "Return only the issue field with this exact name (case-insensitive). Errors when no field matches."
+          },
+          "jq_filter": {
+            "type": "string",
+            "description": "jq expression to filter/transform the JSON output."
+          },
+          "max_lines": {
+            "type": "integer",
+            "description": "Return only the first N lines of output.",
+            "minimum": 1
+          },
+          "suppress_errors": {
+            "type": "boolean",
+            "description": "Discard stderr output.",
+            "default": false
+          },
+          "fallback": {
+            "type": "string",
+            "description": "Text to return if the gh command fails."
+          }
+        },
+        "additionalProperties": false
+      }
     }
   ]
 }
