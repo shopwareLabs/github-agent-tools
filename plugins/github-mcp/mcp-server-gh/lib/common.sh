@@ -69,6 +69,55 @@ _gh_require_repo_or_git() {
     return 1
 }
 
+#######################################
+# Resolve the organization owning org-level resources (issue types, issue fields).
+# Priority: org > owner > repo-shaped args > GH_DEFAULT_REPO > git remote.
+# Globals:
+#   GH_DEFAULT_REPO, _GH_OWNER
+# Arguments:
+#   $1 JSON args string, $2 tool name for the error message.
+# Outputs:
+#   Organization login on stdout, or an error message on stdout.
+# Returns:
+#   0 when an organization was resolved, 1 otherwise.
+#######################################
+_gh_resolve_org() {
+    local args="$1" tool="$2"
+
+    local org owner
+    org=$(printf '%s\n' "${args}" | jq -r '.org // empty')
+    owner=$(printf '%s\n' "${args}" | jq -r '.owner // empty')
+
+    if [[ -n "${org}" ]]; then
+        printf '%s\n' "${org}"
+        return 0
+    fi
+    if [[ -n "${owner}" ]]; then
+        printf '%s\n' "${owner}"
+        return 0
+    fi
+
+    # Not run in a command substitution: the resolver reports through globals,
+    # which a subshell would discard. Its own error text goes to our stdout.
+    if ! _gh_resolve_owner_repo_optional "${args}"; then
+        return 1
+    fi
+    if [[ -n "${_GH_OWNER}" ]]; then
+        printf '%s\n' "${_GH_OWNER}"
+        return 0
+    fi
+
+    local name_with_owner
+    name_with_owner=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null) || true
+    if [[ -n "${name_with_owner}" ]]; then
+        printf '%s\n' "${name_with_owner%%/*}"
+        return 0
+    fi
+
+    printf '%s\n' "Error: org is required for ${tool}. Pass 'org', 'owner', or a repository ('repository', 'repo', or 'owner'+'repo'), or set 'repo' in .mcp-gh-tooling.json"
+    return 1
+}
+
 # Read a value from the gh-tooling config file
 # Args: $1 = jq path (e.g. '.repo'), $2 = default value
 _gh_config_value() {

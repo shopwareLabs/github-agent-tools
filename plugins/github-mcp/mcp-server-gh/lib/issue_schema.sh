@@ -3,55 +3,6 @@
 # Read: issue_schema
 
 #######################################
-# Resolve the organization that owns issue types and issue fields.
-# Priority: org > owner > repo-shaped args > GH_DEFAULT_REPO > git remote.
-# Globals:
-#   GH_DEFAULT_REPO, _GH_OWNER
-# Arguments:
-#   JSON args string.
-# Outputs:
-#   Organization login on stdout, or an error message on stdout.
-# Returns:
-#   0 when an organization was resolved, 1 otherwise.
-#######################################
-_gh_resolve_issue_schema_org() {
-    local args="$1"
-
-    local org owner
-    org=$(printf '%s\n' "${args}" | jq -r '.org // empty')
-    owner=$(printf '%s\n' "${args}" | jq -r '.owner // empty')
-
-    if [[ -n "${org}" ]]; then
-        printf '%s\n' "${org}"
-        return 0
-    fi
-    if [[ -n "${owner}" ]]; then
-        printf '%s\n' "${owner}"
-        return 0
-    fi
-
-    # Not run in a command substitution: the resolver reports through globals,
-    # which a subshell would discard. Its own error text goes to our stdout.
-    if ! _gh_resolve_owner_repo_optional "${args}"; then
-        return 1
-    fi
-    if [[ -n "${_GH_OWNER}" ]]; then
-        printf '%s\n' "${_GH_OWNER}"
-        return 0
-    fi
-
-    local name_with_owner
-    name_with_owner=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null) || true
-    if [[ -n "${name_with_owner}" ]]; then
-        printf '%s\n' "${name_with_owner%%/*}"
-        return 0
-    fi
-
-    printf '%s\n' "Error: org is required for issue_schema. Pass 'org', 'owner', or a repository ('repository', 'repo', or 'owner'+'repo'), or set 'repo' in .mcp-gh-tooling.json"
-    return 1
-}
-
-#######################################
 # List an organization's issue types and issue fields as one JSON document.
 # Types and fields are independent: GitHub pins fields to types for the web UI
 # only, and any org field can be set on an issue of any type, so this tool
@@ -78,7 +29,7 @@ tool_issue_schema() {
     _gh_validate_jq_filter "${jq_filter}" || return 1
 
     local org
-    org=$(_gh_resolve_issue_schema_org "${args}") || {
+    org=$(_gh_resolve_org "${args}" "issue_schema") || {
         [[ -n "${fallback}" ]] && { printf '%s\n' "${fallback}"; return 0; }
         printf '%s\n' "${org}"
         return 1

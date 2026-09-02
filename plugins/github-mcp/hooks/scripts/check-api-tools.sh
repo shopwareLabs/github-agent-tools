@@ -141,6 +141,16 @@ if [[ "$IS_WRITE" == "true" ]]; then
         block_tool "issue_comment" "Use issue_comment with number and body."
     fi
 
+    # Issue field values (POST/PUT/DELETE)
+    if echo "$ENDPOINT" | grep -qE 'issues/[0-9]+/issue-field-values'; then
+        block_tool "issue_field_set" "Use issue_field_set with number and a values object keyed by field name. It replaces the issue's whole set of field values."
+    fi
+
+    # Issue metadata, including the issue type (PATCH)
+    if [[ "$METHOD" == "PATCH" ]] && echo "$ENDPOINT" | grep -qE 'repos/[^/]+/[^/]+/issues/[0-9]+$'; then
+        block_tool "issue_edit or issue_type_set" "Use issue_edit for title, body, labels, and assignees, or issue_type_set for the issue type."
+    fi
+
     # PR review comment thread replies (POST)
     if [[ "$METHOD" == "POST" ]] && echo "$ENDPOINT" | grep -qE 'pulls/[0-9]+/comments/[0-9]+/replies$'; then
         block_tool "pr_review_reply" "Use pr_review_reply with number, comment_id, and body."

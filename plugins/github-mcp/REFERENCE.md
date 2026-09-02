@@ -532,7 +532,7 @@ Use gh-tooling api_read with endpoint "search/issues" and jq_filter ".items[] | 
 
 ## Write Server (gh-tooling-write)
 
-23 tools available via the `gh-tooling-write` MCP server. Requires `enable_write_server: true` in `.mcp-gh-tooling.json`.
+25 tools available via the `gh-tooling-write` MCP server. Requires `enable_write_server: true` in `.mcp-gh-tooling.json`.
 
 ### Shared Tool Parameters
 
@@ -770,6 +770,46 @@ Use gh-tooling-write issue_comment with number 8498 and body "This has been fixe
 **Parameters:**
 - `number` (integer, required): Issue number.
 - `body` (string, required): Comment text to post.
+- `repo` (string, optional): Repository in `owner/repo` format.
+
+### Issue Type and Field Write Tools
+
+Both tools take names, not IDs, and resolve them against the organization's schema before calling the
+API, so an unknown name fails with the valid ones listed. Use `issue_schema` to see what is available.
+Issue types and issue fields apply to issues only, not pull requests.
+
+#### `issue_type_set`
+
+Set or clear an issue's type. The name replaces whatever the issue carried before, and `null` clears
+it, so repeating the same call leaves the issue in the same state.
+
+```
+Use gh-tooling-write issue_type_set with number 19952 and type "Bug"
+Use gh-tooling-write issue_type_set with number 19952 and type null
+```
+
+**Parameters:**
+- `number` (integer, required): Issue number.
+- `type` (string or null, required): Issue type name, matched case-insensitively, or `null` to clear.
+- `repo` (string, optional): Repository in `owner/repo` format.
+
+#### `issue_field_set`
+
+Replace an issue's field values. The `values` object becomes the issue's **complete** set: a field
+left out is cleared, and `{}` clears them all. To change one field without dropping the others, read
+the current values with `issue_view` first and pass them back alongside the change.
+
+Values are typed by the field: a single-select takes an option name, a date takes `YYYY-MM-DD`, a
+number takes a number, and a text field takes a string.
+
+```
+Use gh-tooling-write issue_field_set with number 19952 and values {"Priority": "High", "Effort": "Low"}
+Use gh-tooling-write issue_field_set with number 19952 and values {}
+```
+
+**Parameters:**
+- `number` (integer, required): Issue number.
+- `values` (object, required): Complete set of field values keyed by field name. `{}` clears every value.
 - `repo` (string, optional): Repository in `owner/repo` format.
 
 ### Label Write Tools

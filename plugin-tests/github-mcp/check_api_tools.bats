@@ -147,6 +147,27 @@ setup_write_blocking() {
     assert_output --partial "issue_comment"
 }
 
+@test "write api: blocks PUT issues/N/issue-field-values → suggests issue_field_set" {
+    setup_write_blocking
+    run_api_hook "$WRITE_TOOL" "repos/shopware/shopware/issues/123/issue-field-values" "PUT"
+    assert_failure 2
+    assert_output --partial "issue_field_set"
+}
+
+@test "write api: blocks DELETE issues/N/issue-field-values/M → suggests issue_field_set" {
+    setup_write_blocking
+    run_api_hook "$WRITE_TOOL" "repos/shopware/shopware/issues/123/issue-field-values/8847" "DELETE"
+    assert_failure 2
+    assert_output --partial "issue_field_set"
+}
+
+@test "write api: blocks PATCH issues/N → suggests issue_edit or issue_type_set" {
+    setup_write_blocking
+    run_api_hook "$WRITE_TOOL" "repos/shopware/shopware/issues/123" "PATCH"
+    assert_failure 2
+    assert_output --partial "issue_type_set"
+}
+
 @test "write api: blocks POST pulls/N/reviews → suggests pr_review_submit" {
     setup_write_blocking
     run_api_hook "$WRITE_TOOL" "repos/shopware/shopware/pulls/123/reviews" "POST"
