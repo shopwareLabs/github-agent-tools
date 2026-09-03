@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.1] - 2026-09-03
+
+### Fixed
+- Write tools no longer accept unknown parameters. All 25 schemas in `tools-write.json` now set `additionalProperties: false`, so a misspelled or unsupported field — `body_file` on `pr_edit`, say — returns an error naming the allowed parameters instead of being dropped in silence while the rest of the call succeeds. The read server has always behaved this way; every write tool's declared properties were audited against the argument keys its function reads, so no previously working call is affected. ([#1](https://github.com/shopwareLabs/github-agent-tools/issues/1))
+
 ## [4.0.0] - 2026-09-03
 
 ### Added
