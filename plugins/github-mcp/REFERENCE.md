@@ -142,7 +142,19 @@ View a GitHub issue.
 Use gh-tooling issue_view with number 8498
 Use gh-tooling issue_view with number 8498 and with_comments true
 Use gh-tooling issue_view with number 8498 and fields "title,body,state,labels,comments"
+Use gh-tooling issue_view with number 8498 and with_field_values true
 ```
+
+`with_field_values` returns the issue's type and its field values keyed by field
+name, which `gh issue view` exposes for neither:
+
+```json
+{"type": "Bug", "field_values": {"Priority": "Low", "Effort": "Low"}}
+```
+
+The `field_values` object is the shape `issue_field_set` takes, so it can be read,
+edited, and passed straight back. Output is always JSON; combine it with `fields`
+to add gh's own fields to the same document, and request comments separately.
 
 ### `issue_list`
 
@@ -798,7 +810,9 @@ Use gh-tooling-write issue_type_set with number 19952 and type null
 
 Replace an issue's field values. The `values` object becomes the issue's **complete** set: a field
 left out is cleared, and `{}` clears them all. To change one field without dropping the others, read
-the current values with `issue_view` first and pass them back alongside the change.
+the current values with `issue_view` and `with_field_values true`, edit the entry you want, and pass
+the whole object back — its `field_values` object and this `values` object are the same shape, and so
+is this tool's own response.
 
 Values are typed by the field: a single-select takes an option name, a multi-select takes an array of
 option names, a date takes `YYYY-MM-DD`, a number takes a number, and a text field takes a string.

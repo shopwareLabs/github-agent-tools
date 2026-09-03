@@ -107,9 +107,9 @@ if echo "$ENDPOINT" | grep -qE 'labels(\?|$)'; then
     block_tool "label_list" "Use label_list with optional repo and filter parameters."
 fi
 
-# Issue field values on one issue — issue_view returns them inline
+# Issue field values on one issue
 if echo "$ENDPOINT" | grep -qE 'issues/[0-9]+/issue-field-values'; then
-    block_tool "issue_view" "Use issue_view with number. The response carries the issue's field values under issue_field_values."
+    block_tool "issue_view" "Use issue_view with number and with_field_values true. It returns the issue's type and field values keyed by field name."
 fi
 
 # Organization issue types and issue fields

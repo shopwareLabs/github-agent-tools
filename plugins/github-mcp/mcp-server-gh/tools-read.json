@@ -454,7 +454,7 @@
     },
     {
       "name": "issue_view",
-      "description": "View a GitHub issue including title, body, state, labels, assignees, and milestone. Use to understand bug reports, feature requests, or task descriptions. Pass 'with_comments' to include discussion thread. Repository: pass `repo`, `repository`, or `owner`+`repo`.",
+      "description": "View a GitHub issue including title, body, state, labels, assignees, and milestone. Use to understand bug reports, feature requests, or task descriptions. Pass 'with_comments' to include discussion thread, or 'with_field_values' for the issue's type and field values. Repository: pass `repo`, `repository`, or `owner`+`repo`.",
       "inputSchema": {
         "type": "object",
         "required": [
@@ -479,6 +479,11 @@
           "with_comments": {
             "type": "boolean",
             "description": "Include issue comments in text output. Only applies when 'fields' is not set.",
+            "default": false
+          },
+          "with_field_values": {
+            "type": "boolean",
+            "description": "Return the issue's type and field values as JSON: {\"type\": \"Bug\", \"field_values\": {\"Priority\": \"Low\"}}. The 'field_values' object is exactly what issue_field_set takes, so read it first, change the entries you want, and pass the whole object back. Output is always JSON; combine with 'fields' to add gh's own fields, and do not combine with 'with_comments'.",
             "default": false
           },
           "jq_filter": {

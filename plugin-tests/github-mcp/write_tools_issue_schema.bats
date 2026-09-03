@@ -164,11 +164,11 @@ body() { jq -c "$1" "${GH_BODY_FILE}"; }
     assert_output "unchanged"
 }
 
-@test "issue_field_set shapes the response into field/value pairs" {
-    GH_STUB_OUTPUT='[{"issue_field_name":"Priority","value":12296,"single_select_option":{"id":12296,"name":"High"}},{"issue_field_name":"Start date","value":"2026-09-30"}]'
+@test "issue_field_set shapes the response like the values it takes" {
+    GH_STUB_OUTPUT='[{"issue_field_name":"Priority","value":12296,"single_select_option":{"id":12296,"name":"High"}},{"issue_field_name":"Start date","value":"2026-09-30"},{"issue_field_name":"Areas","multi_select_options":[{"id":13001,"name":"Storefront"}]}]'
     run tool_issue_field_set '{"number": 19952, "values": {"Priority": "High"}}'
     assert_success
-    assert_equal "$(printf '%s' "${output}" | jq -c '.')" '[{"field":"Priority","value":"High"},{"field":"Start date","value":"2026-09-30"}]'
+    assert_equal "$(printf '%s' "${output}" | jq -c '.')" '{"Priority":"High","Start date":"2026-09-30","Areas":["Storefront"]}'
 }
 
 @test "issue_field_set resolves a multi-select array to canonical option names" {

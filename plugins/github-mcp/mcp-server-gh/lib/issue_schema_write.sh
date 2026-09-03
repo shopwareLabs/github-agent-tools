@@ -205,7 +205,8 @@ tool_issue_type_set() {
 # Arguments:
 #   JSON args string.
 # Outputs:
-#   The resulting field values as JSON, or an error message.
+#   The resulting field values as JSON, keyed by field name so the response can
+#   be passed straight back as the next call's 'values', or an error message.
 # Returns:
 #   0 on success, non-zero on validation or gh failure.
 #######################################
@@ -252,7 +253,10 @@ tool_issue_field_set() {
     }
 
     _gh_issue_schema_write "PUT" "repos/${effective_repo}/issues/${number}/issue-field-values" \
-        "${body}" '[.[] | {field: .issue_field_name, value: (.single_select_option.name // .value)}]' \
+        "${body}" '[.[] | {key: .issue_field_name, value: (
+            if .multi_select_options != null then [.multi_select_options[].name]
+            elif .single_select_option != null then .single_select_option.name
+            else .value end)}] | from_entries' \
         "issue_field_set" "${suppress_errors}" "${fallback}"
 }
 

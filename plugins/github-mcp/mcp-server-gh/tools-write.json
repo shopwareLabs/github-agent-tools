@@ -785,7 +785,7 @@
     },
     {
       "name": "issue_field_set",
-      "description": "Replace an issue's field values with the given set. The 'values' object becomes the issue's complete set of field values: a field left out is cleared, and {} clears them all. Read the current values with issue_view before setting one field, or the others are dropped. Field and option names are matched case-insensitively; use issue_schema to list the available fields and options. Issue fields apply to issues only, not pull requests.",
+      "description": "Replace an issue's field values with the given set. The 'values' object becomes the issue's complete set of field values: a field left out is cleared, and {} clears them all. Read the current values with issue_view and 'with_field_values' before setting one field, or the others are dropped: its 'field_values' object is this parameter's shape, so change the entries you want and pass the whole object back. Field and option names are matched case-insensitively; use issue_schema to list the available fields and options. Issue fields apply to issues only, not pull requests.",
       "inputSchema": {
         "type": "object",
         "required": ["number", "values"],
