@@ -107,6 +107,16 @@ if echo "$ENDPOINT" | grep -qE 'labels(\?|$)'; then
     block_tool "label_list" "Use label_list with optional repo and filter parameters."
 fi
 
+# Issue field values on one issue
+if echo "$ENDPOINT" | grep -qE 'issues/[0-9]+/issue-field-values'; then
+    block_tool "issue_view" "Use issue_view with number and with_field_values true. It returns the issue's type and field values keyed by field name."
+fi
+
+# Organization issue types and issue fields
+if echo "$ENDPOINT" | grep -qE 'orgs/[^/]+/issue-(types|fields)'; then
+    block_tool "issue_schema" "Use issue_schema with optional org and type/field name filters. It returns both collections in one call."
+fi
+
 fi  # end GET-only read endpoint mapping
 
 # ============================================================================
@@ -134,6 +144,16 @@ if [[ "$IS_WRITE" == "true" ]]; then
     # Issue/PR comments (POST)
     if [[ "$METHOD" == "POST" ]] && echo "$ENDPOINT" | grep -qE 'issues/[0-9]+/comments'; then
         block_tool "issue_comment" "Use issue_comment with number and body."
+    fi
+
+    # Issue field values (POST/PUT/DELETE; a GET is handled by the read section)
+    if [[ "$METHOD" != "GET" ]] && echo "$ENDPOINT" | grep -qE 'issues/[0-9]+/issue-field-values'; then
+        block_tool "issue_field_set" "Use issue_field_set with number and a values object keyed by field name. It replaces the issue's whole set of field values."
+    fi
+
+    # Issue metadata, including the issue type (PATCH)
+    if [[ "$METHOD" == "PATCH" ]] && echo "$ENDPOINT" | grep -qE 'repos/[^/]+/[^/]+/issues/[0-9]+(\?|$)'; then
+        block_tool "issue_edit or issue_type_set" "Use issue_edit for title, body, labels, and assignees, or issue_type_set for the issue type."
     fi
 
     # PR review comment thread replies (POST)

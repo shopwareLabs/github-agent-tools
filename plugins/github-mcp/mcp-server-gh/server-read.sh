@@ -91,6 +91,7 @@ export GH_DEFAULT_REPO GH_TOOLING_CONFIG_FILE
 source "${SCRIPT_DIR}/lib/common.sh"
 source "${SCRIPT_DIR}/lib/pr.sh"
 source "${SCRIPT_DIR}/lib/issue.sh"
+source "${SCRIPT_DIR}/lib/issue_schema.sh"
 source "${SCRIPT_DIR}/lib/run.sh"
 source "${SCRIPT_DIR}/lib/job.sh"
 source "${SCRIPT_DIR}/lib/commit.sh"

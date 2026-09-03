@@ -69,6 +69,77 @@ _gh_require_repo_or_git() {
     return 1
 }
 
+#######################################
+# Reject an organization login that is not one path segment of GitHub's login
+# charset, so it cannot steer the request to a different API path.
+# Arguments:
+#   $1 candidate login, $2 tool name for the error message.
+# Outputs:
+#   An error message on stdout when the login is malformed.
+# Returns:
+#   0 when the login is usable, 1 otherwise.
+#######################################
+_gh_validate_org() {
+    local org="$1" tool="$2"
+    if [[ ! "${org}" =~ ^[A-Za-z0-9][A-Za-z0-9-]*$ ]]; then
+        printf '%s\n' "Error: invalid organization '${org}' for ${tool}. Expected a GitHub organization login."
+        return 1
+    fi
+}
+
+#######################################
+# Resolve the organization owning org-level resources (issue types, issue fields).
+# Priority: org > owner > repo-shaped args > GH_DEFAULT_REPO > git remote.
+# Globals:
+#   GH_DEFAULT_REPO, _GH_OWNER
+# Arguments:
+#   $1 JSON args string, $2 tool name for the error message.
+# Outputs:
+#   Organization login on stdout, or an error message on stdout.
+# Returns:
+#   0 when an organization was resolved, 1 otherwise.
+#######################################
+_gh_resolve_org() {
+    local args="$1" tool="$2"
+
+    local org owner
+    org=$(printf '%s\n' "${args}" | jq -r '.org // empty')
+    owner=$(printf '%s\n' "${args}" | jq -r '.owner // empty')
+
+    if [[ -n "${org}" ]]; then
+        _gh_validate_org "${org}" "${tool}" || return 1
+        printf '%s\n' "${org}"
+        return 0
+    fi
+    if [[ -n "${owner}" ]]; then
+        _gh_validate_org "${owner}" "${tool}" || return 1
+        printf '%s\n' "${owner}"
+        return 0
+    fi
+
+    # Not run in a command substitution: the resolver reports through globals,
+    # which a subshell would discard. Its own error text goes to our stdout.
+    if ! _gh_resolve_owner_repo_optional "${args}"; then
+        return 1
+    fi
+    if [[ -n "${_GH_OWNER}" ]]; then
+        _gh_validate_org "${_GH_OWNER}" "${tool}" || return 1
+        printf '%s\n' "${_GH_OWNER}"
+        return 0
+    fi
+
+    local name_with_owner
+    name_with_owner=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null) || true
+    if [[ -n "${name_with_owner}" ]]; then
+        _gh_validate_org "${name_with_owner%%/*}" "${tool}" || return 1
+        printf '%s\n' "${name_with_owner%%/*}"
+        return 0
+    fi
+
+    printf '%s\n' "Error: org is required for ${tool}. Pass 'org', 'owner', or a repository ('repository', 'repo', or 'owner'+'repo'), or set 'repo' in .mcp-gh-tooling.json"
+    return 1
+}
+
 # Read a value from the gh-tooling config file
 # Args: $1 = jq path (e.g. '.repo'), $2 = default value
 _gh_config_value() {

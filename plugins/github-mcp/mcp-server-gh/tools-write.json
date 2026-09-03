@@ -766,6 +766,38 @@
           "fallback": { "type": "string" }
         }
       }
+    },
+    {
+      "name": "issue_type_set",
+      "description": "Set or clear an issue's type (for example 'Bug' or 'Task'). The type name replaces whatever the issue carried before; pass null to clear it. Names are matched case-insensitively against the organization's types and resolved to their canonical spelling. Use issue_schema to list the available types. Issue types apply to issues only, not pull requests.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["number", "type"],
+        "properties": {
+          "number": { "type": ["integer", "string"], "description": "Issue number." },
+          "type": { "type": ["string", "null"], "description": "Issue type name, or null to clear the issue's type." },
+          "repo": { "type": "string", "pattern": "^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$", "description": "GitHub repository in 'owner/repo' format. Defaults to the repo configured in .mcp-gh-tooling.json." },
+          "suppress_errors": { "type": "boolean", "description": "Discard stderr output. When true, gh errors are silenced.", "default": false },
+          "fallback": { "type": "string", "description": "Text to return if the gh command fails (non-zero exit)." }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "issue_field_set",
+      "description": "Replace an issue's field values with the given set. The 'values' object becomes the issue's complete set of field values: a field left out is cleared, and {} clears them all. Read the current values with issue_view and 'with_field_values' before setting one field, or the others are dropped: its 'field_values' object is this parameter's shape, so change the entries you want and pass the whole object back. Field and option names are matched case-insensitively; use issue_schema to list the available fields and options. Issue fields apply to issues only, not pull requests.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["number", "values"],
+        "properties": {
+          "number": { "type": ["integer", "string"], "description": "Issue number." },
+          "values": { "type": "object", "description": "The complete set of field values, keyed by field name: single-select takes an option name, multi-select takes an array of option names, date takes 'YYYY-MM-DD', number takes a number, text takes a string. Pass {} to clear every field value." },
+          "repo": { "type": "string", "pattern": "^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$", "description": "GitHub repository in 'owner/repo' format. Defaults to the repo configured in .mcp-gh-tooling.json." },
+          "suppress_errors": { "type": "boolean", "description": "Discard stderr output. When true, gh errors are silenced.", "default": false },
+          "fallback": { "type": "string", "description": "Text to return if the gh command fails (non-zero exit)." }
+        },
+        "additionalProperties": false
+      }
     }
   ]
 }

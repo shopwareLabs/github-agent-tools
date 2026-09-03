@@ -2,7 +2,7 @@
 
 ## Read Server (gh-tooling)
 
-30 tools available via the `gh-tooling` MCP server. Requires `gh` CLI installed and authenticated.
+31 tools available via the `gh-tooling` MCP server. Requires `gh` CLI installed and authenticated.
 
 ### Shared Tool Parameters
 
@@ -142,7 +142,19 @@ View a GitHub issue.
 Use gh-tooling issue_view with number 8498
 Use gh-tooling issue_view with number 8498 and with_comments true
 Use gh-tooling issue_view with number 8498 and fields "title,body,state,labels,comments"
+Use gh-tooling issue_view with number 8498 and with_field_values true
 ```
+
+`with_field_values` returns the issue's type and its field values keyed by field
+name, which `gh issue view` exposes for neither:
+
+```json
+{"type": "Bug", "field_values": {"Priority": "Low", "Effort": "Low"}}
+```
+
+The `field_values` object is the shape `issue_field_set` takes, so it can be read,
+edited, and passed straight back. Output is always JSON; combine it with `fields`
+to add gh's own fields to the same document, and request comments separately.
 
 ### `issue_list`
 
@@ -150,6 +162,25 @@ List issues with filters.
 
 ```
 Use gh-tooling issue_list with search "TODO label:component/core" and limit 20
+```
+
+### `issue_schema`
+
+List an organization's issue types and issue fields, including each single-select field's options.
+The organization comes from `org`, `owner`, a repository parameter, the configured default repo, or the
+current clone's remote.
+
+Types and fields are independent. GitHub lets an organization pin fields to a type, but that pinning
+only drives the web UI: any organization field can be set on an issue of any type, so this tool
+reports the two lists side by side instead of nesting fields under types.
+
+`type` and `field` match one name exactly, case-insensitively, and each narrows only its own list. A
+name that matches nothing is an error rather than an empty list.
+
+```
+Use gh-tooling issue_schema with repo "shopware/shopware"
+Use gh-tooling issue_schema with org "shopware" and type "Bug"
+Use gh-tooling issue_schema with field "Priority" and jq_filter "[.fields[0].options[].name]"
 ```
 
 ### `run_view`
@@ -514,7 +545,7 @@ Use gh-tooling api_read with endpoint "search/issues" and jq_filter ".items[] | 
 
 ## Write Server (gh-tooling-write)
 
-23 tools available via the `gh-tooling-write` MCP server. Requires `enable_write_server: true` in `.mcp-gh-tooling.json`.
+25 tools available via the `gh-tooling-write` MCP server. Requires `enable_write_server: true` in `.mcp-gh-tooling.json`.
 
 ### Shared Tool Parameters
 
@@ -752,6 +783,48 @@ Use gh-tooling-write issue_comment with number 8498 and body "This has been fixe
 **Parameters:**
 - `number` (integer, required): Issue number.
 - `body` (string, required): Comment text to post.
+- `repo` (string, optional): Repository in `owner/repo` format.
+
+### Issue Type and Field Write Tools
+
+Both tools take names, not IDs, and resolve them against the organization's schema before calling the
+API, so an unknown name fails with the valid ones listed. Use `issue_schema` to see what is available.
+Issue types and issue fields apply to issues only, not pull requests.
+
+#### `issue_type_set`
+
+Set or clear an issue's type. The name replaces whatever the issue carried before, and `null` clears
+it, so repeating the same call leaves the issue in the same state.
+
+```
+Use gh-tooling-write issue_type_set with number 19952 and type "Bug"
+Use gh-tooling-write issue_type_set with number 19952 and type null
+```
+
+**Parameters:**
+- `number` (integer, required): Issue number.
+- `type` (string or null, required): Issue type name, matched case-insensitively, or `null` to clear.
+- `repo` (string, optional): Repository in `owner/repo` format.
+
+#### `issue_field_set`
+
+Replace an issue's field values. The `values` object becomes the issue's **complete** set: a field
+left out is cleared, and `{}` clears them all. To change one field without dropping the others, read
+the current values with `issue_view` and `with_field_values true`, edit the entry you want, and pass
+the whole object back — its `field_values` object and this `values` object are the same shape, and so
+is this tool's own response.
+
+Values are typed by the field: a single-select takes an option name, a multi-select takes an array of
+option names, a date takes `YYYY-MM-DD`, a number takes a number, and a text field takes a string.
+
+```
+Use gh-tooling-write issue_field_set with number 19952 and values {"Priority": "High", "Effort": "Low"}
+Use gh-tooling-write issue_field_set with number 19952 and values {}
+```
+
+**Parameters:**
+- `number` (integer, required): Issue number.
+- `values` (object, required): Complete set of field values keyed by field name. `{}` clears every value.
 - `repo` (string, optional): Repository in `owner/repo` format.
 
 ### Label Write Tools

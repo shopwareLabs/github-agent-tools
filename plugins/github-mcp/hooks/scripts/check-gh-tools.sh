@@ -159,7 +159,7 @@ fi
 
 if echo "$COMMAND" | grep -qE '(^|;|&&|\|)\s*gh\s+issue\s+edit(\s|$)'; then
     block_tool "mcp__gh-tooling-write__issue_edit" \
-        "Use issue_edit with number, title, body, labels, and assignees parameters."
+        "Use issue_edit with number, title, body, labels, and assignees parameters, or issue_type_set to change the issue type."
 fi
 
 if echo "$COMMAND" | grep -qE '(^|;|&&|\|)\s*gh\s+issue\s+close(\s|$)'; then

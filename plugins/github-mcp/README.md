@@ -7,7 +7,7 @@ GitHub CLI tools via MCP (Model Context Protocol). Wraps the `gh` CLI for pull r
 ### Read Server (gh-tooling)
 - **PR inspection** via `pr_view`, `pr_diff`, `pr_list`, `pr_checks`
 - **PR review data** via `pr_comments`, `pr_reviews`, `pr_files`, `pr_commits`
-- **Issue operations** via `issue_view`, `issue_list`
+- **Issue operations** via `issue_view`, `issue_list`, `issue_schema`
 - **GitHub Actions CI** via `run_view`, `run_list`, `run_logs`, `workflow_jobs`
 - **Job-level CI debugging** via `job_view`, `job_logs`, `job_annotations`
 - **Commit PR lookup** via `commit_pulls`
@@ -151,15 +151,15 @@ Configuration is loaded in the following priority order:
 
 ## Tools Reference
 
-30 read tools + 23 write tools organized by category. See [REFERENCE.md](./REFERENCE.md) for full parameter docs and examples.
+31 read tools + 25 write tools organized by category. See [REFERENCE.md](./REFERENCE.md) for full parameter docs and examples.
 
-### Read Server (gh-tooling) -- 30 tools
+### Read Server (gh-tooling) -- 31 tools
 
 | Category       | Tools                                                                           |
 |----------------|---------------------------------------------------------------------------------|
 | PR inspection  | `pr_view`, `pr_diff`, `pr_list`, `pr_checks`                                    |
 | PR review data | `pr_comments`, `pr_reviews`, `pr_files`, `pr_commits`                           |
-| Issues         | `issue_view`, `issue_list`                                                      |
+| Issues         | `issue_view`, `issue_list`, `issue_schema`                                      |
 | CI runs        | `run_view`, `run_list`, `run_logs`, `workflow_jobs`                             |
 | CI jobs        | `job_view`, `job_logs`, `job_annotations`                                       |
 | Commits        | `commit_pulls`                                                                  |
@@ -170,13 +170,14 @@ Configuration is loaded in the following priority order:
 | Projects       | `project_list`, `project_view`                                                  |
 | Raw API        | `api_read` (GET only)                                                           |
 
-### Write Server (gh-tooling-write) -- 23 tools
+### Write Server (gh-tooling-write) -- 25 tools
 
 | Category     | Tools                                                                        |
 |--------------|------------------------------------------------------------------------------|
 | PR lifecycle | `pr_create`, `pr_edit`, `pr_ready`, `pr_merge`, `pr_close`, `pr_reopen`      |
 | Reviews      | `pr_review_submit`, `pr_comment`, `pr_review_reply`                          |
 | Issues       | `issue_create`, `issue_edit`, `issue_close`, `issue_reopen`, `issue_comment` |
+| Issue schema | `issue_type_set`, `issue_field_set`                                          |
 | Labels       | `label_add`, `label_remove`                                                  |
 | Assignees    | `assignee_add`, `assignee_remove`                                            |
 | Sub-issues   | `sub_issue_add`, `sub_issue_remove`                                          |

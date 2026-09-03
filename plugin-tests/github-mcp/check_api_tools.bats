@@ -66,6 +66,27 @@ setup_read_blocking() {
     assert_output --partial "repo_tree"
 }
 
+@test "read api: blocks GET issues/N/issue-field-values → suggests issue_view" {
+    setup_read_blocking
+    run_api_hook "$READ_TOOL" "repos/shopware/shopware/issues/123/issue-field-values"
+    assert_failure 2
+    assert_output --partial "issue_view"
+}
+
+@test "read api: blocks orgs/N/issue-types → suggests issue_schema" {
+    setup_read_blocking
+    run_api_hook "$READ_TOOL" "orgs/shopware/issue-types"
+    assert_failure 2
+    assert_output --partial "issue_schema"
+}
+
+@test "read api: blocks orgs/N/issue-fields → suggests issue_schema" {
+    setup_read_blocking
+    run_api_hook "$READ_TOOL" "orgs/shopware/issue-fields"
+    assert_failure 2
+    assert_output --partial "issue_schema"
+}
+
 @test "read api: allows unknown endpoint" {
     setup_read_blocking
     run_api_hook "$READ_TOOL" "repos/shopware/shopware/actions/runs/123/jobs"
@@ -131,6 +152,42 @@ setup_write_blocking() {
     run_api_hook "$WRITE_TOOL" "repos/shopware/shopware/issues/123/comments" "POST"
     assert_failure 2
     assert_output --partial "issue_comment"
+}
+
+@test "write api: blocks PUT issues/N/issue-field-values → suggests issue_field_set" {
+    setup_write_blocking
+    run_api_hook "$WRITE_TOOL" "repos/shopware/shopware/issues/123/issue-field-values" "PUT"
+    assert_failure 2
+    assert_output --partial "issue_field_set"
+}
+
+@test "write api: blocks DELETE issues/N/issue-field-values/M → suggests issue_field_set" {
+    setup_write_blocking
+    run_api_hook "$WRITE_TOOL" "repos/shopware/shopware/issues/123/issue-field-values/8847" "DELETE"
+    assert_failure 2
+    assert_output --partial "issue_field_set"
+}
+
+@test "write api: blocks PATCH issues/N → suggests issue_edit or issue_type_set" {
+    setup_write_blocking
+    run_api_hook "$WRITE_TOOL" "repos/shopware/shopware/issues/123" "PATCH"
+    assert_failure 2
+    assert_output --partial "issue_type_set"
+}
+
+@test "write api: blocks PATCH issues/N with a query string" {
+    setup_write_blocking
+    run_api_hook "$WRITE_TOOL" "repos/shopware/shopware/issues/123?foo=bar" "PATCH"
+    assert_failure 2
+    assert_output --partial "issue_type_set"
+}
+
+@test "write api: a GET of issue-field-values goes to issue_view, not issue_field_set" {
+    setup_write_blocking
+    run_api_hook "$WRITE_TOOL" "repos/shopware/shopware/issues/123/issue-field-values" "GET"
+    assert_failure 2
+    assert_output --partial "issue_view"
+    refute_output --partial "issue_field_set"
 }
 
 @test "write api: blocks POST pulls/N/reviews → suggests pr_review_submit" {

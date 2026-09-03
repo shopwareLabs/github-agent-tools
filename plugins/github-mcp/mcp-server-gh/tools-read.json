@@ -454,7 +454,7 @@
     },
     {
       "name": "issue_view",
-      "description": "View a GitHub issue including title, body, state, labels, assignees, and milestone. Use to understand bug reports, feature requests, or task descriptions. Pass 'with_comments' to include discussion thread. Repository: pass `repo`, `repository`, or `owner`+`repo`.",
+      "description": "View a GitHub issue including title, body, state, labels, assignees, and milestone. Use to understand bug reports, feature requests, or task descriptions. Pass 'with_comments' to include discussion thread, or 'with_field_values' for the issue's type and field values. Repository: pass `repo`, `repository`, or `owner`+`repo`.",
       "inputSchema": {
         "type": "object",
         "required": [
@@ -479,6 +479,11 @@
           "with_comments": {
             "type": "boolean",
             "description": "Include issue comments in text output. Only applies when 'fields' is not set.",
+            "default": false
+          },
+          "with_field_values": {
+            "type": "boolean",
+            "description": "Return the issue's type and field values as JSON: {\"type\": \"Bug\", \"field_values\": {\"Priority\": \"Low\"}}. The 'field_values' object is exactly what issue_field_set takes, so read it first, change the entries you want, and pass the whole object back. Output is always JSON; combine with 'fields' to add gh's own fields, and do not combine with 'with_comments'.",
             "default": false
           },
           "jq_filter": {
@@ -1799,6 +1804,60 @@
           "owner": {
             "type": "string",
             "description": "Owner (user or org). Defaults to the owner from the configured default repo."
+          },
+          "jq_filter": {
+            "type": "string",
+            "description": "jq expression to filter/transform the JSON output."
+          },
+          "max_lines": {
+            "type": "integer",
+            "description": "Return only the first N lines of output.",
+            "minimum": 1
+          },
+          "suppress_errors": {
+            "type": "boolean",
+            "description": "Discard stderr output.",
+            "default": false
+          },
+          "fallback": {
+            "type": "string",
+            "description": "Text to return if the gh command fails."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "issue_schema",
+      "description": "List the issue types and issue fields available for an organization, including each single-select field's options. Use before setting an issue type or a field value to discover the exact names the write tools expect. Types and fields are independent: any organization field can be set on an issue of any type.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "org": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+            "description": "Organization login. Defaults to the owner of the resolved repository."
+          },
+          "owner": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+            "description": "Repository owner, used as the organization when 'org' is not set."
+          },
+          "repo": {
+            "type": "string",
+            "description": "GitHub repository in 'owner/repo' format, used to derive the organization."
+          },
+          "repository": {
+            "type": "string",
+            "description": "GitHub repository in 'owner/repo' format. Alias of `repo`."
+          },
+          "type": {
+            "type": "string",
+            "description": "Return only the issue type with this exact name (case-insensitive). Errors when no type matches."
+          },
+          "field": {
+            "type": "string",
+            "description": "Return only the issue field with this exact name (case-insensitive). Errors when no field matches."
           },
           "jq_filter": {
             "type": "string",

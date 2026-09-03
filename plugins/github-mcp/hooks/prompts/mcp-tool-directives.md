@@ -8,7 +8,7 @@ Repository selection (PR / issue / search / commit / repo tools): pass `repo` (o
 
 ## Read (gh-tooling)
 PRs: pr_view, pr_diff, pr_list, pr_checks, pr_comments, pr_reviews, pr_files, pr_commits
-Issues: issue_view, issue_list
+Issues: issue_view, issue_list, issue_schema
 CI: run_view, run_list, run_logs, workflow_jobs, job_view, job_logs, job_annotations
 Commits: commit_pulls
 Search: search, search_code, search_repos, search_commits, search_discussions
