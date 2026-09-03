@@ -86,3 +86,28 @@ setup() {
     assert_success
     assert_output --partial "Sprint Board"
 }
+
+# ============================================================================
+# jq_filter application
+# ============================================================================
+
+@test "label_list applies jq_filter as a jq transform, not a grep pattern" {
+    GH_STUB_OUTPUT='[{"name":"bug","description":"Bug report","color":"d73a4a"},{"name":"docs","description":"Documentation","color":"0000ff"}]'
+    run tool_label_list '{"repo": "shopware/shopware", "jq_filter": "[.[].name]"}'
+    assert_success
+    assert_output "$(printf '[\n  "bug",\n  "docs"\n]')"
+}
+
+@test "project_list applies jq_filter as a jq transform, not a grep pattern" {
+    GH_STUB_OUTPUT='{"projects":[{"number":1,"title":"Sprint Board"},{"number":2,"title":"Backlog"}]}'
+    run tool_project_list '{"owner": "shopware", "jq_filter": "[.projects[].title]"}'
+    assert_success
+    assert_output "$(printf '[\n  "Sprint Board",\n  "Backlog"\n]')"
+}
+
+@test "project_view applies jq_filter as a jq transform, not a grep pattern" {
+    GH_STUB_OUTPUT='{"number":1,"title":"Sprint Board","fields":{"nodes":[]}}'
+    run tool_project_view '{"number": 1, "owner": "shopware", "jq_filter": ".title"}'
+    assert_success
+    assert_output '"Sprint Board"'
+}

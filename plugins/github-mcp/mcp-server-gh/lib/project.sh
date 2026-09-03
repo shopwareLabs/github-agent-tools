@@ -50,7 +50,7 @@ tool_project_list() {
         [[ -n "${fallback}" ]] && { echo "${fallback}"; return 0; }
         echo "${__raw}"; return ${__exit}
     fi
-    _gh_post_process "${__raw}" "" "${jq_filter}" 0 0 false false "${max_lines}" "" || return $?
+    _gh_post_process "${__raw}" "${jq_filter}" "" 0 0 false false "${max_lines}" "" || return $?
 }
 
 # View details of a GitHub Project (v2).
@@ -93,7 +93,7 @@ tool_project_view() {
         [[ -n "${fallback}" ]] && { echo "${fallback}"; return 0; }
         echo "${__raw}"; return ${__exit}
     fi
-    _gh_post_process "${__raw}" "" "${jq_filter}" 0 0 false false "${max_lines}" "" || return $?
+    _gh_post_process "${__raw}" "${jq_filter}" "" 0 0 false false "${max_lines}" "" || return $?
 }
 
 # Resolve project name to project number.

@@ -42,7 +42,7 @@ tool_label_list() {
         [[ -n "${fallback}" ]] && { echo "${fallback}"; return 0; }
         echo "${__raw}"; return ${__exit}
     fi
-    _gh_post_process "${__raw}" "" "${jq_filter}" 0 0 false false "${max_lines}" "" || return $?
+    _gh_post_process "${__raw}" "${jq_filter}" "" 0 0 false false "${max_lines}" "" || return $?
 }
 
 # Shared helper for add/remove list operations on PRs/issues.
