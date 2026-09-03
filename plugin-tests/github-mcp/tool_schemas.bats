@@ -87,6 +87,19 @@ load_validator_for() {
     assert_output ""
 }
 
+@test "every write tool closes its schema to unknown parameters" {
+    # Without additionalProperties:false the validator has nothing to check a
+    # stray key against, so a misspelled or unsupported parameter is dropped and
+    # the call reports success having ignored it. A write tool added later
+    # without the flag is named here.
+    run jq -r '.tools[]
+        | select(.inputSchema.additionalProperties != false)
+        | "\(.name) does not set inputSchema.additionalProperties to false"' "$WRITE_TOOLS"
+
+    assert_success
+    assert_output ""
+}
+
 # --- validator round-trip against the shipped registries ---
 
 @test "a read tool accepts an issue number sent as a string" {
@@ -132,6 +145,18 @@ load_validator_for() {
 
     assert_success
     assert_output ""
+}
+
+@test "a write tool refuses a parameter it does not declare" {
+    # body_file is a gh flag with no tool parameter behind it. Before the write
+    # schemas were closed it was dropped in silence: the title landed, the body
+    # did not, and the call reported success.
+    load_validator_for "$WRITE_TOOLS"
+
+    run validate_tool_arguments "pr_edit" '{"number": 1, "title": "New title", "body_file": "/tmp/body.md"}'
+
+    assert_failure
+    assert_output --partial "Unknown parameter(s): body_file"
 }
 
 @test "a paging limit sent as a string is refused, naming the parameter" {

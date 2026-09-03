@@ -556,6 +556,8 @@ All gh-tooling-write MCP tools accept these parameters:
 | `suppress_errors` | boolean | `false` | Silence stderr; errors produce empty output instead of an error message |
 | `fallback`        | string  | --      | Return this text (successfully) when the gh command fails               |
 
+Unknown parameters are rejected at the MCP layer (`additionalProperties: false`), the same as on the read server. A misspelled or unsupported field (e.g. `body_file` on `pr_edit`) returns an error naming the allowed parameters instead of being silently dropped from the write.
+
 ### PR Write Tools
 
 #### `pr_create`

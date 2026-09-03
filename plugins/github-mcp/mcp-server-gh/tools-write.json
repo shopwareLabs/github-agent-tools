@@ -49,7 +49,8 @@
             "type": "string",
             "description": "Text to return if the gh command fails."
           }
-        }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -112,7 +113,8 @@
             "type": "string",
             "description": "Text to return if the gh command fails (non-zero exit)."
           }
-        }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -165,7 +167,8 @@
             "type": "string",
             "description": "Text to return if the gh command fails (non-zero exit)."
           }
-        }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -192,7 +195,8 @@
             "type": "string",
             "description": "Text to return if the gh command fails (non-zero exit)."
           }
-        }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -243,7 +247,8 @@
             "type": "string",
             "description": "Text to return if the gh command fails (non-zero exit)."
           }
-        }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -274,7 +279,8 @@
             "type": "string",
             "description": "Text to return if the gh command fails (non-zero exit)."
           }
-        }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -301,7 +307,8 @@
             "type": "string",
             "description": "Text to return if the gh command fails (non-zero exit)."
           }
-        }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -350,7 +357,8 @@
             "type": "string",
             "description": "Text to return if the gh command fails (non-zero exit)."
           }
-        }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -399,7 +407,8 @@
             "type": "string",
             "description": "Text to return if the gh command fails (non-zero exit)."
           }
-        }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -435,7 +444,8 @@
             "type": "string",
             "description": "Text to return if the gh command fails (non-zero exit)."
           }
-        }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -462,7 +472,8 @@
             "type": "string",
             "description": "Text to return if the gh command fails (non-zero exit)."
           }
-        }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -493,7 +504,8 @@
             "type": "string",
             "description": "Text to return if the gh command fails (non-zero exit)."
           }
-        }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -571,7 +583,8 @@
             "type": "string",
             "description": "Text to return if the gh command fails (non-zero exit)."
           }
-        }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -602,7 +615,8 @@
             "type": "string",
             "description": "Text to return if the gh command fails (non-zero exit)."
           }
-        }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -618,7 +632,8 @@
           "repo": { "type": "string", "description": "GitHub repository in 'owner/repo' format." },
           "suppress_errors": { "type": "boolean", "default": false },
           "fallback": { "type": "string" }
-        }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -634,7 +649,8 @@
           "repo": { "type": "string", "description": "GitHub repository in 'owner/repo' format." },
           "suppress_errors": { "type": "boolean", "default": false },
           "fallback": { "type": "string" }
-        }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -650,7 +666,8 @@
           "repo": { "type": "string", "description": "GitHub repository in 'owner/repo' format." },
           "suppress_errors": { "type": "boolean", "default": false },
           "fallback": { "type": "string" }
-        }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -666,7 +683,8 @@
           "repo": { "type": "string", "description": "GitHub repository in 'owner/repo' format." },
           "suppress_errors": { "type": "boolean", "default": false },
           "fallback": { "type": "string" }
-        }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -681,7 +699,8 @@
           "repo": { "type": "string", "description": "GitHub repository in 'owner/repo' format." },
           "suppress_errors": { "type": "boolean", "default": false },
           "fallback": { "type": "string" }
-        }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -696,7 +715,8 @@
           "repo": { "type": "string", "description": "GitHub repository in 'owner/repo' format." },
           "suppress_errors": { "type": "boolean", "default": false },
           "fallback": { "type": "string" }
-        }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -731,7 +751,8 @@
             "type": "string",
             "description": "Text to return if the gh command fails (non-zero exit)."
           }
-        }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -747,7 +768,8 @@
           "repo": { "type": "string", "description": "GitHub repository in 'owner/repo' format." },
           "suppress_errors": { "type": "boolean", "default": false },
           "fallback": { "type": "string" }
-        }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -764,7 +786,8 @@
           "repo": { "type": "string", "description": "GitHub repository in 'owner/repo' format." },
           "suppress_errors": { "type": "boolean", "default": false },
           "fallback": { "type": "string" }
-        }
+        },
+        "additionalProperties": false
       }
     },
     {
