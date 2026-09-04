@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.3] - 2026-09-04
+
+### Fixed
+- `job_logs` works again against gh 2.97.0 and newer. That release made `gh api` refuse to print a raw non-JSON body containing terminal escape sequences unless `--allow-escape-sequences` is passed, and the refusal is not tied to a TTY, so it fired inside the servers' command substitutions and broke `job_logs` for every CI job whose log carries ANSI colour — which is nearly all of them. `api_read` and the write server's `api` failed the same way on raw endpoints, as did `repo_file` on a file containing escape bytes. JSON endpoints were never affected, which is why `job_view` and `job_annotations` kept working, and `run_logs` was never affected because it shells `gh run view --log-failed`. The flag is now passed at the four `gh api` call sites that can return a raw body, after a one-time check of `gh api --help`: a gh older than 2.97.0 rejects the flag as unknown and has no such refusal, so it is omitted there.
+- `pr_view`, `pr_list`, `run_view`, `run_list`, `issue_view`, `issue_list`, and `search` now reject a `jq_filter` passed without `fields`. Those seven add `--json` only when `fields` is set, so a filter given on its own ran against gh's human-readable summary and produced a jq parse error naming neither the cause nor the remedy. The call is refused before it is made, with an error naming both parameters and a `fields` value that works for that tool. `issue_view` is exempt under `with_field_values: true`, which yields JSON on its own. `search_code`, `search_repos`, and `search_commits` always send a default field set and are unaffected.
+
+- `search_code` works again without an explicit `fields`. Its default field list asked gh for `textMatch`, which is not a field gh knows: `gh search code --json` accepts `path`, `repository`, `sha`, `textMatches`, and `url`, and rejects anything else with `Unknown JSON field`. Every `search_code` call that relied on the default failed before it reached the API, while a call passing `fields` explicitly worked. The default now asks for `textMatches`.
+
+### Changed
+- `job_logs`, `repo_file`, and the `api_read` / `api` escape hatches strip terminal escape sequences from the text they return. Passing `--allow-escape-sequences` alone would put raw escape bytes into a tool result the host renders in a terminal, which is what gh's refusal guards against; stripping keeps that guarantee and makes the log greppable, so `grep_pattern`, `max_lines`, and `tail_lines` now see the words rather than the colour codes wrapped around them. `repo_file` with `download_to` writes the file's bytes unchanged.
+
 ## [4.0.2] - 2026-09-03
 
 ### Fixed
