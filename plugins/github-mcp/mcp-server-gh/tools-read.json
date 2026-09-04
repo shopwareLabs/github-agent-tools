@@ -1141,7 +1141,7 @@
           },
           "fields": {
             "type": "string",
-            "description": "Comma-separated JSON fields (e.g. 'repository,path,textMatch'). Default: 'repository,path,textMatch'."
+            "description": "Comma-separated JSON fields (e.g. 'repository,path,textMatches'). Default: 'repository,path,textMatches'. Valid fields: path, repository, sha, textMatches, url."
           },
           "download_to": {
             "type": "string",

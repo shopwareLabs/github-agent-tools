@@ -703,10 +703,27 @@ bats_test_function --description "pr_checks: fails without repo outside git"  --
 # =============================================================================
 
 @test "search_code: succeeds with stub output" {
-    GH_STUB_OUTPUT='[{"repository":{"nameWithOwner":"shopware/shopware"},"path":"src/file.php","textMatch":"match"}]'
+    GH_STUB_OUTPUT='[{"repository":{"nameWithOwner":"shopware/shopware"},"path":"src/file.php","textMatches":[]}]'
     run tool_search_code '{"search":"addClass"}'
     assert_success
     assert_output --partial "shopware/shopware"
+}
+
+@test "search_code: default fields use gh's textMatches, not textMatch" {
+    # Regression: gh rejects textMatch with "Unknown JSON field", so every call
+    # that relied on the default field list failed before it reached the API.
+    gh() {
+        echo "$*" > "${BATS_TEST_TMPDIR}/captured_cmd"
+        echo '[]'
+    }
+    run tool_search_code '{"search":"addClass"}'
+    assert_success
+    local captured_cmd
+    captured_cmd=$(cat "${BATS_TEST_TMPDIR}/captured_cmd")
+    [[ "${captured_cmd}" == *"--json repository,path,textMatches"* ]] || {
+        echo "Expected --json repository,path,textMatches in command: ${captured_cmd}"
+        return 1
+    }
 }
 
 @test "search_code: uses GH_DEFAULT_REPO when no explicit repo provided" {

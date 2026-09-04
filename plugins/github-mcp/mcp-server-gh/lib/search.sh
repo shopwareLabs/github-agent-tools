@@ -132,7 +132,7 @@ tool_search_code() {
     [[ -n "${match}" ]]     && cmd+=("--match" "${match}")
     cmd+=("--limit" "${limit}")
 
-    local default_fields="repository,path,textMatch"
+    local default_fields="repository,path,textMatches"
     [[ -n "${fields}" ]] && cmd+=("--json" "${fields}") || cmd+=("--json" "${default_fields}")
 
     log "INFO" "search_code: ${cmd[*]}"
