@@ -167,6 +167,73 @@ _gh_validate_jq_filter() {
     fi
 }
 
+#######################################
+# Determine whether the installed gh accepts `gh api --allow-escape-sequences`
+# and record the answer in a global.
+#
+# gh 2.97.0 made `gh api` refuse to print a raw non-JSON body containing ESC
+# bytes unless the flag is passed; an older gh rejects the flag as unknown and
+# has no such refusal, so omitting it there reaches the same output rather than
+# a degraded one. This is the only capability-conditional behavior here.
+#
+# The result is reported through a global rather than stdout: a command
+# substitution would run the probe in a subshell and discard the cache, turning
+# a once-per-process `gh api --help` into one per tool call.
+#
+# The help text is captured and matched in the shell rather than piped to
+# `grep -q`. Under the servers' `pipefail`, `grep -q` closing the pipe on the
+# first match kills gh with SIGPIPE, and the pipeline's non-zero status would
+# then record the flag as absent on exactly the runs that found it.
+# Globals:
+#   _GH_ALLOW_ESCAPE_FLAG — set to the flag, or to the empty string.
+#######################################
+_gh_probe_allow_escape_flag() {
+    [[ -n "${_GH_ALLOW_ESCAPE_FLAG+set}" ]] && return 0
+    local help_text
+    help_text=$(gh api --help 2>/dev/null) || help_text=""
+    if [[ "${help_text}" == *"--allow-escape-sequences"* ]]; then
+        _GH_ALLOW_ESCAPE_FLAG="--allow-escape-sequences"
+    else
+        _GH_ALLOW_ESCAPE_FLAG=""
+    fi
+}
+
+#######################################
+# Strip terminal escape sequences from text.
+#
+# Passing --allow-escape-sequences without this would put raw ESC bytes into a
+# tool result the host renders in a terminal, which is the hazard gh's refusal
+# guards against; stripping keeps that guarantee and leaves the text greppable.
+#
+# The sed program is plain BRE with no alternation, because BSD sed has no
+# `\|`, and uses `|` as the delimiter so the CSI intermediate range can contain
+# `/`. LC_ALL=C makes the byte ranges byte ranges: BSD sed collates them under
+# the ambient locale and rejects `[@-_]`.
+#
+# The expressions run in this order:
+#   1. OSC terminated by BEL, 2. OSC terminated by ST. Neither payload class
+#      admits BEL or ESC, so a run with one terminator cannot swallow the text
+#      up to a later run with the other.
+#   3. CSI. 4. nF sequences (intermediates then a final), which is what
+#      `ESC ( B` is. 5. any other ESC plus one final byte, covering `ESC c`,
+#      `ESC 7` and `ESC M`. 6. a bare trailing ESC.
+# Rule 6 is what makes the guarantee absolute: no ESC byte reaches the caller,
+# whatever gh emitted.
+# Arguments:
+#   $1 text to clean.
+# Outputs:
+#   The text with escape sequences removed, on stdout.
+#######################################
+_gh_strip_ansi() {
+    printf '%s\n' "$1" | LC_ALL=C sed \
+        -e $'s|\033\\][^\007\033]*\007||g' \
+        -e $'s|\033\\][^\007\033]*\033\\\\||g' \
+        -e $'s|\033\\[[0-9;:<=>?]*[ -/]*[@-~]||g' \
+        -e $'s|\033[ -/][ -/]*[0-~]||g' \
+        -e $'s|\033[0-~]||g' \
+        -e $'s|\033||g'
+}
+
 # Apply optional pipeline post-processing steps in order: jq → grep → head → tail.
 # Each step is a no-op when its controlling parameter is empty/zero.
 # Args: $1=output $2=jq_filter $3=grep_pattern $4=grep_before $5=grep_after
@@ -289,6 +356,10 @@ _gh_download_file() {
     local -a cmd=("gh" "api" "repos/${owner}/${repo}/contents/${remote_path}")
     [[ -n "${ref}" ]] && cmd+=("-f" "ref=${ref}")
     cmd+=("-H" "Accept: application/vnd.github.raw+json")
+    # Raw file bytes: gh refuses to emit a body carrying ESC without the flag.
+    # The bytes are written verbatim to disk, so nothing strips them afterwards.
+    _gh_probe_allow_escape_flag
+    [[ -n "${_GH_ALLOW_ESCAPE_FLAG}" ]] && cmd+=("${_GH_ALLOW_ESCAPE_FLAG}")
 
     local parent_dir
     parent_dir=$(dirname "${local_path}")

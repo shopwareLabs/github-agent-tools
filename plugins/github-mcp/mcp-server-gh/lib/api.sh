@@ -67,6 +67,11 @@ tool_api() {
 
     local -a cmd=("gh" "api" "${endpoint}")
 
+    # The endpoint is caller-chosen, so the body may be raw non-JSON (job logs,
+    # raw file contents), which gh refuses to print when it carries ESC bytes.
+    _gh_probe_allow_escape_flag
+    [[ -n "${_GH_ALLOW_ESCAPE_FLAG}" ]] && cmd+=("${_GH_ALLOW_ESCAPE_FLAG}")
+
     [[ "${method}" != "GET" ]] && cmd+=("-X" "${method}")
     [[ "${paginate}" == "true" ]] && cmd+=("--paginate")
     [[ -n "${fields}" ]] && cmd+=("--jq" "${fields}")
@@ -83,5 +88,8 @@ tool_api() {
         [[ -n "${fallback}" ]] && { echo "${fallback}"; return 0; }
         echo "${__raw}"; return ${__exit}
     fi
+    # Strip before post-processing so max_lines and tail_lines count lines of
+    # text rather than lines padded with colour codes.
+    __raw=$(_gh_strip_ansi "${__raw}")
     _gh_post_process "${__raw}" "" "" 0 0 false false "${max_lines}" "${tail_lines}" || return $?
 }

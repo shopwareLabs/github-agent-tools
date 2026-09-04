@@ -899,7 +899,7 @@
     },
     {
       "name": "job_logs",
-      "description": "Get the raw log output for a specific GitHub Actions job by job ID. More targeted than run_logs - use when you know the specific job that failed. Use 'max_lines'/'tail_lines' to limit output, or 'grep_pattern' to filter for specific error messages.",
+      "description": "Get the log output for a specific GitHub Actions job by job ID, with terminal escape sequences removed. More targeted than run_logs - use when you know the specific job that failed. Use 'max_lines'/'tail_lines' to limit output, or 'grep_pattern' to filter for specific error messages.",
       "inputSchema": {
         "type": "object",
         "required": [
@@ -1475,7 +1475,7 @@
     },
     {
       "name": "repo_file",
-      "description": "Fetch a single file from a GitHub repository as raw text. Accepts GitHub URLs (e.g. 'https://github.com/owner/repo/blob/main/README.md'), explicit owner/repo params, or a repository string. Use instead of WebFetch on GitHub blob URLs. Supports line ranges, grep filtering, and local download via 'download_to'. URL limitation: refs with slashes (e.g. feature/my-branch) are not parsed correctly — use explicit 'ref' param instead.",
+      "description": "Fetch a single file from a GitHub repository as text, with terminal escape sequences removed (the 'download_to' path writes the file bytes unchanged). Accepts GitHub URLs (e.g. 'https://github.com/owner/repo/blob/main/README.md'), explicit owner/repo params, or a repository string. Use instead of WebFetch on GitHub blob URLs. Supports line ranges, grep filtering, and local download via 'download_to'. URL limitation: refs with slashes (e.g. feature/my-branch) are not parsed correctly — use explicit 'ref' param instead.",
       "inputSchema": {
         "type": "object",
         "properties": {

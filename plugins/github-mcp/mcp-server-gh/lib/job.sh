@@ -75,6 +75,10 @@ tool_job_logs() {
     _gh_validate_repo "${effective_repo}" || return 1
 
     local -a cmd=("gh" "api" "repos/${effective_repo}/actions/jobs/${job_id}/logs")
+    # Job logs are a raw non-JSON body and nearly always carry ANSI colour,
+    # which gh refuses to print without this flag.
+    _gh_probe_allow_escape_flag
+    [[ -n "${_GH_ALLOW_ESCAPE_FLAG}" ]] && cmd+=("${_GH_ALLOW_ESCAPE_FLAG}")
 
     log "INFO" "job_logs: ${cmd[*]}"
     local __raw __exit=0
@@ -87,6 +91,9 @@ tool_job_logs() {
         [[ -n "${fallback}" ]] && { echo "${fallback}"; return 0; }
         echo "${__raw}"; return ${__exit}
     fi
+    # Strip before post-processing so grep_pattern, max_lines and tail_lines see
+    # clean text rather than colour codes wrapped around the words they match.
+    __raw=$(_gh_strip_ansi "${__raw}")
     _gh_post_process "${__raw}" "" "${grep_pattern}" "${grep_context_before}" "${grep_context_after}" "${grep_ignore_case}" "${grep_invert}" "${max_lines}" "${tail_lines}" || return $?
 }
 

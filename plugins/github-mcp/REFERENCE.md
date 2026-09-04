@@ -29,6 +29,8 @@ Tools with large text output (`run_logs`, `job_logs`, `pr_diff`) additionally ac
 
 `max_lines` and `tail_lines` are also available on `pr_view`, `pr_checks`, `pr_comments`, `pr_reviews`, `issue_view`, `api_read`, `label_list`, `project_list`, and `project_view` for output size control.
 
+`job_logs`, `repo_file`, and `api_read` remove terminal escape sequences from the text they return, so `grep_pattern`, `max_lines`, and `tail_lines` work on the words rather than on the colour codes wrapped around them. `repo_file` with `download_to` is the exception: it writes the file's bytes unchanged.
+
 #### Repository selection
 
 PR, issue, search, commit, and repo browsing tools accept the repository in any of these shapes — pass whichever matches the data you have:
@@ -272,7 +274,7 @@ Use gh-tooling job_view with job_id 62056364818 and jq_filter ".steps[] | select
 
 ### `job_logs`
 
-Get raw log output for a specific CI job.
+Get log output for a specific CI job, with terminal escape sequences removed.
 
 ```
 Use gh-tooling job_logs with job_id 62056364818
@@ -975,3 +977,5 @@ Use gh-tooling-write api with endpoint "repos/shopware/shopware/issues/8498/time
 - `fields` (string, optional): jq expression for `--jq` flag on the gh api call.
 - `max_lines` (integer, optional): Return only the first N lines of output.
 - `tail_lines` (integer, optional): Return only the last N lines of output.
+
+Shares the implementation of `api_read`, including its escape-sequence handling — see Read Server §Shared Tool Parameters.

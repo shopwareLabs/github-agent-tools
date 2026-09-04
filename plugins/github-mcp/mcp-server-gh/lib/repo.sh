@@ -118,6 +118,10 @@ tool_repo_file() {
     local endpoint="repos/${owner}/${repo}/contents/${path}"
     [[ -n "${ref}" ]] && endpoint="${endpoint}?ref=${ref}"
     local -a cmd=("gh" "api" "${endpoint}" "-H" "Accept: application/vnd.github.raw+json")
+    # The raw Accept header makes this a non-JSON body, which gh refuses to
+    # print when the file itself contains ESC bytes.
+    _gh_probe_allow_escape_flag
+    [[ -n "${_GH_ALLOW_ESCAPE_FLAG}" ]] && cmd+=("${_GH_ALLOW_ESCAPE_FLAG}")
 
     # download_to mode: save raw file locally
     if [[ -n "${download_to}" ]]; then
@@ -157,6 +161,11 @@ tool_repo_file() {
         [[ -n "${fallback}" ]] && { echo "${fallback}"; return 0; }
         echo "${__raw}"; return ${__exit}
     fi
+
+    # Text mode only — the download_to path above returns before here and must
+    # stay byte-faithful. Stripping first keeps the line range, grep_pattern,
+    # max_lines and tail_lines working on clean text.
+    __raw=$(_gh_strip_ansi "${__raw}")
 
     # Apply line range via sed if specified (validate as integers first)
     if [[ -n "${line_start}" || -n "${line_end}" ]]; then
