@@ -28,6 +28,12 @@ tool_issue_view() {
     fi
     _gh_validate_number "${number}" "number" || return 1
     _gh_validate_jq_filter "${jq_filter}" || return 1
+    # with_field_values is exempt: that path merges the REST issue into a JSON
+    # document regardless of fields, so the filter has JSON to run against.
+    if [[ -n "${jq_filter}" && -z "${fields}" && "${with_field_values}" != "true" ]]; then
+        printf '%s\n' "Error: jq_filter requires fields on issue_view. Without fields, gh issue view returns human-readable text that jq cannot parse. Pass fields (for example \"number,title,state,labels\") alongside jq_filter."
+        return 1
+    fi
 
     _gh_resolve_owner_repo_optional "${args}" || return 1
     local effective_repo=""
@@ -183,6 +189,10 @@ tool_issue_list() {
     fallback=$(echo "${args}" | jq -r '.fallback // empty')
 
     _gh_validate_jq_filter "${jq_filter}" || return 1
+    if [[ -n "${jq_filter}" && -z "${fields}" ]]; then
+        printf '%s\n' "Error: jq_filter requires fields on issue_list. Without fields, gh issue list returns a human-readable table that jq cannot parse. Pass fields (for example \"number,title,state,labels\") alongside jq_filter."
+        return 1
+    fi
 
     _gh_resolve_owner_repo_optional "${args}" || return 1
     local effective_repo=""

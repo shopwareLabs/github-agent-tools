@@ -345,6 +345,10 @@ Use the identifiers exposed by the active host rather than copying the other hos
 1. Run `gh auth login` and follow the prompts
 2. Verify with `gh auth status`
 
+### `jq_filter` Rejected Without `fields`
+
+Seven read tools need `fields` before a filter has JSON to run on, and `issue_view` also accepts `with_field_values` in its place. Pass one of them alongside the filter -- see [REFERENCE.md](./REFERENCE.md) §Shared Tool Parameters.
+
 ### Write Server Not Showing Tools
 
 1. Verify `enable_write_server` is set to `true` in `.mcp-gh-tooling.json`

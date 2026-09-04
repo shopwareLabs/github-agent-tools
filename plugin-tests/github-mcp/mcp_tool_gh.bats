@@ -1704,7 +1704,7 @@ diff --git a/src/Third.php b/src/Third.php
 
 @test "pr_list: jq_filter applied to output" {
     GH_STUB_OUTPUT='[{"number":1},{"number":2}]'
-    run tool_pr_list '{"jq_filter":".[0].number"}'
+    run tool_pr_list '{"fields":"number","jq_filter":".[0].number"}'
     assert_success
     assert_output "1"
 }
@@ -1857,7 +1857,7 @@ diff --git a/src/Third.php b/src/Third.php
 
 @test "run_view: jq_filter applied to output" {
     GH_STUB_OUTPUT='{"status":"completed","conclusion":"success"}'
-    run tool_run_view '{"run_id":"12345","jq_filter":".conclusion"}'
+    run tool_run_view '{"run_id":"12345","fields":"status,conclusion","jq_filter":".conclusion"}'
     assert_success
     assert_output '"success"'
 }

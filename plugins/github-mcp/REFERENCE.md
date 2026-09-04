@@ -15,6 +15,8 @@ All gh-tooling MCP tools accept these parameters:
 
 Tools that produce structured JSON output also accept `jq_filter` (string) for filtering and transforming results with full jq expression syntax. A syntax check runs before execution to give early feedback on invalid expressions.
 
+`pr_view`, `pr_list`, `run_view`, `run_list`, `issue_view`, `issue_list`, and `search` only emit JSON when `fields` is set; without it the underlying `gh` command prints a human-readable summary. On those seven, a `jq_filter` passed without `fields` is rejected before the call, with an error naming both. `issue_view` also emits JSON under `with_field_values: true`, which satisfies the requirement on its own.
+
 Tools with large text output (`run_logs`, `job_logs`, `pr_diff`) additionally accept:
 
 | Parameter             | Type    | Description                                                 |

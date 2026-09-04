@@ -31,7 +31,7 @@
           },
           "jq_filter": {
             "type": "string",
-            "description": "jq expression to filter/transform the output. Syntax is validated before execution. Useful for shaping JSON responses or reducing response size before the token cap."
+            "description": "jq expression to filter/transform the output. Requires 'fields' — without it the tool returns human-readable text and the filter cannot parse it. Syntax is validated before execution. Useful for shaping JSON responses or reducing response size before the token cap."
           },
           "max_lines": {
             "type": "integer",
@@ -188,7 +188,7 @@
           },
           "jq_filter": {
             "type": "string",
-            "description": "jq expression to filter/transform the output. Syntax is validated before execution. Useful for shaping JSON responses or reducing response size before the token cap."
+            "description": "jq expression to filter/transform the output. Requires 'fields' — without it the tool returns human-readable text and the filter cannot parse it. Syntax is validated before execution. Useful for shaping JSON responses or reducing response size before the token cap."
           },
           "suppress_errors": {
             "type": "boolean",
@@ -488,7 +488,7 @@
           },
           "jq_filter": {
             "type": "string",
-            "description": "jq expression to filter/transform the output. Syntax is validated before execution. Useful for shaping JSON responses or reducing response size before the token cap."
+            "description": "jq expression to filter/transform the output. Requires 'fields' or with_field_values — without one of them the tool returns human-readable text and the filter cannot parse it. Syntax is validated before execution. Useful for shaping JSON responses or reducing response size before the token cap."
           },
           "max_lines": {
             "type": "integer",
@@ -554,7 +554,7 @@
           },
           "jq_filter": {
             "type": "string",
-            "description": "jq expression to filter/transform the output. Syntax is validated before execution. Useful for shaping JSON responses or reducing response size before the token cap."
+            "description": "jq expression to filter/transform the output. Requires 'fields' — without it the tool returns human-readable text and the filter cannot parse it. Syntax is validated before execution. Useful for shaping JSON responses or reducing response size before the token cap."
           },
           "suppress_errors": {
             "type": "boolean",
@@ -603,7 +603,7 @@
           },
           "jq_filter": {
             "type": "string",
-            "description": "jq expression to filter/transform the output. Syntax is validated before execution. Useful for shaping JSON responses or reducing response size before the token cap."
+            "description": "jq expression to filter/transform the output. Requires 'fields' — without it the tool returns human-readable text and the filter cannot parse it. Syntax is validated before execution. Useful for shaping JSON responses or reducing response size before the token cap."
           },
           "suppress_errors": {
             "type": "boolean",
@@ -684,7 +684,7 @@
           },
           "jq_filter": {
             "type": "string",
-            "description": "jq expression to filter/transform the output. Syntax is validated before execution. Useful for shaping JSON responses or reducing response size before the token cap."
+            "description": "jq expression to filter/transform the output. Requires 'fields' — without it the tool returns human-readable text and the filter cannot parse it. Syntax is validated before execution. Useful for shaping JSON responses or reducing response size before the token cap."
           },
           "suppress_errors": {
             "type": "boolean",
@@ -1078,7 +1078,7 @@
           },
           "jq_filter": {
             "type": "string",
-            "description": "jq expression to filter/transform the output. Syntax is validated before execution. Useful for shaping JSON responses or reducing response size before the token cap."
+            "description": "jq expression to filter/transform the output. Requires 'fields' — without it the tool returns human-readable text and the filter cannot parse it. Syntax is validated before execution. Useful for shaping JSON responses or reducing response size before the token cap."
           },
           "suppress_errors": {
             "type": "boolean",

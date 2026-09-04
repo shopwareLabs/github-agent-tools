@@ -30,6 +30,10 @@ tool_search() {
     fi
 
     _gh_validate_jq_filter "${jq_filter}" || return 1
+    if [[ -n "${jq_filter}" && -z "${fields}" ]]; then
+        printf '%s\n' "Error: jq_filter requires fields on search. Without fields, gh search returns a human-readable table that jq cannot parse. Pass fields (for example \"number,title,state,repository\") alongside jq_filter."
+        return 1
+    fi
 
     local effective_repo
     effective_repo=$(_gh_resolve_repo "${repo}")

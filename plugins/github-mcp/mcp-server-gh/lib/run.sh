@@ -21,6 +21,10 @@ tool_run_view() {
     fi
     _gh_validate_number "${run_id}" "run_id" || return 1
     _gh_validate_jq_filter "${jq_filter}" || return 1
+    if [[ -n "${jq_filter}" && -z "${fields}" ]]; then
+        printf '%s\n' "Error: jq_filter requires fields on run_view. Without fields, gh run view returns a human-readable summary that jq cannot parse. Pass fields (for example \"conclusion,status,headSha\") alongside jq_filter."
+        return 1
+    fi
 
     local effective_repo
     effective_repo=$(_gh_resolve_repo "${repo}")
@@ -69,6 +73,10 @@ tool_run_list() {
     fallback=$(echo "${args}" | jq -r '.fallback // empty')
 
     _gh_validate_jq_filter "${jq_filter}" || return 1
+    if [[ -n "${jq_filter}" && -z "${fields}" ]]; then
+        printf '%s\n' "Error: jq_filter requires fields on run_list. Without fields, gh run list returns a human-readable table that jq cannot parse. Pass fields (for example \"databaseId,status,conclusion,headBranch\") alongside jq_filter."
+        return 1
+    fi
 
     local effective_repo
     effective_repo=$(_gh_resolve_repo "${repo}")

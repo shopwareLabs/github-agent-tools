@@ -22,6 +22,10 @@ tool_pr_view() {
     fi
     _gh_validate_number "${number}" "number" || return 1
     _gh_validate_jq_filter "${jq_filter}" || return 1
+    if [[ -n "${jq_filter}" && -z "${fields}" ]]; then
+        printf '%s\n' "Error: jq_filter requires fields on pr_view. Without fields, gh pr view returns human-readable text that jq cannot parse. Pass fields (for example \"number,title,state,url\") alongside jq_filter."
+        return 1
+    fi
 
     _gh_resolve_owner_repo_optional "${args}" || return 1
     local effective_repo=""
@@ -135,6 +139,10 @@ tool_pr_list() {
     fallback=$(echo "${args}" | jq -r '.fallback // empty')
 
     _gh_validate_jq_filter "${jq_filter}" || return 1
+    if [[ -n "${jq_filter}" && -z "${fields}" ]]; then
+        printf '%s\n' "Error: jq_filter requires fields on pr_list. Without fields, gh pr list returns a human-readable table that jq cannot parse. Pass fields (for example \"number,title,author,state\") alongside jq_filter."
+        return 1
+    fi
 
     _gh_resolve_owner_repo_optional "${args}" || return 1
     local effective_repo=""
