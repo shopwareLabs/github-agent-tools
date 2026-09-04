@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.0] - 2026-09-04
+
+### Changed
+- `shared/mcpserver_core.sh` is now vendored from [shopwareLabs/bash-mcp-sdk](https://github.com/shopwareLabs/bash-mcp-sdk) `v3.0.0`, up from `v2.0.0`. `.mcp-sdk.lock` records the release and the file's hash, and the vendored copy is byte-identical to `lib/mcpserver_core.sh` at that tag.
+- Tool-call argument validation now enforces declared `minimum`, `maximum`, `exclusiveMinimum` and `exclusiveMaximum` bounds against number-valued arguments. Bounds were previously read by nothing, so a schema declaring one stated a constraint the protocol layer did not hold. Diagnostics still report the most fundamental defect first, in the order missing, unknown, type, pattern, range, items, enum. **Breaking for callers:** the shipped schemas carry 41 `minimum` declarations and one `maximum`, and all of them now bind. `max_lines`, `tail_lines`, `limit`, `line_start` and `line_end` declare `minimum: 1`; `grep_context_before` and `grep_context_after` declare `minimum: 0`; `workflow_jobs.limit` declares `maximum: 50`. A value outside those bounds returns an `isError` result naming the parameter and the bound instead of failing downstream or passing silently — `max_lines: 0` disabled truncation indistinguishably from omitting the parameter, `release_list` with `limit: -1` reached `gh` as `per_page=-1`, and `workflow_jobs` with `limit: 999` sent the request the cap exists to prevent. No shipped default falls outside its own bounds, and every parameter carrying one is integer-typed, so a call already within range is unaffected. No schema declares an exclusive bound.
+- A declared `integer` is now decided from the number as jq renders it as well as from its double value. At or above 2^52 the spacing between doubles reaches 1, so a fractional literal such as `4503599627370496.5` was already whole once converted and passed the check; it is now refused. A rendering that carries an exponent keeps the double-based verdict.
+
 ## [4.0.3] - 2026-09-04
 
 ### Fixed
