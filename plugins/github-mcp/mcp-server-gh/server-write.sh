@@ -91,12 +91,12 @@ _check_write_enabled() {
     fi
     if [[ "${enabled}" != "true" ]]; then
         log "INFO" "Write server disabled (enable_write_server != true)"
-        local empty_tools
-        empty_tools=$(mktemp "${SCRIPT_DIR}/tools-empty.XXXXXX.json")
-        printf '{"tools":[]}\n' > "${empty_tools}"
-        MCP_TOOLS_LIST_FILE="${empty_tools}"
+        # A shipped empty list rather than one written at startup. The protocol
+        # layer owns the process's EXIT trap, so a cleanup trap set here never
+        # runs, and it answers -32603 for a tools list it cannot read — which a
+        # startup-written file becomes the moment anything removes it.
+        MCP_TOOLS_LIST_FILE="${SCRIPT_DIR}/tools-empty.json"
         export MCP_TOOLS_LIST_FILE
-        trap 'rm -f "'"${empty_tools}"'"' EXIT
     else
         log "INFO" "Write server enabled"
     fi
