@@ -31,9 +31,11 @@ call_tool() {
 undeclared_tools() {
     local server="$1" tools_file="$2" lib sourced declared
     sourced=$(
-        for lib in $(grep -o 'lib/[a-z_]*\.sh' "${GH_SERVER_DIR}/${server}" | sort -u); do
-            grep -h -o '^tool_[a-z_0-9]*' "${GH_SERVER_DIR}/${lib}" 2>/dev/null
-        done | sed 's/^tool_//' | sort -u
+        grep -o 'lib/[a-z_]*\.sh' "${GH_SERVER_DIR}/${server}" | sort -u \
+            | while IFS= read -r lib; do
+                  grep -h -o '^tool_[a-z_0-9]*' "${GH_SERVER_DIR}/${lib}" 2>/dev/null
+              done \
+            | sed 's/^tool_//' | sort -u
     )
     declared=$(jq -r '.tools[].name' "${GH_SERVER_DIR}/${tools_file}" | sort -u)
     comm -23 <(printf '%s\n' "$sourced") <(printf '%s\n' "$declared")
