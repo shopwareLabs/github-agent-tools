@@ -357,8 +357,8 @@ Seven read tools need `fields` before a filter has JSON to run on, and `issue_vi
 
 ## Dependencies
 
-- **bash** (4.0+)
-- **jq** (JSON processor)
+- **bash** (4.1+) — the MCP servers refuse to start below this and say so on stderr. macOS ships 3.2 as `/bin/bash` and no install replaces it, so a Mac needs a newer bash on the `PATH` the host launches the server with.
+- **jq** (1.7+) — below this, tool argument validation is skipped, so the servers refuse to start rather than validate less than they claim.
 - **gh** CLI (GitHub CLI, authenticated)
 
 ## License
