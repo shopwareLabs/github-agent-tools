@@ -94,10 +94,17 @@ undeclared_tools() {
 @test "disabled write server writes no tools list of its own" {
     printf '%s\n' '{"enable_write_server": false}' > "${PROJECT_DIR}/.mcp-gh-tooling.json"
 
+    # Compared before and after rather than asserted absent: the server
+    # directory is shared, and a run of any earlier revision leaves its own
+    # startup-written list behind. What matters is that this run writes none.
+    # The shipped tools-empty.json does not match the pattern.
+    local before after
+    before=$(find "${GH_SERVER_DIR}" -maxdepth 1 -name 'tools-empty.*.json' | sort)
+
     printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \
         | env PROJECT_ROOT="${PROJECT_DIR}" bash "${GH_SERVER_DIR}/server-write.sh" >/dev/null 2>&1
 
-    run find "${GH_SERVER_DIR}" -maxdepth 1 -name 'tools-empty.*.json'
-    assert_success
-    assert_output ""
+    after=$(find "${GH_SERVER_DIR}" -maxdepth 1 -name 'tools-empty.*.json' | sort)
+
+    [[ "$before" == "$after" ]]
 }
