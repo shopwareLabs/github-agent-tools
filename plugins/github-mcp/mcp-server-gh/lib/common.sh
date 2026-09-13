@@ -398,8 +398,23 @@ _gh_download_file() {
         echo "Error: cannot create directory ${parent_dir}"
         return 1
     }
-    "${cmd[@]}" > "${local_path}" 2>&1 || {
+    # Write to a sibling and rename once the body is complete. A cancelled call
+    # has its process group killed mid-write, and a half-written file at the
+    # target path reads as a complete one. The redirect also captures gh's
+    # diagnostics, which would otherwise land in the file as its contents.
+    local tmp_path
+    tmp_path=$(mktemp "${local_path}.partial.XXXXXX") || {
+        echo "Error: cannot create a temporary file next to ${local_path}"
+        return 1
+    }
+    "${cmd[@]}" > "${tmp_path}" 2>&1 || {
+        rm -f "${tmp_path}"
         echo "Error: failed to download ${owner}/${repo}/${remote_path}"
+        return 1
+    }
+    mv -- "${tmp_path}" "${local_path}" || {
+        rm -f "${tmp_path}"
+        echo "Error: cannot write ${local_path}"
         return 1
     }
 }

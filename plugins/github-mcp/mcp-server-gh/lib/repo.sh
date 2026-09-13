@@ -132,20 +132,34 @@ tool_repo_file() {
             echo "Error: cannot create directory ${parent_dir}"
             return 1
         }
+        # Write to a sibling and rename once the body is complete. A cancelled
+        # call has its process group killed mid-write, and a half-written file
+        # at the target path reads as a complete one. A failed download now also
+        # leaves any existing file at that path alone.
+        local __tmp_dl
+        __tmp_dl=$(mktemp "${download_to}.partial.XXXXXX") || {
+            echo "Error: cannot create a temporary file next to ${download_to}"
+            return 1
+        }
         local __exit=0 __dl_err=""
         if [[ "${suppress_errors}" == "true" ]]; then
-            "${cmd[@]}" > "${download_to}" 2>/dev/null || __exit=$?
+            "${cmd[@]}" > "${__tmp_dl}" 2>/dev/null || __exit=$?
         else
             # Capture stderr separately — don't write API errors into the download file
-            __dl_err=$({ "${cmd[@]}" > "${download_to}"; } 2>&1) || __exit=$?
+            __dl_err=$({ "${cmd[@]}" > "${__tmp_dl}"; } 2>&1) || __exit=$?
         fi
         if [[ ${__exit} -ne 0 ]]; then
-            rm -f "${download_to}" 2>/dev/null
+            rm -f "${__tmp_dl}" 2>/dev/null
             [[ -n "${fallback}" ]] && { echo "${fallback}"; return 0; }
             [[ -n "${__dl_err}" ]] && { echo "${__dl_err}"; return ${__exit}; }
             echo "Error: failed to download ${owner}/${repo}/${path}"
             return ${__exit}
         fi
+        mv -- "${__tmp_dl}" "${download_to}" || {
+            rm -f "${__tmp_dl}" 2>/dev/null
+            echo "Error: cannot write ${download_to}"
+            return 1
+        }
         echo "Downloaded ${owner}/${repo}/${path} to ${download_to}"
         return 0
     fi
