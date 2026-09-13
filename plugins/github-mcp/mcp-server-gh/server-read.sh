@@ -106,6 +106,7 @@ trap 'log "ERROR" "Unexpected error on line ${LINENO}"' ERR
 
 _load_gh_config "${PROJECT_ROOT}"
 _read_gh_config
+_gh_unset_undeclared_tools
 
 log "INFO" "======================================"
 log "INFO" "GitHub CLI MCP Server starting"

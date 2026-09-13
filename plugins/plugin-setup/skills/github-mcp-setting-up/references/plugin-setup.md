@@ -13,9 +13,14 @@
 - **Required by**: The gh-tooling MCP server. The CLI must be authenticated with a GitHub account that has access to the repositories you want to work with.
 
 ### jq
-- **Check**: `jq --version`
+- **Check**: `jq --version` (1.7 or newer)
 - **Install**: https://jqlang.github.io/jq/download/
-- **Required by**: The gh-tooling MCP server (JSON processing)
+- **Required by**: The gh-tooling MCP server (JSON processing). Below 1.7 the server refuses to start: tool argument validation cannot hold every constraint it declares on an older jq, and starting anyway would validate less than the schemas promise.
+
+### bash
+- **Check**: `bash --version` (4.1 or newer)
+- **Install**: `brew install bash` on macOS; already satisfied by any current Linux distribution
+- **Required by**: The gh-tooling MCP server. macOS ships bash 3.2 as `/bin/bash` and no install replaces it, so installing a newer bash is only half the job — its directory has to come before `/usr/bin` on the `PATH` the MCP host launches the server with. A host started from the desktop reads no shell profile, so that `PATH` may not be the one your terminal has.
 
 ## Configuration Files
 

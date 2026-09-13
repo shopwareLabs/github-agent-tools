@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.0] - 2026-09-13
+
+### Security
+
+- A server now runs only the tools its own tools list declares. Tool calls resolve to a shell function by name, and `api.sh`, `label.sh`, and `project.sh` are shared by both servers, so every tool one server sourced for the other was callable on it. That put `label_add`, `label_remove`, `project_item_add`, `project_status_set`, and `api` — which takes any HTTP method — on the read server, which is always active and needs no configuration. `enable_write_server` gated what `tools/list` advertised and nothing else, so those five write tools ran against the authenticated `gh` CLI whether or not the write server was enabled. An undeclared tool also has no schema, and argument validation treats a missing schema as nothing to check, so all of them ran with their arguments unvalidated; combined with the unguarded numeric comparisons in `_gh_post_process`, a crafted `max_lines` reached bash arithmetic evaluation and executed a command inside the server process. Tools not declared by the running server are now removed from dispatch at startup and answer `Tool not found`. **Breaking for callers** who reached a write tool through the read server, or any tool through the write server while it was disabled: both now refuse. Every tool a server declares is unaffected.
+
+### Fixed
+
+- `repo_file` and `search_code` with `download_to` write to a sibling file and rename it once the body is complete. Both wrote straight to the destination, so a call interrupted partway left a truncated file that reads as a complete one — reachable for the first time now that a cancelled call has its process group killed mid-write. A failed download also no longer removes an existing file at that path, and `search_code` no longer leaves the GitHub API's error text on disk as the file's contents.
+- The write server no longer writes its own empty tools list at startup. The file was created with a `mktemp` template whose placeholder was not at the end of the name, so every server on the machine shared one fixed path, and its cleanup ran from an `EXIT` trap the protocol layer replaces. A shipped `mcp-server-gh/tools-empty.json` takes its place.
+
+### Changed
+
+- `shared/mcpserver_core.sh` is vendored from [shopwareLabs/bash-mcp-sdk](https://github.com/shopwareLabs/bash-mcp-sdk) `v5.0.0`, up from `v3.0.0`.
+- **The servers now require bash 4.1+ and jq 1.7+, and refuse to start below either.** Both floors were already the protocol layer's documented requirements, and a server below them started anyway: on bash 3.2 it died with `{_MCP_LIFELINE_FD}: not found` before speaking, and on jq 1.6 it ran while silently skipping part of the argument validation its schemas declare. A refusal now names the requirement, the version found, and the install command for the platform. **This stops servers that start today.** macOS ships bash 3.2 as `/bin/bash` and no install replaces it, so a Mac needs a newer bash ahead of `/usr/bin` on the `PATH` the MCP host launches the server with — and a host started from the desktop reads no shell profile, so that is not necessarily the `PATH` your terminal has.
+- Cancelling a tool call now stops the work. `notifications/cancelled` was previously ignored, so a cancelled `run_logs` or `search_code` ran its `gh` command to completion; the call's process group is now signalled and the command stops. No configuration or tool change was needed for this.
+- A malformed request no longer ends a server. A line carrying more than one JSON document, a document that is not an object, a `tools/call` whose `params` is not an object, and a request whose `id` is neither a string nor an integer are each answered and the server keeps reading. Any one of them previously stopped it with no response, leaving every later request unanswered.
+
 ## [4.1.0] - 2026-09-04
 
 ### Changed

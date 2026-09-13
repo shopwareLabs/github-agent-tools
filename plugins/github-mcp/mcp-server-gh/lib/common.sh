@@ -36,6 +36,37 @@ _gh_validate_sha() {
     fi
 }
 
+# Restrict dispatch to the tools this server declares.
+#
+# The protocol layer resolves a tools/call to a shell function by name, so every
+# sourced tool_* function is callable whether or not this server's tools list
+# declares it. api.sh, label.sh, and project.sh are shared by both servers and
+# each carries tools the other does not declare, which put the write-side
+# label_add, label_remove, project_item_add, project_status_set, and api on the
+# always-active read server. An undeclared tool also has no schema, and argument
+# validation treats a missing schema as nothing to check, so those tools ran
+# with their arguments unvalidated.
+#
+# Dropping the undeclared functions makes the tools list the only thing that
+# decides what this server runs. An empty tools list therefore leaves no tool
+# callable, which is how the write server stays inert until it is enabled.
+_gh_unset_undeclared_tools() {
+    local declared fn name
+    declared=$(jq -r '.tools[]?.name // empty' "${MCP_TOOLS_LIST_FILE}" 2>/dev/null) || {
+        log "ERROR" "Cannot read declared tool names from ${MCP_TOOLS_LIST_FILE}"
+        return 1
+    }
+
+    while IFS= read -r fn; do
+        [[ -n "${fn}" ]] || continue
+        name="${fn#tool_}"
+        if ! printf '%s\n' "${declared}" | grep -qxF -- "${name}"; then
+            unset -f "${fn}"
+            log "INFO" "Removed from dispatch, not declared here: ${name}"
+        fi
+    done < <(declare -F | awk '{print $3}' | grep '^tool_' || true)
+}
+
 # Resolve the effective repository to use for an API call.
 # Uses the provided repo arg first, then falls back to GH_DEFAULT_REPO.
 # Args: $1 = repo from tool arguments (may be empty)
@@ -367,8 +398,23 @@ _gh_download_file() {
         echo "Error: cannot create directory ${parent_dir}"
         return 1
     }
-    "${cmd[@]}" > "${local_path}" 2>&1 || {
+    # Write to a sibling and rename once the body is complete. A cancelled call
+    # has its process group killed mid-write, and a half-written file at the
+    # target path reads as a complete one. The redirect also captures gh's
+    # diagnostics, which would otherwise land in the file as its contents.
+    local tmp_path
+    tmp_path=$(mktemp "${local_path}.partial.XXXXXX") || {
+        echo "Error: cannot create a temporary file next to ${local_path}"
+        return 1
+    }
+    "${cmd[@]}" > "${tmp_path}" 2>&1 || {
+        rm -f "${tmp_path}"
         echo "Error: failed to download ${owner}/${repo}/${remote_path}"
+        return 1
+    }
+    mv -- "${tmp_path}" "${local_path}" || {
+        rm -f "${tmp_path}"
+        echo "Error: cannot write ${local_path}"
         return 1
     }
 }
