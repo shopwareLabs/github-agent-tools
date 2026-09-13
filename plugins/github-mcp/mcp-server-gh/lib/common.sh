@@ -36,6 +36,37 @@ _gh_validate_sha() {
     fi
 }
 
+# Restrict dispatch to the tools this server declares.
+#
+# The protocol layer resolves a tools/call to a shell function by name, so every
+# sourced tool_* function is callable whether or not this server's tools list
+# declares it. api.sh, label.sh, and project.sh are shared by both servers and
+# each carries tools the other does not declare, which put the write-side
+# label_add, label_remove, project_item_add, project_status_set, and api on the
+# always-active read server. An undeclared tool also has no schema, and argument
+# validation treats a missing schema as nothing to check, so those tools ran
+# with their arguments unvalidated.
+#
+# Dropping the undeclared functions makes the tools list the only thing that
+# decides what this server runs. An empty tools list therefore leaves no tool
+# callable, which is how the write server stays inert until it is enabled.
+_gh_unset_undeclared_tools() {
+    local declared fn name
+    declared=$(jq -r '.tools[]?.name // empty' "${MCP_TOOLS_LIST_FILE}" 2>/dev/null) || {
+        log "ERROR" "Cannot read declared tool names from ${MCP_TOOLS_LIST_FILE}"
+        return 1
+    }
+
+    while IFS= read -r fn; do
+        [[ -n "${fn}" ]] || continue
+        name="${fn#tool_}"
+        if ! printf '%s\n' "${declared}" | grep -qxF -- "${name}"; then
+            unset -f "${fn}"
+            log "INFO" "Removed from dispatch, not declared here: ${name}"
+        fi
+    done < <(declare -F | awk '{print $3}' | grep '^tool_' || true)
+}
+
 # Resolve the effective repository to use for an API call.
 # Uses the provided repo arg first, then falls back to GH_DEFAULT_REPO.
 # Args: $1 = repo from tool arguments (may be empty)
