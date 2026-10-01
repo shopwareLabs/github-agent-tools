@@ -36,37 +36,6 @@ _gh_validate_sha() {
     fi
 }
 
-# Restrict dispatch to the tools this server declares.
-#
-# The protocol layer resolves a tools/call to a shell function by name, so every
-# sourced tool_* function is callable whether or not this server's tools list
-# declares it. api.sh, label.sh, and project.sh are shared by both servers and
-# each carries tools the other does not declare, which put the write-side
-# label_add, label_remove, project_item_add, project_status_set, and api on the
-# always-active read server. An undeclared tool also has no schema, and argument
-# validation treats a missing schema as nothing to check, so those tools ran
-# with their arguments unvalidated.
-#
-# Dropping the undeclared functions makes the tools list the only thing that
-# decides what this server runs. An empty tools list therefore leaves no tool
-# callable, which is how the write server stays inert until it is enabled.
-_gh_unset_undeclared_tools() {
-    local declared fn name
-    declared=$(jq -r '.tools[]?.name // empty' "${MCP_TOOLS_LIST_FILE}" 2>/dev/null) || {
-        log "ERROR" "Cannot read declared tool names from ${MCP_TOOLS_LIST_FILE}"
-        return 1
-    }
-
-    while IFS= read -r fn; do
-        [[ -n "${fn}" ]] || continue
-        name="${fn#tool_}"
-        if ! printf '%s\n' "${declared}" | grep -qxF -- "${name}"; then
-            unset -f "${fn}"
-            log "INFO" "Removed from dispatch, not declared here: ${name}"
-        fi
-    done < <(declare -F | awk '{print $3}' | grep '^tool_' || true)
-}
-
 # Resolve the effective repository to use for an API call.
 # Uses the provided repo arg first, then falls back to GH_DEFAULT_REPO.
 # Args: $1 = repo from tool arguments (may be empty)
@@ -380,6 +349,92 @@ _gh_validate_path() {
     fi
 }
 
+# Partial-download helper state (see _gh_partial_create). Each tool call runs
+# in its own subshell, so these never leak between calls.
+_GH_DL_TMP=""
+_GH_DL_TRAP_INSTALLED=""
+
+#######################################
+# EXIT handler installed by _gh_partial_create. Removes the in-flight partial
+# file, if any.
+#
+# No earlier EXIT handler is captured or chained here. Each tool call runs in
+# a subshell of the server (`( … ) &` in the vendored protocol layer), and a
+# subshell that has not set an EXIT trap of its own reports its parent's
+# handler to `trap -p` — here, the server's own teardown trap. A captured
+# handler can't be told apart from that inherited one, so running it on
+# cancellation would run the server's teardown inside the tool's shell. A
+# tool's shell has no EXIT handler of its own to preserve today.
+# Globals:
+#   _GH_DL_TMP
+#######################################
+_gh_partial_cleanup() {
+    [[ -n "${_GH_DL_TMP}" ]] && rm -f -- "${_GH_DL_TMP}"
+}
+
+#######################################
+# Create a download's `<dest>.partial.*` sibling and, on first use in this
+# shell, install the EXIT trap that removes it on cancellation.
+#
+# The file is created with `noclobber` in this shell rather than via
+# `mktemp`, whose command substitution creates the file in a subshell well
+# before this shell can name it for the trap. What remains is the single
+# assignment after creation: a SIGTERM there leaves an empty partial file.
+# Globals:
+#   _GH_DL_TMP (set to the created path on success), _GH_DL_TRAP_INSTALLED
+# Arguments:
+#   $1 destination path the partial file sits beside.
+# Outputs:
+#   An error naming the directory on failure.
+# Returns:
+#   0 on success, 1 after 5 failed attempts or a non-collision failure.
+#######################################
+_gh_partial_create() {
+    local dest="$1"
+
+    if [[ -z "${_GH_DL_TRAP_INSTALLED}" ]]; then
+        trap '_gh_partial_cleanup' EXIT
+        _GH_DL_TRAP_INSTALLED=1
+    fi
+
+    local had_noclobber=1
+    [[ -o noclobber ]] || had_noclobber=0
+    set -o noclobber
+
+    # The name is recorded only after noclobber has created the file, so the
+    # trap never removes a file another process left under the same name.
+    local attempt=0 candidate
+    _GH_DL_TMP=""
+    while (( attempt < 5 )); do
+        attempt=$(( attempt + 1 ))
+        candidate="${dest}.partial.${BASHPID}.${RANDOM}${RANDOM}"
+        if { : > "${candidate}"; } 2>/dev/null; then
+            _GH_DL_TMP="${candidate}"
+            break
+        fi
+        # Not a name collision — e.g. the parent directory is missing.
+        [[ -e "${candidate}" ]] || break
+    done
+
+    [[ ${had_noclobber} -eq 1 ]] || set +o noclobber
+
+    if [[ -z "${_GH_DL_TMP}" ]]; then
+        echo "Error: cannot create a temporary file in $(dirname "${dest}")"
+        return 1
+    fi
+}
+
+#######################################
+# Clear partial-download state after a rename or an explicit removal. The
+# EXIT trap installed by _gh_partial_create stays in place — see that
+# function and _gh_partial_cleanup for why nothing is restored in its place.
+# Globals:
+#   _GH_DL_TMP
+#######################################
+_gh_partial_finish() {
+    _GH_DL_TMP=""
+}
+
 # Download a file from GitHub to a local path.
 # Args: $1=owner, $2=repo, $3=remote_path, $4=local_path, $5=ref (optional)
 _gh_download_file() {
@@ -398,25 +453,37 @@ _gh_download_file() {
         echo "Error: cannot create directory ${parent_dir}"
         return 1
     }
+
     # Write to a sibling and rename once the body is complete. A cancelled call
     # has its process group killed mid-write, and a half-written file at the
-    # target path reads as a complete one. The redirect also captures gh's
-    # diagnostics, which would otherwise land in the file as its contents.
-    local tmp_path
-    tmp_path=$(mktemp "${local_path}.partial.XXXXXX") || {
-        echo "Error: cannot create a temporary file next to ${local_path}"
+    # target path reads as a complete one.
+    _gh_partial_create "${local_path}" || return 1
+    local tmp_path="${_GH_DL_TMP}"
+
+    # stderr is captured apart from the body so gh's own diagnostics never
+    # become the file's contents; a warning on an otherwise successful
+    # download is logged instead of discarded.
+    local dl_err="" dl_exit=0
+    dl_err=$({ "${cmd[@]}" > "${tmp_path}"; } 2>&1) || dl_exit=$?
+    if [[ ${dl_exit} -ne 0 ]]; then
+        rm -f -- "${tmp_path}"
+        _gh_partial_finish
+        if [[ -n "${dl_err}" ]]; then
+            echo "Error: failed to download ${owner}/${repo}/${remote_path}: ${dl_err}"
+        else
+            echo "Error: failed to download ${owner}/${repo}/${remote_path}"
+        fi
         return 1
-    }
-    "${cmd[@]}" > "${tmp_path}" 2>&1 || {
-        rm -f "${tmp_path}"
-        echo "Error: failed to download ${owner}/${repo}/${remote_path}"
-        return 1
-    }
+    fi
+    [[ -n "${dl_err}" ]] && log "WARN" "gh reported during download of ${owner}/${repo}/${remote_path}: ${dl_err}"
+
     mv -- "${tmp_path}" "${local_path}" || {
-        rm -f "${tmp_path}"
+        rm -f -- "${tmp_path}"
+        _gh_partial_finish
         echo "Error: cannot write ${local_path}"
         return 1
     }
+    _gh_partial_finish
 }
 
 # Resolve owner/repo from multiple sources with priority:
@@ -497,6 +564,29 @@ _gh_resolve_owner_repo() {
 
     echo "Error: repository is required. Provide 'url', 'owner'+'repo', 'repository', or 'repo' (owner/repo), or set 'repo' in .mcp-gh-tooling.json"
     return 1
+}
+
+#######################################
+# Verify the running server's own tools list is present and well-formed
+# before startup completes. The protocol layer reads MCP_TOOLS_LIST_FILE
+# lazily, once per tools/list or tools/call request, so nothing else catches
+# a missing or corrupt list before the first call — the server would start
+# cleanly and then fail every tools/list and tools/call request.
+# Globals:
+#   MCP_TOOLS_LIST_FILE
+# Outputs:
+#   An error naming the file, to stderr.
+# Returns:
+#   0 when the file holds exactly one JSON object, whose `tools` is an array
+#   (the protocol layer's own reader requires the single object); 1 otherwise.
+#######################################
+_gh_require_tools_list() {
+    if ! jq -e -s 'length == 1 and (.[0] | type) == "object" and (.[0].tools | type) == "array"' \
+        -- "${MCP_TOOLS_LIST_FILE}" >/dev/null 2>&1; then
+        log "ERROR" "Tools list is missing or invalid: ${MCP_TOOLS_LIST_FILE}"
+        echo "Error: tools list is missing or invalid: ${MCP_TOOLS_LIST_FILE}" >&2
+        return 1
+    fi
 }
 
 # Like _gh_resolve_owner_repo, but returns success with empty globals when no

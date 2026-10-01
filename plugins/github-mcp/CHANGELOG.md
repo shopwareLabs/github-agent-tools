@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- A cancelled `repo_file` or `search_code` download with `download_to` no longer leaves its `<file>.partial.*` sibling next to the destination. The file is now created with `noclobber` in the tool's own shell rather than via `mktemp`, whose `$()` subshell created the file well before anything could name it in a trap, and an `EXIT` trap installed before the file exists removes it on the SIGTERM a cancelled call's process group receives. Two cases still leave an empty or partial sibling: a SIGTERM landing on the single assignment that records the new file's name, and a call killed with SIGKILL. The partial file's mode now comes from umask rather than `mktemp`'s fixed `0600`, so the renamed destination ends with an ordinary file mode.
+- `search_code` with `download_to` no longer writes gh's own stderr into a downloaded file. `_gh_download_file` redirected gh's diagnostics into the destination alongside its body, so a warning on an otherwise successful download became part of the file's contents; stderr is now captured apart from the body, a warning on success is logged instead, and a failure's captured text is returned in the tool's error message. `repo_file`'s own download path already separated them and is unaffected.
+- A missing or unreadable tools list stops the server at startup again. Removing `_gh_unset_undeclared_tools` (see Changed, below) also removed the startup `jq` read it incidentally did over the tools list; the protocol layer reads that list lazily, once per `tools/list` or `tools/call` request, so nothing else caught a corrupt or absent list before the first call, and the server started cleanly only to fail every `tools/list` and `tools/call` request. A dedicated startup check restores the refusal, naming the file, and applies the protocol layer's own rule that the file holds exactly one JSON object.
+
+### Changed
+
+- `shared/mcpserver_core.sh` is vendored from [shopwareLabs/bash-mcp-sdk](https://github.com/shopwareLabs/bash-mcp-sdk) `v5.2.0`, up from `v5.0.0`. The restriction to declared tools now lives in the protocol layer, which also stops an executable named `tool_<name>` on `PATH` and a `tool_<name>_cancel` hook from being called as a tool, so `_gh_unset_undeclared_tools` is removed. v5.1.0 chains an `EXIT` trap set before the server starts into its teardown; these servers set none, so that change does not reach them. Every tool a server declares is unaffected.
+
 ## [4.2.0] - 2026-09-13
 
 ### Security

@@ -3,11 +3,11 @@
 # A server must run only the tools its own tools list declares.
 #
 # api.sh, label.sh, and project.sh are shared by both servers and each carries
-# tools the other does not declare. Dispatch resolves a tools/call to a shell
-# function by name, so without _gh_unset_undeclared_tools every sourced tool is
-# callable — which put the write-side label_add, label_remove, project_item_add,
-# project_status_set, and api on the always-active read server, each running
-# with no schema to validate its arguments against.
+# tools the other does not declare. The protocol layer (bash-mcp-sdk v5.2.0+)
+# refuses a tool the running server's list does not declare, which keeps the
+# write-side label_add, label_remove, project_item_add, project_status_set, and
+# api off the always-active read server. These tests pin that guarantee for the
+# shared libs.
 bats_require_minimum_version 1.11.0
 
 load 'test_helper/common_setup'
