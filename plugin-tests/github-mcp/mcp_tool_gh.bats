@@ -1066,6 +1066,65 @@ bats_test_function --description "pr_checks: fails without repo outside git"  --
 }
 
 # =============================================================================
+# _gh_download_file — gh's own diagnostics stay out of the downloaded file
+# (used by search_code's download_to loop; tool_repo_file has its own
+# separate download path, covered above)
+# =============================================================================
+
+@test "_gh_download_file: a stderr warning on a successful download is logged, not written into the file" {
+    local dl_path="${BATS_TEST_TMPDIR}/dl_warn/composer.json"
+    local warned=""
+    log() { [[ "$1" == "WARN" ]] && warned="$2"; }
+    gh() {
+        [[ "$1" == "api" && "$2" == "--help" ]] && return 0
+        printf 'file body'
+        printf 'gh: a warning\n' >&2
+    }
+    _gh_download_file "shopware" "shopware" "composer.json" "${dl_path}"
+    [[ "$(cat "${dl_path}")" == "file body" ]] || {
+        echo "Expected only the body in the file, got: $(cat "${dl_path}")"
+        return 1
+    }
+    [[ "${warned}" == *"a warning"* ]] || {
+        echo "Expected the warning logged, got: ${warned}"
+        return 1
+    }
+}
+
+@test "_gh_download_file: a failing gh reports its stderr and leaves nothing behind" {
+    local dl_path="${BATS_TEST_TMPDIR}/dl_fail/composer.json"
+    local out_file="${BATS_TEST_TMPDIR}/download_output"
+    gh() {
+        [[ "$1" == "api" && "$2" == "--help" ]] && return 0
+        printf 'gh: rate limit exceeded\n' >&2
+        return 1
+    }
+    # Called directly with plain redirection rather than via `run` (a command
+    # substitution, which forks a subshell): _gh_partial_create/_finish read
+    # and restore this shell's own EXIT trap, and bats sets one of its own for
+    # the real test process, so a forked copy re-arming it fires a spurious
+    # second report when that copy's subshell ends.
+    local status=0
+    _gh_download_file "shopware" "shopware" "composer.json" "${dl_path}" > "${out_file}" 2>&1 || status=$?
+    [[ ${status} -ne 0 ]] || {
+        echo "Expected failure, got success: $(cat "${out_file}")"
+        return 1
+    }
+    grep -q "rate limit exceeded" "${out_file}" || {
+        echo "Expected error text, got: $(cat "${out_file}")"
+        return 1
+    }
+    [[ ! -e "${dl_path}" ]] || {
+        echo "Destination should not exist: ${dl_path}"
+        return 1
+    }
+    ! compgen -G "${dl_path}.partial.*" >/dev/null || {
+        echo "Partial file left behind"
+        return 1
+    }
+}
+
+# =============================================================================
 # run_list — new filter params
 # =============================================================================
 

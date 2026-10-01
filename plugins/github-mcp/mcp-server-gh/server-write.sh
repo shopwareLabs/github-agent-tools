@@ -92,9 +92,9 @@ _check_write_enabled() {
     if [[ "${enabled}" != "true" ]]; then
         log "INFO" "Write server disabled (enable_write_server != true)"
         # A shipped empty list rather than one written at startup. The protocol
-        # layer owns the process's EXIT trap, so a cleanup trap set here never
-        # runs, and it answers -32603 for a tools list it cannot read — which a
-        # startup-written file becomes the moment anything removes it.
+        # layer answers -32603 for a tools list it cannot read, which a
+        # startup-written file becomes the moment anything removes it, and any
+        # cleanup it chains into teardown never runs after SIGKILL.
         MCP_TOOLS_LIST_FILE="${SCRIPT_DIR}/tools-empty.json"
         export MCP_TOOLS_LIST_FILE
     else
@@ -120,7 +120,7 @@ trap 'log "ERROR" "Unexpected error on line ${LINENO}"' ERR
 _load_gh_config "${PROJECT_ROOT}"
 _read_gh_config
 _check_write_enabled
-_gh_unset_undeclared_tools
+_gh_require_tools_list
 
 log "INFO" "======================================"
 log "INFO" "GitHub CLI MCP Server (WRITE) starting"
