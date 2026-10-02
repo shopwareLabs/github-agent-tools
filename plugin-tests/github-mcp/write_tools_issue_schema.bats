@@ -26,12 +26,10 @@ setup() {
         esac
         printf '%s\n' "$@" > "${GH_ARGS_FILE}"
         cat > "${GH_BODY_FILE}"
-        [[ -n "${GH_STUB_EXIT:-}" ]] && return "${GH_STUB_EXIT}"
-        printf '%s\n' "${GH_STUB_OUTPUT}"
-        return 0
+        gh_stub_respond
     }
+    reset_gh_stub
     GH_STUB_OUTPUT='{"number":19952,"type":{"name":"Bug"}}'
-    GH_STUB_EXIT=""
 }
 
 body() { jq -c "$1" "${GH_BODY_FILE}"; }
@@ -56,6 +54,16 @@ body() { jq -c "$1" "${GH_BODY_FILE}"; }
     assert_success
     assert_equal "$(body '.type')" 'null'
     assert_equal "$(printf '%s' "${output}" | jq -r '.type')" 'null'
+}
+
+@test "issue_type_set with suppress_errors returns no error text when listing the types fails" {
+    gh() {
+        printf '%s\n' "gh: Not Found (HTTP 404)" >&2
+        return 1
+    }
+    run tool_issue_type_set '{"number": 19952, "type": "bug", "suppress_errors": true}'
+    assert_failure
+    assert_output ""
 }
 
 @test "issue_type_set rejects an unknown type before calling the API" {
@@ -191,6 +199,9 @@ body() { jq -c "$1" "${GH_BODY_FILE}"; }
 }
 
 @test "issue_field_set with suppress_errors returns no error text" {
+    # gh api prints an HTTP error's JSON body on stdout and its summary on stderr.
+    GH_STUB_OUTPUT='{"message":"Not Found","documentation_url":"https://docs.github.com/rest","status":"404"}'
+    GH_STUB_STDERR="gh: Not Found (HTTP 404)"
     GH_STUB_EXIT=1
     run tool_issue_field_set '{"number": 19952, "values": {}, "suppress_errors": true}'
     assert_failure

@@ -4,12 +4,16 @@
 
 source "$(dirname "${BASH_SOURCE[0]}")/../../shared/config-dirs.sh"
 
+#######################################
 # Locate .mcp-gh-tooling.json. MCP_GH_TOOLING_CONFIG wins outright; otherwise
 # the last existing file of the list wins: project root, editor directories,
 # then the host directories of github_mcp_config_dirs in reverse, so the
 # active host's directory is checked last.
-# Args: $1 = project root, $2 = log line when no config is found
-# Sets: GH_TOOLING_CONFIG_FILE (global)
+# Globals:
+#   MCP_GH_TOOLING_CONFIG, GITHUB_MCP_HOST (read); GH_TOOLING_CONFIG_FILE (set)
+# Arguments:
+#   $1 project root, $2 log line when no config is found.
+#######################################
 _load_gh_config() {
     local project_root="$1"
     local no_config_message="$2"
@@ -60,9 +64,15 @@ _load_gh_config() {
     fi
 }
 
-# Validate a GitHub number (PR, issue, run, job ID - positive integer)
-# Args: $1 = value, $2 = field name for error message
-# Outputs error message to stdout and returns 1 on failure
+#######################################
+# Validate a GitHub number (PR, issue, run, or job ID): digits only, non-empty.
+# Arguments:
+#   $1 value, $2 field name for the error message (default: number).
+# Outputs:
+#   An error message on stdout when the value is invalid.
+# Returns:
+#   0 when valid, 1 otherwise.
+#######################################
 _gh_validate_number() {
     local value="$1"
     local field="${2:-number}"
@@ -72,9 +82,16 @@ _gh_validate_number() {
     fi
 }
 
-# Validate a GitHub repository in owner/repo format
-# Args: $1 = repo string (empty is allowed - means use default)
-# Outputs error message to stdout and returns 1 on invalid format
+#######################################
+# Validate a GitHub repository in owner/repo format. An empty value is valid
+# and means the caller falls back to the default repository.
+# Arguments:
+#   $1 repository string.
+# Outputs:
+#   An error message on stdout when the format is invalid.
+# Returns:
+#   0 when valid or empty, 1 otherwise.
+#######################################
 _gh_validate_repo() {
     local repo="$1"
     [[ -z "${repo}" ]] && return 0
@@ -84,8 +101,15 @@ _gh_validate_repo() {
     fi
 }
 
-# Validate a git commit SHA (7-40 hex characters)
-# Args: $1 = sha string
+#######################################
+# Validate a git commit SHA: 7 to 40 hex characters.
+# Arguments:
+#   $1 SHA string.
+# Outputs:
+#   An error message on stdout when the SHA is invalid.
+# Returns:
+#   0 when valid, 1 otherwise.
+#######################################
 _gh_validate_sha() {
     local sha="$1"
     if [[ -z "${sha}" ]] || [[ ! "${sha}" =~ ^[0-9a-fA-F]{7,40}$ ]]; then
@@ -94,18 +118,30 @@ _gh_validate_sha() {
     fi
 }
 
-# Resolve the effective repository to use for an API call.
-# Uses the provided repo arg first, then falls back to GH_DEFAULT_REPO.
-# Args: $1 = repo from tool arguments (may be empty)
-# Outputs: resolved repo string, or empty if none configured
+#######################################
+# Resolve the effective repository for an API call: the repo argument first,
+# then GH_DEFAULT_REPO.
+# Globals:
+#   GH_DEFAULT_REPO (read)
+# Arguments:
+#   $1 repo from the tool arguments, may be empty.
+# Outputs:
+#   The resolved repository on stdout, empty when neither source has one.
+#######################################
 _gh_resolve_repo() {
     local repo_arg="${1:-}"
     echo "${repo_arg:-${GH_DEFAULT_REPO:-}}"
 }
 
-# Assert that a repo is available (either passed or configured as default).
-# Outputs error and returns 1 if no repo available.
-# Args: $1 = effective repo string (from _gh_resolve_repo)
+#######################################
+# Require a repository, passed or configured as the default.
+# Arguments:
+#   $1 effective repository, as _gh_resolve_repo returns it.
+# Outputs:
+#   An error message on stdout when the repository is empty.
+# Returns:
+#   0 when a repository is set, 1 otherwise.
+#######################################
 _gh_require_repo() {
     local effective_repo="$1"
     if [[ -z "${effective_repo}" ]]; then
@@ -114,11 +150,18 @@ _gh_require_repo() {
     fi
 }
 
-# Assert that a repo is available OR the working directory is inside a git repo.
+#######################################
+# Require a repository, or a working directory inside a git repository.
 # Tools using gh subcommands (gh pr view, gh issue list) that resolve from local
 # git context call this instead of _gh_require_repo to preserve the in-repo
 # "omit repo" workflow while still failing prescriptively in non-git contexts.
-# Args: $1 = effective repo string (from _gh_resolve_repo or _gh_resolve_owner_repo)
+# Arguments:
+#   $1 effective repository, from _gh_resolve_repo or _gh_resolve_owner_repo.
+# Outputs:
+#   An error message on stdout when neither is available.
+# Returns:
+#   0 when a repository or a git working directory is available, 1 otherwise.
+#######################################
 _gh_require_repo_or_git() {
     local effective_repo="$1"
     [[ -n "${effective_repo}" ]] && return 0
@@ -146,14 +189,48 @@ _gh_validate_org() {
 }
 
 #######################################
+# Run a command with its stdout and stderr captured apart, so a warning on a
+# successful run never joins the value and a failed run can still say why.
+# stderr goes through a file in MCP_CALL_TMPDIR, which the server removes
+# when the call ends, even a cancelled one.
+# Globals:
+#   MCP_CALL_TMPDIR (read)
+# Arguments:
+#   $1 name of the caller's variable that receives stdout,
+#   $2 name of the caller's variable that receives stderr,
+#   $3... the command and its arguments.
+# Returns:
+#   The command's exit status, or 1 with a message in the stderr variable when
+#   the temporary file cannot be created.
+#######################################
+_gh_capture_split() {
+    local __gh_cs_out_var="$1" __gh_cs_err_var="$2"
+    shift 2
+    local __gh_cs_file __gh_cs_out __gh_cs_exit=0
+    __gh_cs_file=$(mktemp "${MCP_CALL_TMPDIR:-${TMPDIR:-/tmp}}/gh-stderr.XXXXXX") || {
+        printf -v "${__gh_cs_out_var}" '%s' ""
+        printf -v "${__gh_cs_err_var}" '%s' "cannot create a temporary file for the command's stderr"
+        return 1
+    }
+    __gh_cs_out=$("$@" 2>"${__gh_cs_file}") || __gh_cs_exit=$?
+    printf -v "${__gh_cs_out_var}" '%s' "${__gh_cs_out}"
+    printf -v "${__gh_cs_err_var}" '%s' "$(<"${__gh_cs_file}")"
+    rm -f -- "${__gh_cs_file}"
+    return "${__gh_cs_exit}"
+}
+
+#######################################
 # Resolve the organization owning org-level resources (issue types, issue fields).
 # Priority: org > owner > repo-shaped args > GH_DEFAULT_REPO > git remote.
 # Globals:
-#   GH_DEFAULT_REPO, _GH_OWNER
+#   GH_DEFAULT_REPO (read); _GH_OWNER, _GH_REPO, _GH_REF, _GH_PATH (set by
+#   _gh_resolve_owner_repo_optional)
 # Arguments:
 #   $1 JSON args string, $2 tool name for the error message.
 # Outputs:
-#   Organization login on stdout, or an error message on stdout.
+#   Organization login on stdout, or an error message on stdout. When the
+#   git-remote lookup fails, the message carries gh's reason unless the args
+#   set suppress_errors.
 # Returns:
 #   0 when an organization was resolved, 1 otherwise.
 #######################################
@@ -186,20 +263,36 @@ _gh_resolve_org() {
         return 0
     fi
 
-    local name_with_owner
-    name_with_owner=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null) || true
-    if [[ -n "${name_with_owner}" ]]; then
-        _gh_validate_org "${name_with_owner%%/*}" "${tool}" || return 1
-        printf '%s\n' "${name_with_owner%%/*}"
+    # A failed lookup must say why: an auth or network failure otherwise reads
+    # as "no org was given".
+    local repo_view repo_view_err repo_view_exit=0
+    _gh_capture_split repo_view repo_view_err \
+        gh repo view --json nameWithOwner -q .nameWithOwner || repo_view_exit=$?
+    if [[ ${repo_view_exit} -eq 0 && -n "${repo_view}" ]]; then
+        _gh_validate_org "${repo_view%%/*}" "${tool}" || return 1
+        printf '%s\n' "${repo_view%%/*}"
         return 0
     fi
 
-    printf '%s\n' "Error: org is required for ${tool}. Pass 'org', 'owner', or a repository ('repository', 'repo', or 'owner'+'repo'), or set 'repo' in .mcp-gh-tooling.json"
+    local message="Error: org is required for ${tool}. Pass 'org', 'owner', or a repository ('repository', 'repo', or 'owner'+'repo'), or set 'repo' in .mcp-gh-tooling.json"
+    local suppress_errors
+    suppress_errors=$(printf '%s\n' "${args}" | jq -r '.suppress_errors // false')
+    if [[ ${repo_view_exit} -ne 0 && -n "${repo_view_err}" && "${suppress_errors}" != "true" ]]; then
+        message+=". The current directory's repository could not be read: ${repo_view_err}"
+    fi
+    printf '%s\n' "${message}"
     return 1
 }
 
-# Read a value from the gh-tooling config file
-# Args: $1 = jq path (e.g. '.repo'), $2 = default value
+#######################################
+# Read a value from the gh-tooling config file.
+# Globals:
+#   GH_TOOLING_CONFIG_FILE (read)
+# Arguments:
+#   $1 jq path, e.g. '.repo'; $2 value to use when the file or key is absent.
+# Outputs:
+#   The value, or the default, on stdout.
+#######################################
 _gh_config_value() {
     local path="$1"
     local default="${2:-}"
@@ -209,18 +302,53 @@ _gh_config_value() {
     [[ -n "${value}" ]] && echo "${value}" || echo "${default}"
 }
 
-# Validate jq filter syntax before execution.
-# Only rejects definitive compile/parse/lexical errors; runtime errors on null are acceptable.
-# Args: $1 = filter expression, $2 = field name for error message (default: jq_filter)
-# Outputs error message to stdout and returns 1 on compile-time syntax failure.
+#######################################
+# Reject a jq filter that does not compile, before any gh call is made.
+# The filter is compiled behind `empty |`, so it never runs: running it on
+# null input would hang on a filter such as until(.done; .next), and a
+# halt_error would read as a compile error. The newlines keep a trailing
+# `# comment` in the filter from swallowing the closing parenthesis.
+# Arguments:
+#   $1 filter expression, $2 field name for the error message (default: jq_filter).
+# Outputs:
+#   An error message carrying jq's diagnostic on stdout when the filter does
+#   not compile.
+# Returns:
+#   0 when the filter is empty or compiles, 1 otherwise.
+#######################################
 _gh_validate_jq_filter() {
     local filter="$1"
     local field="${2:-jq_filter}"
     [[ -z "${filter}" ]] && return 0
-    local err
-    err=$(jq -n "${filter}" 2>&1 1>/dev/null) || true
-    if [[ -n "${err}" ]] && echo "${err}" | grep -qiE "compile error|unexpected \\\$end|parse error|lexical error"; then
+    local err jq_exit=0
+    err=$(jq -n "empty | (
+${filter}
+)" 2>&1 1>/dev/null) || jq_exit=$?
+    if [[ ${jq_exit} -ne 0 ]]; then
         echo "Error: Invalid ${field}: ${err}"
+        return 1
+    fi
+}
+
+#######################################
+# Reject a grep_pattern that grep -E does not accept, before any gh call is
+# made, so a bad pattern does not cost a log download or a search request.
+# Arguments:
+#   $1 pattern.
+# Outputs:
+#   An error message carrying grep's diagnostic on stdout when the pattern is
+#   rejected.
+# Returns:
+#   0 when the pattern is empty or valid, 1 otherwise.
+#######################################
+_gh_validate_grep_pattern() {
+    local pattern="$1"
+    [[ -z "${pattern}" ]] && return 0
+    # Against empty input a valid pattern exits 1 (no match); 2 is an error.
+    local err grep_exit=0
+    err=$(grep -E -- "${pattern}" </dev/null 2>&1) || grep_exit=$?
+    if [[ ${grep_exit} -gt 1 ]]; then
+        echo "Error: Invalid grep_pattern: ${err}"
         return 1
     fi
 }
@@ -292,11 +420,19 @@ _gh_strip_ansi() {
         -e $'s|\033||g'
 }
 
+#######################################
 # Apply optional pipeline post-processing steps in order: jq → grep → head → tail.
 # Each step is a no-op when its controlling parameter is empty/zero.
-# Args: $1=output $2=jq_filter $3=grep_pattern $4=grep_before $5=grep_after
-#       $6=grep_ignore_case $7=grep_invert $8=max_lines $9=tail_lines
-# Outputs processed text to stdout; returns 1 if jq filter fails on the output.
+# Arguments:
+#   $1 output, $2 jq_filter, $3 grep_pattern, $4 grep_before, $5 grep_after,
+#   $6 grep_ignore_case, $7 grep_invert, $8 max_lines, $9 tail_lines.
+# Outputs:
+#   The processed text on stdout, or an error message on stdout when a step
+#   fails.
+# Returns:
+#   0 on success, including a grep that matches nothing; 1 when the jq filter
+#   fails on the output or grep rejects the pattern.
+#######################################
 _gh_post_process() {
     local output="$1"
     local jq_filter="${2:-}"
@@ -322,7 +458,15 @@ _gh_post_process() {
         [[ "${grep_before}" -gt 0 ]]          && gcmd+=("-B" "${grep_before}")
         [[ "${grep_after}" -gt 0 ]]           && gcmd+=("-A" "${grep_after}")
         gcmd+=("--" "${grep_pattern}")
-        output=$(echo "${output}" | "${gcmd[@]}") || true
+        # grep exits 1 for "no line matched", which is an empty result; 2 and
+        # above is an error such as an invalid pattern.
+        local grep_output grep_exit=0
+        grep_output=$(echo "${output}" | "${gcmd[@]}") || grep_exit=$?
+        if [[ ${grep_exit} -gt 1 ]]; then
+            echo "Error: grep_pattern failed on output: ${grep_pattern}"
+            return 1
+        fi
+        output="${grep_output}"
     fi
 
     if [[ -n "${max_lines}" && "${max_lines}" -gt 0 ]]; then
@@ -336,11 +480,17 @@ _gh_post_process() {
     echo "${output}"
 }
 
+#######################################
 # Parse a GitHub URL into owner, repo, ref, and path components.
 # Handles /tree/{ref}/{path} and /blob/{ref}/{path} URLs.
-# Sets globals: _GH_URL_OWNER, _GH_URL_REPO, _GH_URL_REF, _GH_URL_PATH
-# Returns 1 for non-GitHub URLs or unrecognized formats.
 # Limitation: refs with slashes (e.g. feature/branch) take only the first segment.
+# Globals:
+#   _GH_URL_OWNER, _GH_URL_REPO, _GH_URL_REF, _GH_URL_PATH (set)
+# Arguments:
+#   $1 URL.
+# Returns:
+#   0 when parsed, 1 for non-GitHub URLs or unrecognized formats.
+#######################################
 _gh_parse_github_url() {
     local url="$1"
     _GH_URL_OWNER="" _GH_URL_REPO="" _GH_URL_REF="" _GH_URL_PATH=""
@@ -352,6 +502,10 @@ _gh_parse_github_url() {
 
     # Strip scheme and host
     local path_part="${url#*github.com/}"
+
+    # Without a slash, the split below would read the one segment as both
+    # owner and repo.
+    [[ "${path_part}" == */* ]] || return 1
 
     # Extract owner/repo (first two segments)
     local owner repo remainder
@@ -391,9 +545,17 @@ _gh_parse_github_url() {
     return 0
 }
 
-# Validate a file path (reject traversal and leading slash).
-# Empty path is valid (means repo root).
-# Args: $1 = path string
+#######################################
+# Reject a repository path with a leading slash or a '..' anywhere in it, so
+# it cannot leave the repository. The substring check also refuses names such
+# as a..b.txt. An empty path is valid and means the root.
+# Arguments:
+#   $1 path string.
+# Outputs:
+#   An error message on stdout when the path is rejected.
+# Returns:
+#   0 when valid or empty, 1 otherwise.
+#######################################
 _gh_validate_path() {
     local path="$1"
     [[ -z "${path}" ]] && return 0
@@ -493,8 +655,19 @@ _gh_partial_finish() {
     _GH_DL_TMP=""
 }
 
-# Download a file from GitHub to a local path.
-# Args: $1=owner, $2=repo, $3=remote_path, $4=local_path, $5=ref (optional)
+#######################################
+# Download a file from GitHub to a local path, byte for byte.
+# Globals:
+#   _GH_ALLOW_ESCAPE_FLAG (set by _gh_probe_allow_escape_flag); _GH_DL_TMP and
+#   the shell's EXIT trap (set by _gh_partial_create, which leaves the trap
+#   installed after the download)
+# Arguments:
+#   $1 owner, $2 repo, $3 remote path, $4 local path, $5 ref (optional).
+# Outputs:
+#   An error message on stdout when the download or the write fails.
+# Returns:
+#   0 when the file is in place at the local path, 1 otherwise.
+#######################################
 _gh_download_file() {
     local owner="$1" repo="$2" remote_path="$3" local_path="$4" ref="${5:-}"
     local -a cmd=("gh" "api" "repos/${owner}/${repo}/contents/${remote_path}")
@@ -544,10 +717,18 @@ _gh_download_file() {
     _gh_partial_finish
 }
 
+#######################################
 # Resolve owner/repo from multiple sources with priority:
-# url > owner+repo > repository (owner/repo string) > GH_DEFAULT_REPO
-# Sets globals: _GH_OWNER, _GH_REPO, _GH_REF, _GH_PATH
-# Args: $1=JSON args string
+# url > owner+repo > repository (owner/repo) > repo (owner/repo) > GH_DEFAULT_REPO
+# Globals:
+#   GH_DEFAULT_REPO (read); _GH_OWNER, _GH_REPO, _GH_REF, _GH_PATH (set)
+# Arguments:
+#   $1 JSON args string.
+# Outputs:
+#   An error message on stdout when no source resolves or one is malformed.
+# Returns:
+#   0 when owner and repo are set, 1 otherwise.
+#######################################
 _gh_resolve_owner_repo() {
     local args="$1"
     _GH_OWNER="" _GH_REPO="" _GH_REF="" _GH_PATH=""
@@ -647,10 +828,19 @@ _gh_require_tools_list() {
     fi
 }
 
+#######################################
 # Like _gh_resolve_owner_repo, but returns success with empty globals when no
 # repo source is provided. Use for tools that have a valid no-repo fallback
 # (e.g. gh's own git-context resolution for issue/PR subcommands inside a clone).
-# Args: $1 = JSON args string
+# Globals:
+#   GH_DEFAULT_REPO (read); _GH_OWNER, _GH_REPO, _GH_REF, _GH_PATH (set)
+# Arguments:
+#   $1 JSON args string.
+# Outputs:
+#   An error message on stdout when a provided source is malformed.
+# Returns:
+#   0 when resolved or when no source is provided, 1 otherwise.
+#######################################
 _gh_resolve_owner_repo_optional() {
     local args="$1"
     _GH_OWNER="" _GH_REPO="" _GH_REF="" _GH_PATH=""

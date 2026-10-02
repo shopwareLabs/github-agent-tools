@@ -14,13 +14,9 @@ setup() {
     GH_ARGS_FILE="${BATS_TEST_TMPDIR}/gh_args"
     gh() {
         printf '%s\n' "$*" > "${GH_ARGS_FILE}"
-        [[ -n "${GH_STUB_STDERR:-}" ]] && echo "${GH_STUB_STDERR}" >&2
-        [[ -n "${GH_STUB_OUTPUT:-}" ]] && printf '%s\n' "${GH_STUB_OUTPUT}"
-        return "${GH_STUB_EXIT:-0}"
+        gh_stub_respond
     }
-    GH_STUB_OUTPUT=""
-    GH_STUB_STDERR=""
-    GH_STUB_EXIT=0
+    reset_gh_stub
 }
 
 # Helper to check gh was called with expected args

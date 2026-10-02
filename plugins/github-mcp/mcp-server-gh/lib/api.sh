@@ -86,7 +86,7 @@ tool_api() {
     fi
     if [[ ${__exit} -ne 0 ]]; then
         [[ -n "${fallback}" ]] && { echo "${fallback}"; return 0; }
-        echo "${__raw}"; return ${__exit}
+        [[ "${suppress_errors}" == "true" ]] || echo "${__raw}"; return ${__exit}
     fi
     # Strip before post-processing so max_lines and tail_lines count lines of
     # text rather than lines padded with colour codes.

@@ -74,7 +74,7 @@ tool_issue_view() {
         fi
         if [[ ${__exit} -ne 0 ]]; then
             [[ -n "${fallback}" ]] && { echo "${fallback}"; return 0; }
-            echo "${__raw}"; return ${__exit}
+            [[ "${suppress_errors}" == "true" ]] || echo "${__raw}"; return ${__exit}
         fi
 
         if [[ "${with_field_values}" != "true" ]]; then
@@ -128,7 +128,7 @@ _gh_issue_rest_issue() {
         __raw=$("${cmd[@]}" 2>&1) || __exit=$?
     fi
     if [[ ${__exit} -ne 0 ]]; then
-        echo "${__raw}"
+        [[ "${suppress_errors}" == "true" ]] || echo "${__raw}"
         return ${__exit}
     fi
     echo "${__raw}"
@@ -221,7 +221,7 @@ tool_issue_list() {
     fi
     if [[ ${__exit} -ne 0 ]]; then
         [[ -n "${fallback}" ]] && { echo "${fallback}"; return 0; }
-        echo "${__raw}"; return ${__exit}
+        [[ "${suppress_errors}" == "true" ]] || echo "${__raw}"; return ${__exit}
     fi
     _gh_post_process "${__raw}" "${jq_filter}" "" 0 0 false false "" "" || return $?
 }

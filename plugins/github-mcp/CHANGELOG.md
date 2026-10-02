@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- An invalid `grep_pattern` now fails the tool call with `Error: Invalid grep_pattern` before `gh`
+  runs, so `run_logs` and `job_logs` no longer download a log and `search_code` no longer spends a
+  search request first. Before, grep's exit status was discarded and the call succeeded, returning
+  grep's error message as the tool's output.
+- Checking a `jq_filter` no longer runs it. A filter such as `until(.done; .next)` hung the call, and
+  a valid filter that halts with exit status 3 and the text `compile error` was rejected.
+- `issue_schema` called without `org`, `owner`, or a repository now reports why
+  `gh repo view` could not supply the organization (for example an authentication failure),
+  instead of only saying that `org` is required. `suppress_errors: true` leaves gh's message out.
+- `sub_issue_add`, `sub_issue_remove`, `project_item_add`, and `project_status_set` now reject a
+  `repo` that is not in `owner/repo` form before any GitHub call. Before, `acme/app/extra` was read
+  as owner `acme` and repository `extra`, or built a wrong item URL.
+- Under `suppress_errors: true`, a failed call now returns no error text on every tool. Tools built
+  on `gh api` returned the HTTP error's JSON body, which gh prints on stdout, as the result, and the
+  project and issue-schema write tools returned gh's message when looking up a project, a status,
+  or the organization's types or fields failed.
+- `workflow_jobs` now fails the call, or returns `fallback`, when fetching any run's jobs fails or
+  gh's output cannot be read. Before, it left that run out and returned the rest as if complete.
+  It also reads every page of a run's jobs. Before, only the first page reached the result.
+- gh's stderr no longer ends up in a value a tool parses from gh's stdout: the issue node IDs of
+  `sub_issue_add` and `sub_issue_remove`, the head SHA `pr_review_submit` fetches, the project and
+  status listings of the project tools, the organization's types and fields for `issue_type_set` and
+  `issue_field_set`, and the run jobs of `workflow_jobs`. A gh warning on a successful call
+  corrupted the value.
+- A GitHub `url` naming only an owner, such as `https://github.com/acme`, is now rejected. Before,
+  it resolved to owner `acme` and repository `acme`.
+- The project-not-found and status-not-found errors of `project_item_add` and `project_status_set`
+  now separate the listed names with `, `. Before, the separator alternated between `,` and a space.
+
 ## [5.0.0] - 2026-10-02
 
 ### Added

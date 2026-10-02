@@ -18,11 +18,9 @@ setup() {
     GH_ARGS_FILE="${BATS_TEST_TMPDIR}/gh_args"
     gh() {
         printf '%s\n' "$*" > "${GH_ARGS_FILE}"
-        [[ -n "${GH_STUB_OUTPUT:-}" ]] && printf '%s\n' "${GH_STUB_OUTPUT}"
-        return "${GH_STUB_EXIT:-0}"
+        gh_stub_respond
     }
-    GH_STUB_OUTPUT=""
-    GH_STUB_EXIT=0
+    reset_gh_stub
 }
 
 # ============================================================================
@@ -78,6 +76,38 @@ setup() {
     assert_output --partial "Available projects"
 }
 
+@test "project_item_add rejects a repo that is not owner/repo before calling GitHub" {
+    run tool_project_item_add '{"number": 1, "type": "issue", "project": "Board A", "repo": "acme/app/extra"}'
+    assert_failure
+    assert_output --partial "repo must be in 'owner/repo' format"
+    [[ ! -f "${GH_ARGS_FILE}" ]]
+}
+
+@test "project_item_add with suppress_errors returns no error text when listing projects fails" {
+    source "${GH_LIB_DIR}/project.sh"  # the real resolver instead of setup's mock
+    GH_STUB_STDERR="HTTP 401: Bad credentials (https://api.github.com/graphql)"
+    GH_STUB_EXIT=1
+    run tool_project_item_add '{"number": 1, "type": "issue", "project": "Board A", "suppress_errors": true}'
+    assert_failure
+    assert_output ""
+}
+
+@test "an unknown project name lists the available projects comma-separated" {
+    source "${GH_LIB_DIR}/project.sh"  # the real resolver instead of setup's mock
+    GH_STUB_OUTPUT='{"projects":[{"title":"Roadmap","number":1},{"title":"Sprint Board","number":2},{"title":"Backlog","number":3}]}'
+    run _gh_resolve_project_number "Missing" "acme" "false"
+    assert_failure
+    assert_output "Error: project 'Missing' not found. Available projects: Roadmap, Sprint Board, Backlog"
+}
+
+@test "an unknown status lists the available options comma-separated" {
+    source "${GH_LIB_DIR}/project.sh"  # the real resolver instead of setup's mock
+    GH_STUB_OUTPUT='{"fields":[{"id":"FIELD_1","name":"Status","type":"ProjectV2SingleSelectField","options":[{"id":"o1","name":"In Progress"},{"id":"o2","name":"Done"},{"id":"o3","name":"Won'"'"'t Do"}]}]}'
+    run _gh_resolve_status_option 42 "acme" "Missing" "false"
+    assert_failure
+    assert_output "Error: status 'Missing' not found in project 42. Available options: In Progress, Done, Won't Do"
+}
+
 # ============================================================================
 # project_status_set
 # ============================================================================
@@ -98,6 +128,13 @@ setup() {
     run tool_project_status_set '{"number": 1, "type": "issue", "status": "Done"}'
     assert_failure
     assert_output --partial "project name is required"
+}
+
+@test "project_status_set rejects a repo that is not owner/repo before calling GitHub" {
+    run tool_project_status_set '{"number": 1, "type": "issue", "project": "Board A", "status": "Done", "repo": "acme/app/extra"}'
+    assert_failure
+    assert_output --partial "repo must be in 'owner/repo' format"
+    [[ ! -f "${GH_ARGS_FILE}" ]]
 }
 
 @test "project_status_set calls item-edit with resolved IDs" {

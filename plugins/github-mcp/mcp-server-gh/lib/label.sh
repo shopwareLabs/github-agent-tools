@@ -40,13 +40,25 @@ tool_label_list() {
     fi
     if [[ ${__exit} -ne 0 ]]; then
         [[ -n "${fallback}" ]] && { echo "${fallback}"; return 0; }
-        echo "${__raw}"; return ${__exit}
+        [[ "${suppress_errors}" == "true" ]] || echo "${__raw}"; return ${__exit}
     fi
     _gh_post_process "${__raw}" "${jq_filter}" "" 0 0 false false "${max_lines}" "" || return $?
 }
 
-# Shared helper for add/remove list operations on PRs/issues.
-# Args: $1=args_json, $2=param_name (labels/assignees), $3=gh_flag (--add-label/--remove-label/etc)
+#######################################
+# Add or remove list values (labels, assignees) on a PR or issue through
+# gh <pr|issue> edit.
+# Arguments:
+#   $1 JSON args string; $2 list parameter name (labels or assignees);
+#   $3 gh edit flag per value, e.g. --add-label or --remove-assignee.
+# Outputs:
+#   gh's output on stdout; on failure the fallback text when one is set,
+#   otherwise gh's error (its stdout only under suppress_errors) or a
+#   validation error.
+# Returns:
+#   0 on success or when the fallback answers; 1 on a validation error;
+#   gh's exit status when gh fails without a fallback.
+#######################################
 _gh_edit_list_param() {
     local args="$1" param_name="$2" gh_flag="$3"
 
@@ -101,7 +113,7 @@ _gh_edit_list_param() {
     fi
     if [[ ${__exit} -ne 0 ]]; then
         [[ -n "${fallback}" ]] && { printf '%s\n' "${fallback}"; return 0; }
-        printf '%s\n' "${__raw}"; return ${__exit}
+        [[ "${suppress_errors}" == "true" ]] || printf '%s\n' "${__raw}"; return ${__exit}
     fi
     [[ -n "${__raw}" ]] && printf '%s\n' "${__raw}"
     return 0

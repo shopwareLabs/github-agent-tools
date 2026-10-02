@@ -14,14 +14,6 @@ setup() {
     SERVER_SCRIPT="${PLUGIN_COPY}/mcp-server-gh/server-write.sh"
 }
 
-# Helper: send a JSON-RPC request
-send_jsonrpc() {
-    local method="$1"
-    local id="${2:-1}"
-    local params="${3:-{}}"
-    printf '{"jsonrpc":"2.0","id":%d,"method":"%s","params":%s}\n' "$id" "$method" "$params"
-}
-
 # Helper: run the server with a config and a request, capture last response
 run_server_request() {
     local config_json="$1"
@@ -34,9 +26,9 @@ run_server_request() {
     fi
 
     local requests
-    requests=$(send_jsonrpc "initialize" 1)
+    requests=$(jsonrpc_request "initialize" 1)
     requests+=$'\n'
-    requests+=$(send_jsonrpc "${method}" 2)
+    requests+=$(jsonrpc_request "${method}" 2)
 
     run bash -c 'echo "$1" | bash "$2" 2>/dev/null | tail -1' _ "${requests}" "${SERVER_SCRIPT}"
 }
@@ -70,9 +62,9 @@ run_server_request() {
     mkdir -p "$CLAUDE_PROJECT_DIR"
     export PROJECT_ROOT="$CLAUDE_PROJECT_DIR"
     local requests
-    requests=$(send_jsonrpc "initialize" 1)
+    requests=$(jsonrpc_request "initialize" 1)
     requests+=$'\n'
-    requests+=$(send_jsonrpc "tools/list" 2)
+    requests+=$(jsonrpc_request "tools/list" 2)
     run bash -c 'echo "$1" | bash "$2" 2>/dev/null | tail -1' _ "${requests}" "${SERVER_SCRIPT}"
     assert_success
     local tool_count
@@ -90,9 +82,9 @@ run_host_server_tools_list() {
     local host="$1"
     local project_root="$2"
     local requests
-    requests=$(send_jsonrpc "initialize" 1)
+    requests=$(jsonrpc_request "initialize" 1)
     requests+=$'\n'
-    requests+=$(send_jsonrpc "tools/list" 2)
+    requests+=$(jsonrpc_request "tools/list" 2)
 
     local -a host_env=(-u GITHUB_MCP_HOST)
     [[ -n "$host" ]] && host_env=("GITHUB_MCP_HOST=${host}")

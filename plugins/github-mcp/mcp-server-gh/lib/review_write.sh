@@ -66,7 +66,7 @@ tool_pr_review_submit() {
         fi
         if [[ ${__exit} -ne 0 ]]; then
             [[ -n "${fallback}" ]] && { echo "${fallback}"; return 0; }
-            echo "${__raw}"; return ${__exit}
+            [[ "${suppress_errors}" == "true" ]] || echo "${__raw}"; return ${__exit}
         fi
         echo "${__raw}"
         return 0
@@ -88,11 +88,12 @@ tool_pr_review_submit() {
 
     # Auto-fetch head SHA if commit_id not provided.
     if [[ -z "${commit_id}" ]]; then
-        local fetch_raw fetch_exit=0
-        fetch_raw=$(gh api "repos/${effective_repo}/pulls/${number}" --jq '.head.sha' 2>&1) || fetch_exit=$?
+        local fetch_raw fetch_err fetch_exit=0
+        _gh_capture_split fetch_raw fetch_err \
+            gh api "repos/${effective_repo}/pulls/${number}" --jq '.head.sha' || fetch_exit=$?
         if [[ ${fetch_exit} -ne 0 ]]; then
             [[ -n "${fallback}" ]] && { echo "${fallback}"; return 0; }
-            echo "Error: failed to fetch commit_id for PR ${number}: ${fetch_raw}"
+            [[ "${suppress_errors}" == "true" ]] || echo "Error: failed to fetch commit_id for PR ${number}: ${fetch_err:-${fetch_raw}}"
             return 1
         fi
         commit_id="${fetch_raw}"
@@ -126,7 +127,7 @@ tool_pr_review_submit() {
     fi
     if [[ ${__exit} -ne 0 ]]; then
         [[ -n "${fallback}" ]] && { echo "${fallback}"; return 0; }
-        echo "${__raw}"; return ${__exit}
+        [[ "${suppress_errors}" == "true" ]] || echo "${__raw}"; return ${__exit}
     fi
     echo "${__raw}"
 }
@@ -173,7 +174,7 @@ tool_pr_comment() {
     fi
     if [[ ${__exit} -ne 0 ]]; then
         [[ -n "${fallback}" ]] && { echo "${fallback}"; return 0; }
-        echo "${__raw}"; return ${__exit}
+        [[ "${suppress_errors}" == "true" ]] || echo "${__raw}"; return ${__exit}
     fi
     echo "${__raw}"
 }
@@ -225,7 +226,7 @@ tool_pr_review_reply() {
     fi
     if [[ ${__exit} -ne 0 ]]; then
         [[ -n "${fallback}" ]] && { echo "${fallback}"; return 0; }
-        echo "${__raw}"; return ${__exit}
+        [[ "${suppress_errors}" == "true" ]] || echo "${__raw}"; return ${__exit}
     fi
     echo "${__raw}"
 }

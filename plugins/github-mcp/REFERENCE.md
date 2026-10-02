@@ -2,7 +2,7 @@
 
 ## Read Server (gh-tooling)
 
-31 tools available via the `gh-tooling` MCP server. Requires `gh` CLI installed and authenticated.
+Tools available via the `gh-tooling` MCP server. Requires `gh` CLI installed and authenticated.
 
 ### Shared Tool Parameters
 
@@ -28,6 +28,8 @@ Tools with large text output (`run_logs`, `job_logs`, `pr_diff`) additionally ac
 | `grep_context_after`  | integer | Lines of context after each match (-A)                      |
 | `grep_ignore_case`    | boolean | Case-insensitive matching (-i)                              |
 | `grep_invert`         | boolean | Return non-matching lines (-v)                              |
+
+A `grep_pattern` that `grep -E` rejects, such as an unbalanced `(`, fails the call with `Error: Invalid grep_pattern` before `gh` runs, the same as an invalid `jq_filter`. A pattern that matches nothing is not an error. The result is empty.
 
 `max_lines` and `tail_lines` are also available on `pr_view`, `pr_checks`, `pr_comments`, `pr_reviews`, `issue_view`, `api_read`, `label_list`, `project_list`, and `project_view` for output size control.
 
@@ -172,7 +174,8 @@ Use gh-tooling issue_list with search "TODO label:component/core" and limit 20
 
 List an organization's issue types and issue fields, including each single-select field's options.
 The organization comes from `org`, `owner`, a repository parameter, the configured default repo, or the
-current clone's remote.
+current clone's remote. When none of them supplies one, the error says `org` is required and, when
+reading the clone's remote failed, includes gh's message unless `suppress_errors` is set.
 
 Types and fields are independent. GitHub lets an organization pin fields to a type, but that pinning
 only drives the web UI: any organization field can be set on an issue of any type, so this tool
@@ -243,7 +246,7 @@ Use gh-tooling run_logs with run_id 22245862281 and tail_lines 100
 
 ### `workflow_jobs`
 
-Aggregate jobs across workflow runs in a single call. Reduces N+1 tool calls (run_list + N x job_view) to one invocation. Fetches runs for a workflow, then retrieves jobs for each run.
+Aggregate jobs across workflow runs in a single call. Reduces N+1 tool calls (run_list + N x job_view) to one invocation. Fetches runs for a workflow, then retrieves jobs for each run. If the jobs of any run cannot be fetched, the call fails, or returns `fallback` when set, rather than returning the jobs of the other runs.
 
 ```
 Use gh-tooling workflow_jobs with workflow "CI" and repo "shopware/shopware" and job "PHPStan" and limit 3
@@ -549,7 +552,7 @@ Use gh-tooling api_read with endpoint "search/issues" and jq_filter ".items[] | 
 
 ## Write Server (gh-tooling-write)
 
-25 tools available via the `gh-tooling-write` MCP server. Requires `enable_write_server: true` in `.mcp-gh-tooling.json`.
+Tools available via the `gh-tooling-write` MCP server. Requires `enable_write_server: true` in `.mcp-gh-tooling.json`.
 
 ### Shared Tool Parameters
 

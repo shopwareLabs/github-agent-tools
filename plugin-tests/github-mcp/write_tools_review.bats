@@ -27,13 +27,9 @@ setup() {
             printf '%s\n' "${GH_STUB_HEAD_SHA:-0123456789abcdef0123456789abcdef01234567}"
             return 0
         fi
-        [[ -n "${GH_STUB_STDERR:-}" ]] && echo "${GH_STUB_STDERR}" >&2
-        [[ -n "${GH_STUB_OUTPUT:-}" ]] && printf '%s\n' "${GH_STUB_OUTPUT}"
-        return "${GH_STUB_EXIT:-0}"
+        gh_stub_respond
     }
-    GH_STUB_OUTPUT=""
-    GH_STUB_STDERR=""
-    GH_STUB_EXIT=0
+    reset_gh_stub
     GH_STUB_HEAD_SHA="0123456789abcdef0123456789abcdef01234567"
 }
 
@@ -116,6 +112,20 @@ assert_gh_stdin_contain() {
     assert_gh_stdin_contain '"src/Foo.php"'
     assert_gh_stdin_contain '"src/Bar.php"'
     assert_gh_stdin_contain '"line": 42'
+}
+
+@test "pr_review_submit with suppress_errors returns no error text when the head SHA lookup fails" {
+    gh() {
+        printf '%s\n' "gh: Not Found (HTTP 404)" >&2
+        return 1
+    }
+    run tool_pr_review_submit '{
+        "number": 100,
+        "comments": [{"path": "x.php", "line": 1, "body": "n"}],
+        "suppress_errors": true
+    }'
+    assert_failure
+    assert_output ""
 }
 
 @test "pr_review_submit with comments auto-fetches commit_id from PR head" {

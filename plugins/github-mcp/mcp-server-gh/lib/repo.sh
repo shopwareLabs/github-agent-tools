@@ -36,7 +36,7 @@ tool_repo_tree() {
         fi
         if [[ ${__exit} -ne 0 ]]; then
             [[ -n "${fallback}" ]] && { echo "${fallback}"; return 0; }
-            echo "${__raw}"; return ${__exit}
+            [[ "${suppress_errors}" == "true" ]] || echo "${__raw}"; return ${__exit}
         fi
 
         # Filter by path prefix if provided, then apply default or custom jq
@@ -69,7 +69,7 @@ tool_repo_tree() {
         fi
         if [[ ${__exit} -ne 0 ]]; then
             [[ -n "${fallback}" ]] && { echo "${fallback}"; return 0; }
-            echo "${__raw}"; return ${__exit}
+            [[ "${suppress_errors}" == "true" ]] || echo "${__raw}"; return ${__exit}
         fi
 
         local default_jq='[.[] | {name, type, size, path}]'
@@ -114,6 +114,7 @@ tool_repo_file() {
     fi
 
     _gh_validate_path "${path}" || return 1
+    _gh_validate_grep_pattern "${grep_pattern}" || return 1
 
     local endpoint="repos/${owner}/${repo}/contents/${path}"
     [[ -n "${ref}" ]] && endpoint="${endpoint}?ref=${ref}"
@@ -150,6 +151,7 @@ tool_repo_file() {
             rm -f -- "${__tmp_dl}"
             _gh_partial_finish
             [[ -n "${fallback}" ]] && { echo "${fallback}"; return 0; }
+            [[ "${suppress_errors}" == "true" ]] && return ${__exit}
             [[ -n "${__dl_err}" ]] && { echo "${__dl_err}"; return ${__exit}; }
             echo "Error: failed to download ${owner}/${repo}/${path}"
             return ${__exit}
@@ -174,7 +176,7 @@ tool_repo_file() {
     fi
     if [[ ${__exit} -ne 0 ]]; then
         [[ -n "${fallback}" ]] && { echo "${fallback}"; return 0; }
-        echo "${__raw}"; return ${__exit}
+        [[ "${suppress_errors}" == "true" ]] || echo "${__raw}"; return ${__exit}
     fi
 
     # Text mode only — the download_to path above returns before here and must

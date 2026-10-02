@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # MCP API Tool Enforcer
 # =========================================================
 # Blocks MCP api/api_read tool calls when a dedicated tool exists.

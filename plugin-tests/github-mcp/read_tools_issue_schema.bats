@@ -30,11 +30,14 @@ setup() {
                 printf '%s\n' "${GH_STUB_FIELDS}"
                 ;;
             *)
-                printf '%s\n' "${GH_STUB_REPO_VIEW:-}"
+                # gh repo view, the git-remote fallback for the org
+                gh_stub_respond
+                return
                 ;;
         esac
         return 0
     }
+    reset_gh_stub
     GH_STUB_TYPES="${TYPES_JSON}"
     GH_STUB_FIELDS="${FIELDS_JSON}"
     GH_STUB_TYPES_EXIT=""
@@ -155,6 +158,26 @@ setup() {
     assert_failure
     assert_output --partial "invalid organization"
     [ ! -f "${GH_ARGS_FILE}" ]
+}
+
+@test "issue_schema says why the current repository could not supply the org" {
+    GH_DEFAULT_REPO=""
+    GH_STUB_STDERR="HTTP 401: Bad credentials (https://api.github.com/graphql)"
+    GH_STUB_EXIT=1
+    run tool_issue_schema '{}'
+    assert_failure
+    assert_output --partial "org is required for issue_schema"
+    assert_output --partial "HTTP 401: Bad credentials"
+}
+
+@test "issue_schema leaves gh's reason out of the org error under suppress_errors" {
+    GH_DEFAULT_REPO=""
+    GH_STUB_STDERR="HTTP 401: Bad credentials (https://api.github.com/graphql)"
+    GH_STUB_EXIT=1
+    run tool_issue_schema '{"suppress_errors": true}'
+    assert_failure
+    assert_output --partial "org is required for issue_schema"
+    refute_output --partial "Bad credentials"
 }
 
 @test "fallback does not mask an unresolvable org" {

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Shared functions for MCP tool enforcement hooks
 # ================================================
 # This library provides common functionality for the hooks that block bash
@@ -7,9 +7,9 @@
 # Usage:
 #   source "${SCRIPT_DIR}/lib/common.sh"
 #   parse_hook_input
-#   load_mcp_config "php-tooling"  # or "js-tooling"
+#   load_mcp_config "gh-tooling"
 #   # ... pattern matching ...
-#   block_tool "mcp__php-tooling__phpstan_analyze" "Description"
+#   block_tool "mcp__gh-tooling__pr_view" "Description"
 
 # Global variables set by this library:
 #   HOOK_INPUT - Raw hook input read from stdin
@@ -22,11 +22,17 @@
 
 source "$(dirname "${BASH_SOURCE[0]}")/../../../shared/config-dirs.sh"
 
+#######################################
 # Resolve the active host and project directory from hook input.
 # Claude Code provides CLAUDE_PROJECT_DIR, which selects claude even when
 # GITHUB_MCP_HOST is exported in the shell. Otherwise GITHUB_MCP_HOST=pi or
 # codex names the host, and codex is assumed. Codex and pi provide cwd in the
 # JSON payload.
+# Globals:
+#   CLAUDE_PROJECT_DIR, GITHUB_MCP_HOST (read); HOOK_HOST, PROJECT_DIR (set)
+# Arguments:
+#   $1 raw hook payload JSON.
+#######################################
 resolve_hook_context() {
     local input="${1:-}"
 
@@ -48,11 +54,15 @@ resolve_hook_context() {
     fi
 }
 
+#######################################
 # Find a project config in the host config directories, in the order
 # github_mcp_config_dirs gives for the active host, then in the project root.
 # First match wins.
-# Args: $1 = config prefix
-# Sets: CONFIG_FILE (global)
+# Globals:
+#   PROJECT_DIR, HOOK_HOST (read); CONFIG_FILE (set, empty when none found)
+# Arguments:
+#   $1 config prefix, e.g. gh-tooling for .mcp-gh-tooling.json.
+#######################################
 find_mcp_config() {
     local config_prefix="$1"
     CONFIG_FILE=""
@@ -72,9 +82,13 @@ find_mcp_config() {
     fi
 }
 
-# Parse hook input from stdin
-# Sets: HOOK_INPUT, COMMAND, PROJECT_DIR, HOOK_HOST (globals)
-# Exits 0 if command is empty
+#######################################
+# Read the hook payload from stdin and extract the bash command it carries.
+# Globals:
+#   HOOK_INPUT, COMMAND, PROJECT_DIR, HOOK_HOST (set)
+# Returns:
+#   Exits the hook with 0 when the payload carries no command.
+#######################################
 parse_hook_input() {
     HOOK_INPUT=$(cat)
     resolve_hook_context "$HOOK_INPUT"
@@ -84,10 +98,16 @@ parse_hook_input() {
     fi
 }
 
-# Load MCP config from project directory
-# Args: $1 = config prefix (e.g., "php-tooling", "js-tooling")
-# Sets: CONFIG_FILE, ENVIRONMENT, ENFORCE_MCP_TOOLS (globals)
-# Exits 0 if enforcement is disabled
+#######################################
+# Load the project config and read its enforcement settings.
+# Globals:
+#   PROJECT_DIR, HOOK_HOST (read, through find_mcp_config);
+#   CONFIG_FILE, ENVIRONMENT, ENFORCE_MCP_TOOLS (set)
+# Arguments:
+#   $1 config prefix, e.g. gh-tooling.
+# Returns:
+#   Exits the hook with 0 when enforce_mcp_tools is false.
+#######################################
 load_mcp_config() {
     local config_prefix="$1"
     ENVIRONMENT=""
@@ -111,10 +131,19 @@ load_mcp_config() {
     fi
 }
 
-# Block a tool with formatted message
-# Args: $1 = full MCP tool name (e.g., "mcp__php-tooling__phpstan_analyze")
-#       $2 = description of what to use instead
-# Outputs to stderr and exits with code 2
+#######################################
+# Block the current command and name the MCP tool to use instead, spelled the
+# way the active host exposes it.
+# Globals:
+#   HOOK_HOST, COMMAND, ENVIRONMENT (read)
+# Arguments:
+#   $1 MCP tool name in server-ID form, e.g. mcp__gh-tooling__pr_view.
+#   $2 description of what to use instead.
+# Outputs:
+#   The block message on stderr.
+# Returns:
+#   Exits the hook with 2, which the host reads as a block.
+#######################################
 block_tool() {
     local tool="$1"
     local description="$2"

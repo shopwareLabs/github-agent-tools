@@ -22,7 +22,7 @@ setup() {
 # Pipe one initialize request into the copied read server and capture both
 # streams plus the exit status.
 run_server() {
-    printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}\n' \
+    jsonrpc_request "initialize" 1 \
         | env PROJECT_ROOT="${PROJECT_DIR}" bash "${PLUGIN_COPY}/mcp-server-gh/server-read.sh"
 }
 

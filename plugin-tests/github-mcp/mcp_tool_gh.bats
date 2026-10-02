@@ -26,17 +26,8 @@ setup() {
     source "${GH_LIB_DIR}/issue.sh"
     source "${GH_LIB_DIR}/job.sh"
 
-    # Configurable gh stub: control via GH_STUB_OUTPUT / GH_STUB_STDERR / GH_STUB_EXIT
-    gh() {
-        [[ -n "${GH_STUB_STDERR:-}" ]] && echo "${GH_STUB_STDERR}" >&2
-        [[ -n "${GH_STUB_OUTPUT:-}" ]] && printf '%s\n' "${GH_STUB_OUTPUT}"
-        return "${GH_STUB_EXIT:-0}"
-    }
-
-    # Reset stub state between tests
-    GH_STUB_OUTPUT=""
-    GH_STUB_STDERR=""
-    GH_STUB_EXIT=0
+    gh() { gh_stub_respond; }
+    reset_gh_stub
 }
 
 # =============================================================================
@@ -335,6 +326,64 @@ bats_test_function --description "pr_checks: fails without repo outside git"  --
     assert_success
 }
 
+@test "_gh_validate_jq_filter: compiles the filter without running it" {
+    # Run on null input, this filter halts with the exit status and the text of
+    # a compile error; a filter such as until(.done; .next) would never return.
+    run _gh_validate_jq_filter '"compile error" | halt_error(3)'
+    assert_success
+    assert_output ""
+}
+
+@test "_gh_validate_jq_filter: accepts a filter ending in a comment" {
+    run _gh_validate_jq_filter '.title # the PR title'
+    assert_success
+    assert_output ""
+}
+
+@test "_gh_capture_split: keeps stdout and stderr apart and returns the command's status" {
+    emit_both() {
+        printf '%s\n' "shopware/shopware"
+        printf '%s\n' "A new release of gh is available" >&2
+        return 3
+    }
+    local out err rc=0
+    _gh_capture_split out err emit_both || rc=$?
+    assert_equal "${out}" "shopware/shopware"
+    assert_equal "${err}" "A new release of gh is available"
+    assert_equal "${rc}" "3"
+}
+
+@test "_gh_validate_grep_pattern: accepts a valid extended regex" {
+    run _gh_validate_grep_pattern 'FAILED|Error [0-9]+'
+    assert_success
+    assert_output ""
+}
+
+@test "_gh_validate_grep_pattern: rejects a pattern grep -E refuses" {
+    run _gh_validate_grep_pattern '('
+    assert_failure
+    assert_output --partial "Invalid grep_pattern"
+}
+
+@test "an invalid grep_pattern is rejected before gh is called, on every tool that takes one" {
+    gh() { touch "${BATS_TEST_TMPDIR}/gh_called"; gh_stub_respond; }
+    local -a calls=(
+        'tool_pr_diff {"number": 1, "grep_pattern": "("}'
+        'tool_run_logs {"run_id": 1, "grep_pattern": "("}'
+        'tool_job_logs {"job_id": 1, "grep_pattern": "("}'
+        'tool_search_code {"search": "needle", "grep_pattern": "("}'
+        'tool_repo_file {"path": "README.md", "grep_pattern": "("}'
+    )
+    local call
+    for call in "${calls[@]}"; do
+        rm -f "${BATS_TEST_TMPDIR}/gh_called"
+        run "${call%% *}" "${call#* }"
+        assert_failure
+        assert_output --partial "Invalid grep_pattern"
+        [[ ! -f "${BATS_TEST_TMPDIR}/gh_called" ]] || fail "${call%% *} called gh before rejecting the pattern"
+    done
+}
+
 @test "_gh_validate_jq_filter: uses custom field name in error message" {
     run _gh_validate_jq_filter '{{bad' "my_filter"
     assert_failure
@@ -391,6 +440,13 @@ bats_test_function --description "pr_checks: fails without repo outside git"  --
 @test "_gh_post_process: grep no matches returns success with empty output" {
     run _gh_post_process $'line1\nline2' "" "NOMATCH_XYZ" 0 0 false false "" ""
     assert_success
+    assert_output ""
+}
+
+@test "_gh_post_process: invalid grep_pattern fails with error message" {
+    run _gh_post_process $'line1\nline2' "" "(" 0 0 false false "" ""
+    assert_failure
+    assert_output --partial "grep_pattern failed"
 }
 
 @test "_gh_post_process: jq filter transforms JSON output" {
@@ -624,6 +680,11 @@ bats_test_function --description "pr_checks: fails without repo outside git"  --
     assert_equal "${_GH_URL_REPO}" "shopware"
     assert_equal "${_GH_URL_REF}" "main"
     assert_equal "${_GH_URL_PATH}" "composer.json"
+}
+
+@test "_gh_parse_github_url: rejects a URL that names only an owner" {
+    run _gh_parse_github_url "https://github.com/shopware"
+    assert_failure
 }
 
 @test "_gh_parse_github_url: parses repo-only URL" {
@@ -1057,6 +1118,15 @@ bats_test_function --description "pr_checks: fails without repo outside git"  --
     assert_output --partial "API error: Not Found"
 }
 
+@test "repo_file: download_to on failure returns no error text under suppress_errors" {
+    local dl_path="${BATS_TEST_TMPDIR}/suppressed.json"
+    GH_STUB_EXIT=1
+    GH_STUB_STDERR="API error: Not Found"
+    run tool_repo_file '{"repository":"shopware/shopware","path":"missing.txt","download_to":"'"${dl_path}"'","suppress_errors":true}'
+    assert_failure
+    assert_output ""
+}
+
 @test "repo_file: download_to on failure returns fallback when provided" {
     local dl_path="${BATS_TEST_TMPDIR}/fallback_test.json"
     GH_STUB_EXIT=1
@@ -1398,33 +1468,50 @@ bats_test_function --description "pr_checks: fails without repo outside git"  --
     }
 }
 
-@test "workflow_jobs: partial API failure skips failed run" {
+@test "workflow_jobs: fails the call when one run's jobs cannot be fetched" {
     gh() {
         if [[ "$1" == "run" && "$2" == "list" ]]; then
             echo '[{"databaseId":100,"displayTitle":"Run 100","headBranch":"main","status":"completed","conclusion":"failure","createdAt":"2024-01-01T00:00:00Z"},{"databaseId":200,"displayTitle":"Run 200","headBranch":"main","status":"completed","conclusion":"success","createdAt":"2024-01-02T00:00:00Z"}]'
             return 0
         fi
-        if [[ "$1" == "api" ]]; then
-            # Run 100 fails, run 200 succeeds
-            if [[ "$2" == *"/100/"* ]]; then
-                echo "API error" >&2
-                return 1
-            fi
-            if [[ "$2" == *"/200/"* ]]; then
-                echo '{"jobs":[{"id":2001,"name":"PHPStan","status":"completed","conclusion":"success","html_url":"","started_at":"","completed_at":"","steps":[]}]}'
-                return 0
-            fi
+        if [[ "$2" == *"/100/"* ]]; then
+            echo "gh: Server Error (HTTP 502)" >&2
+            return 1
         fi
+        echo '{"jobs":[{"id":2001,"name":"PHPStan","status":"completed","conclusion":"success","html_url":"","started_at":"","completed_at":"","steps":[]}]}'
+    }
+    run tool_workflow_jobs '{"workflow":"CI"}'
+    assert_failure
+    assert_output "Error: could not fetch the jobs of run 100: gh: Server Error (HTTP 502)"
+}
+
+@test "workflow_jobs: returns the fallback when one run's jobs cannot be fetched" {
+    gh() {
+        if [[ "$1" == "run" && "$2" == "list" ]]; then
+            echo '[{"databaseId":100,"displayTitle":"Run 100","headBranch":"main","status":"completed","conclusion":"failure","createdAt":"2024-01-01T00:00:00Z"}]'
+            return 0
+        fi
+        echo "gh: Server Error (HTTP 502)" >&2
+        return 1
+    }
+    run tool_workflow_jobs '{"workflow":"CI","fallback":"no jobs"}'
+    assert_success
+    assert_output "no jobs"
+}
+
+@test "workflow_jobs: reads the jobs on every page of a paginated run" {
+    gh() {
+        if [[ "$1" == "run" && "$2" == "list" ]]; then
+            echo '[{"databaseId":100,"displayTitle":"Run 100","headBranch":"main","status":"completed","conclusion":"failure","createdAt":"2024-01-01T00:00:00Z"}]'
+            return 0
+        fi
+        # --paginate prints one JSON object per page.
+        echo '{"total_count":2,"jobs":[{"id":1001,"name":"Unit","status":"completed","conclusion":"success","html_url":"","started_at":"","completed_at":"","steps":[]}]}'
+        echo '{"total_count":2,"jobs":[{"id":1002,"name":"Lint","status":"completed","conclusion":"failure","html_url":"","started_at":"","completed_at":"","steps":[]}]}'
     }
     run tool_workflow_jobs '{"workflow":"CI"}'
     assert_success
-    # Should still return jobs from the successful run
-    local count
-    count=$(echo "${output}" | jq 'length')
-    [[ "${count}" == "1" ]] || {
-        echo "Expected 1 job (from successful run), got: ${count}"
-        return 1
-    }
+    assert_equal "$(printf '%s' "${output}" | jq -c '[.[].id]')" "[1001,1002]"
 }
 
 @test "workflow_jobs: suppress_errors hides run list stderr" {

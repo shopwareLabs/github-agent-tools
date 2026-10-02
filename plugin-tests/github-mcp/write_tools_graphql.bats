@@ -20,11 +20,10 @@ setup() {
     GH_ARGS_FILE="${BATS_TEST_TMPDIR}/gh_args"
     gh() {
         printf '%s\n' "$*" > "${GH_ARGS_FILE}"
-        [[ -n "${GH_STUB_OUTPUT:-}" ]] && printf '%s\n' "${GH_STUB_OUTPUT}"
-        return "${GH_STUB_EXIT:-0}"
+        gh_stub_respond
     }
+    reset_gh_stub
     GH_STUB_OUTPUT='{"data":{"addSubIssue":{"issue":{"number":1,"title":"Parent"},"subIssue":{"number":2,"title":"Child"}}}}'
-    GH_STUB_EXIT=0
 }
 
 # ============================================================================
@@ -58,6 +57,23 @@ setup() {
     run tool_sub_issue_add '{"issue_number": 1, "sub_issue_number": 2}'
     assert_failure
     assert_output --partial "repo is required"
+}
+
+@test "sub_issue_add rejects a repo that is not owner/repo before calling GitHub" {
+    run tool_sub_issue_add '{"issue_number": 1, "sub_issue_number": 2, "repo": "acme/app/extra"}'
+    assert_failure
+    assert_output --partial "repo must be in 'owner/repo' format"
+    [[ ! -f "${GH_ARGS_FILE}" ]]
+}
+
+@test "sub_issue_add with suppress_errors returns no error text when a lookup fails" {
+    _gh_resolve_issue_node_id() {
+        printf '%s\n' "Could not resolve to an Issue with the number of 999." >&2
+        return 1
+    }
+    run tool_sub_issue_add '{"issue_number": 999, "sub_issue_number": 2, "suppress_errors": true}'
+    assert_failure
+    assert_output ""
 }
 
 @test "sub_issue_add handles resolution failure" {
@@ -130,6 +146,23 @@ setup() {
     run tool_sub_issue_remove '{"issue_number": 1, "sub_issue_number": 2}'
     assert_failure
     assert_output --partial "repo is required"
+}
+
+@test "sub_issue_remove rejects a repo that is not owner/repo before calling GitHub" {
+    run tool_sub_issue_remove '{"issue_number": 1, "sub_issue_number": 2, "repo": "acme/app/extra"}'
+    assert_failure
+    assert_output --partial "repo must be in 'owner/repo' format"
+    [[ ! -f "${GH_ARGS_FILE}" ]]
+}
+
+@test "sub_issue_remove with suppress_errors returns no error text when a lookup fails" {
+    _gh_resolve_issue_node_id() {
+        printf '%s\n' "Could not resolve to an Issue with the number of 999." >&2
+        return 1
+    }
+    run tool_sub_issue_remove '{"issue_number": 999, "sub_issue_number": 2, "suppress_errors": true}'
+    assert_failure
+    assert_output ""
 }
 
 @test "sub_issue_remove handles resolution failure" {

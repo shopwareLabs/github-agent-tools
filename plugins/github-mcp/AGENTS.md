@@ -5,7 +5,7 @@
 ```
 plugins/github-mcp/
 ├── README.md                           # User documentation (usage, configuration, troubleshooting)
-├── REFERENCE.md                        # Full tool parameter docs and examples (31 read + 25 write tools)
+├── REFERENCE.md                        # Full tool parameter docs and examples
 ├── AGENTS.md                           # LLM navigation guide (this file)
 ├── CHANGELOG.md                        # Version history
 ├── SETUP.md                            # Interactive setup procedure (kept byte-identical to plugin-setup's copy)
@@ -42,8 +42,8 @@ plugins/github-mcp/
     ├── server-write.sh                # Write server entry point - gated by enable_write_server config
     ├── config-read.json               # Read server metadata (name="gh-tooling")
     ├── config-write.json              # Write server metadata (name="gh-tooling-write")
-    ├── tools-read.json                # 31 read tools (PR, issue, CI, commit, search, repo, release, label, project, api_read)
-    ├── tools-write.json               # 25 write tools (PR lifecycle, reviews, issues, issue types/fields, labels, assignees, sub-issues, projects, api)
+    ├── tools-read.json                # Read tools (PR, issue, CI, commit, search, repo, release, label, project, api_read)
+    ├── tools-write.json               # Write tools (PR lifecycle, reviews, issues, issue types/fields, labels, assignees, sub-issues, projects, api)
     ├── tools-empty.json               # Tools list the write server reports while enable_write_server is false
     ├── mcp-gh-tooling.schema.json     # JSON Schema for .mcp-gh-tooling.json
     └── lib/
@@ -73,8 +73,8 @@ plugins/github-mcp/
 This plugin provides:
 - **Two MCP Servers** via `.mcp.json` in Claude Code and inline `mcpServers` in
   `.codex-plugin/plugin.json` in Codex:
-  - `gh-tooling` (read) - 31 read-only GitHub tools (PRs, issues, CI, commits, search, repo, releases, labels, projects, read-only API)
-  - `gh-tooling-write` (write) - 25 write tools (PR lifecycle, reviews, issues, issue types/fields, labels, assignees, sub-issues, projects, full API). Gated by `enable_write_server` config flag.
+  - `gh-tooling` (read) - read-only GitHub tools (PRs, issues, CI, commits, search, repo, releases, labels, projects, read-only API)
+  - `gh-tooling-write` (write) - write tools (PR lifecycle, reviews, issues, issue types/fields, labels, assignees, sub-issues, projects, full API). Gated by `enable_write_server` config flag.
 - **SessionStart Hook** via the shared `hooks/hooks.json`:
   - Assembles MCP tool directives dynamically from template with conditional write and label sections
   - Prompt template maintained in `hooks/prompts/mcp-tool-directives.md`
@@ -127,11 +127,14 @@ Tools in `tools-read.json` and `tools-write.json` map to bash functions with `to
 - `_gh_resolve_repo()` falls back to `GH_DEFAULT_REPO` from config
 - All tools support `suppress_errors` and `fallback` shared parameters
 - Tools with JSON output support `jq_filter` with pre-execution syntax validation
+- Tools that accept `grep_pattern` validate it with `_gh_validate_grep_pattern()` before calling `gh`
 - Log/text tools support `max_lines`, `tail_lines`, and grep parameters
 
 ### Standard execution block
 
-Captures `__raw` and `__exit` separately; branches on `suppress_errors` for `2>/dev/null` vs `2>&1`; checks `fallback` before re-echoing error output. Always calls `_gh_post_process()` on success.
+Captures `__raw` and `__exit` separately. It branches on `suppress_errors` for `2>/dev/null` vs `2>&1`. On failure it returns `fallback` when set, otherwise re-echoes the error output unless `suppress_errors` is set. Discarding stderr is not enough there: `gh api` prints an HTTP error's JSON body on stdout. Always calls `_gh_post_process()` on success.
+
+Where gh's stdout is a value the tool parses (an ID, a SHA, a JSON listing) rather than the tool's own output, capture it with `_gh_capture_split` so a gh warning on stderr never becomes part of the value.
 
 ## Key Navigation Points
 
