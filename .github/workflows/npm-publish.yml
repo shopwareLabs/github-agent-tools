@@ -70,5 +70,28 @@ jobs:
             exit 1
           fi
 
+      # A version published by hand (the first one, which trusted publishing cannot create) is
+      # already on the registry when its tag runs this workflow.
+      - name: Check whether the version is already published
+        id: registry
+        run: |
+          NAME=$(jq -r '.name' package.json)
+          VERSION=$(jq -r '.version' package.json)
+          if PUBLISHED=$(npm view "${NAME}@${VERSION}" version 2>npm-view.err); then
+            :
+          elif grep -q 'E404' npm-view.err; then
+            PUBLISHED=""
+          else
+            cat npm-view.err >&2
+            exit 1
+          fi
+          if [[ "${PUBLISHED}" == "${VERSION}" ]]; then
+            echo "${NAME}@${VERSION} is already on the registry; skipping npm publish."
+            echo "published=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "published=false" >> "${GITHUB_OUTPUT}"
+          fi
+
       - name: Publish to npm
+        if: steps.registry.outputs.published != 'true'
         run: npm publish

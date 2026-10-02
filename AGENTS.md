@@ -235,6 +235,8 @@ pi installs the repository as the npm package `@shopwarelabs/github-agent-tools`
 `.github/workflows/npm-publish.yml` publishes on a pushed tag matching `v*`: it type-checks, lints, runs
 the Node unit tests and the full BATS suite, checks the tag against `package.json` and both plugin
 manifests' versions, then runs `npm publish` using npm trusted publishing (no stored npm token).
+It skips `npm publish` when that version is already on the registry, as the hand-published first
+version is, and fails if the registry lookup itself fails.
 Releasing a version bumps `package.json`, both plugin manifests, and
 `plugins/github-mcp/CHANGELOG.md` in one commit, then tags `v<version>` on that commit and pushes
 the tag. Bootstrap, once: a maintainer with publish rights in the `@shopwarelabs` npm organization
