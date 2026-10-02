@@ -226,8 +226,6 @@ own unit tests are Node tests under `plugin-tests/github-mcp/pi/`:
 | `gh_tools.bats` | GitHub CLI read-command blocking (gh pr, gh issue, gh run, gh search, gh api) and host and config resolution across Claude Code, Codex, and pi |
 | `gh_tools_write.bats` | GitHub CLI blocking for the write-server commands (gh pr/issue create/edit/close/reopen/review/comment, gh project item-add/item-edit) and for `gh label list` and `gh project list`/`view` |
 | `mcp_tool_gh.bats` | MCP tool shared parameters (`_gh_validate_jq_filter`, `_gh_post_process`, `suppress_errors`, `fallback`) and core read tool behavior (`pr_view`/`diff`/`list`/`checks`/`comments`/`reviews`/`files`/`commits`, `issue_view`/`list`, `run_view`/`list`/`logs`, `workflow_jobs`, `commit_pulls`, `search`/`search_code`/`search_repos`/`search_commits`/`search_discussions`, `repo_tree`/`repo_file`, `job_view`/`logs`/`annotations`) |
-| `package_contents.bats` | npm tarball contents: every runtime file packed, tests/CI/host manifests excluded, executable permissions preserved |
-| `package_manifest.bats` | `package.json` version alignment with both plugin manifests, pi extension entry points, and `@earendil-works` dependency pinning |
 | `pi_e2e.bats` | End-to-end `pi` binary runs against a scripted model and stubbed `gh`, in both git-clone and npm-install layouts, plus codemode and config-override cases |
 | `read_tools_escape_sequences.bats` | ANSI escape-sequence stripping and byte-for-byte downloads across `job_logs`, `api`, `repo_file` |
 | `read_tools_issue_schema.bats` | `issue_schema` org resolution, name filters, and merge output |

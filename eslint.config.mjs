@@ -203,6 +203,26 @@ export default tseslint.config(
     },
   },
 
+  // The pi extension: the package has no runtime dependencies, so pi packages are imported only as
+  // types, which Node's type stripping erases.
+  {
+    files: ['plugins/github-mcp/pi/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              allowTypeImports: true,
+              group: ['@earendil-works/*'],
+              message: 'The pi package has no runtime dependencies; import pi packages only as types.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // Test files and fixtures
   {
     files: ['plugin-tests/**/*.ts'],

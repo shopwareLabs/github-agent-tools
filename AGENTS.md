@@ -189,8 +189,8 @@ node --test 'plugin-tests/github-mcp/pi/*.test.ts'  # pi extension unit tests
 ```
 
 `plugin-tests/github-mcp/pi_e2e.bats` drives the real `pi` binary against a scripted model and a
-stubbed `gh`; `plugin-tests/github-mcp/package_contents.bats` and `package_manifest.bats` check the
-npm package. All three run as part of the BATS suite below. `pi_e2e.bats` needs GNU coreutils'
+stubbed `gh`, in both the git-clone and npm-tarball install layouts. It runs as part of the BATS
+suite below. `pi_e2e.bats` needs GNU coreutils'
 `timeout` (or `gtimeout`) on PATH; on macOS, install it with `brew install coreutils`.
 
 ### BATS
@@ -204,8 +204,7 @@ Tests live in `plugin-tests/<name>/` mirroring the plugin structure and load the
 `plugin-tests/test_helper/common_setup.bash` (it resolves the repo root by walking up to `.bats/`).
 CI (`.github/workflows/ci.yml`) runs `npm ci`, the type-check, ESLint, and the Node unit tests, then
 ShellCheck over `plugins plugin-tests .github/scripts`, `vendor-mcp-sdk.sh --check` for the
-vendored SDK copy, and BATS over `plugin-tests/` (including `pi_e2e.bats` and
-`package_contents.bats`); a separate `validate.yml` checks the issue-template dropdowns.
+vendored SDK copy, and BATS over `plugin-tests/` (including `pi_e2e.bats`); a separate `validate.yml` checks the issue-template dropdowns.
 
 ### Pre-release checklist
 
@@ -216,8 +215,7 @@ vendored SDK copy, and BATS over `plugin-tests/` (including `pi_e2e.bats` and
 - [ ] `npx tsc --noEmit -p .` passes
 - [ ] `npx eslint . --max-warnings 0` passes
 - [ ] `node --test 'plugin-tests/github-mcp/pi/*.test.ts'` passes
-- [ ] BATS green (`.bats/bats-core/bin/bats -r plugin-tests/`), including `pi_e2e.bats` and
-      `package_contents.bats`
+- [ ] BATS green (`.bats/bats-core/bin/bats -r plugin-tests/`), including `pi_e2e.bats`
 - [ ] ShellCheck clean
 - [ ] Issue-template dropdowns up to date (`.github/scripts/validate-issue-templates.sh`)
 - [ ] Vendored SDK matches its lock (`.github/scripts/vendor-mcp-sdk.sh --check`)
