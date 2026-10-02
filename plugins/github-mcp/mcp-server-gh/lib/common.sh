@@ -657,6 +657,10 @@ _gh_partial_finish() {
 
 #######################################
 # Download a file from GitHub to a local path, byte for byte.
+# Globals:
+#   _GH_ALLOW_ESCAPE_FLAG (set by _gh_probe_allow_escape_flag); _GH_DL_TMP and
+#   the shell's EXIT trap (set by _gh_partial_create, which leaves the trap
+#   installed after the download)
 # Arguments:
 #   $1 owner, $2 repo, $3 remote path, $4 local path, $5 ref (optional).
 # Outputs:

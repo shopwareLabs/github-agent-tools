@@ -101,6 +101,7 @@ parse_hook_input() {
 #######################################
 # Load the project config and read its enforcement settings.
 # Globals:
+#   PROJECT_DIR, HOOK_HOST (read, through find_mcp_config);
 #   CONFIG_FILE, ENVIRONMENT, ENFORCE_MCP_TOOLS (set)
 # Arguments:
 #   $1 config prefix, e.g. gh-tooling.
