@@ -5,7 +5,14 @@ bats_require_minimum_version 1.11.0
 
 load 'test_helper/common_setup'
 
-SERVER_SCRIPT="${GH_SERVER_DIR}/server-write.sh"
+# A private copy: these tests start the server directly, and the real plugin
+# directory is shared with every other suite in this run — running it in
+# place would append to its server-write.log on every test.
+setup() {
+    PLUGIN_COPY="${BATS_TEST_TMPDIR}/plugin"
+    cp -R "${PLUGIN_DIR}" "${PLUGIN_COPY}"
+    SERVER_SCRIPT="${PLUGIN_COPY}/mcp-server-gh/server-write.sh"
+}
 
 # Helper: send a JSON-RPC request
 send_jsonrpc() {
