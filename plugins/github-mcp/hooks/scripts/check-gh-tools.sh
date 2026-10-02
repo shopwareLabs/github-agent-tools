@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Dev Tooling MCP Enforcer (GitHub CLI)
 # =========================================================
 # Blocks common gh CLI bash commands in favor of gh-tooling MCP tools.

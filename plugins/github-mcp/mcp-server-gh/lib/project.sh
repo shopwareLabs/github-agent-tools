@@ -96,10 +96,16 @@ tool_project_view() {
     _gh_post_process "${__raw}" "${jq_filter}" "" 0 0 false false "${max_lines}" "" || return $?
 }
 
-# Resolve project name to project number.
-# Args: $1=project_name, $2=owner
-# On success: prints the project number
-# On failure: prints error listing available projects and returns 1
+#######################################
+# Resolve a project title to its project number.
+# Arguments:
+#   $1 project title, $2 owner login.
+# Outputs:
+#   The project number on stdout, or an error on stdout that lists the
+#   owner's project titles.
+# Returns:
+#   0 when the title matched, 1 otherwise.
+#######################################
 _gh_resolve_project_number() {
     local project_name="$1" owner="$2"
 
@@ -122,10 +128,16 @@ _gh_resolve_project_number() {
     printf '%s\n' "${number}"
 }
 
-# Resolve status field name to field ID and option ID.
-# Args: $1=project_number, $2=owner, $3=status_name
-# On success: prints "field_id<TAB>option_id"
-# On failure: prints error listing available options and returns 1
+#######################################
+# Resolve a Status option name to the Status field ID and the option ID.
+# Arguments:
+#   $1 project number, $2 owner login, $3 status option name.
+# Outputs:
+#   "field_id<TAB>option_id" on stdout with no trailing newline, or an error
+#   on stdout that lists the available options.
+# Returns:
+#   0 when the option matched, 1 otherwise.
+#######################################
 _gh_resolve_status_option() {
     local project_number="$1" owner="$2" status_name="$3"
 

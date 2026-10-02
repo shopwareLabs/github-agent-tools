@@ -4,12 +4,16 @@
 
 source "$(dirname "${BASH_SOURCE[0]}")/../../shared/config-dirs.sh"
 
+#######################################
 # Locate .mcp-gh-tooling.json. MCP_GH_TOOLING_CONFIG wins outright; otherwise
 # the last existing file of the list wins: project root, editor directories,
 # then the host directories of github_mcp_config_dirs in reverse, so the
 # active host's directory is checked last.
-# Args: $1 = project root, $2 = log line when no config is found
-# Sets: GH_TOOLING_CONFIG_FILE (global)
+# Globals:
+#   MCP_GH_TOOLING_CONFIG, GITHUB_MCP_HOST (read); GH_TOOLING_CONFIG_FILE (set)
+# Arguments:
+#   $1 project root, $2 log line when no config is found.
+#######################################
 _load_gh_config() {
     local project_root="$1"
     local no_config_message="$2"
@@ -60,9 +64,15 @@ _load_gh_config() {
     fi
 }
 
-# Validate a GitHub number (PR, issue, run, job ID - positive integer)
-# Args: $1 = value, $2 = field name for error message
-# Outputs error message to stdout and returns 1 on failure
+#######################################
+# Validate a GitHub number (PR, issue, run, or job ID): digits only, non-empty.
+# Arguments:
+#   $1 value, $2 field name for the error message (default: number).
+# Outputs:
+#   An error message on stdout when the value is invalid.
+# Returns:
+#   0 when valid, 1 otherwise.
+#######################################
 _gh_validate_number() {
     local value="$1"
     local field="${2:-number}"
@@ -72,9 +82,16 @@ _gh_validate_number() {
     fi
 }
 
-# Validate a GitHub repository in owner/repo format
-# Args: $1 = repo string (empty is allowed - means use default)
-# Outputs error message to stdout and returns 1 on invalid format
+#######################################
+# Validate a GitHub repository in owner/repo format. An empty value is valid
+# and means the caller falls back to the default repository.
+# Arguments:
+#   $1 repository string.
+# Outputs:
+#   An error message on stdout when the format is invalid.
+# Returns:
+#   0 when valid or empty, 1 otherwise.
+#######################################
 _gh_validate_repo() {
     local repo="$1"
     [[ -z "${repo}" ]] && return 0
@@ -84,8 +101,15 @@ _gh_validate_repo() {
     fi
 }
 
-# Validate a git commit SHA (7-40 hex characters)
-# Args: $1 = sha string
+#######################################
+# Validate a git commit SHA: 7 to 40 hex characters.
+# Arguments:
+#   $1 SHA string.
+# Outputs:
+#   An error message on stdout when the SHA is invalid.
+# Returns:
+#   0 when valid, 1 otherwise.
+#######################################
 _gh_validate_sha() {
     local sha="$1"
     if [[ -z "${sha}" ]] || [[ ! "${sha}" =~ ^[0-9a-fA-F]{7,40}$ ]]; then
@@ -94,18 +118,30 @@ _gh_validate_sha() {
     fi
 }
 
-# Resolve the effective repository to use for an API call.
-# Uses the provided repo arg first, then falls back to GH_DEFAULT_REPO.
-# Args: $1 = repo from tool arguments (may be empty)
-# Outputs: resolved repo string, or empty if none configured
+#######################################
+# Resolve the effective repository for an API call: the repo argument first,
+# then GH_DEFAULT_REPO.
+# Globals:
+#   GH_DEFAULT_REPO (read)
+# Arguments:
+#   $1 repo from the tool arguments, may be empty.
+# Outputs:
+#   The resolved repository on stdout, empty when neither source has one.
+#######################################
 _gh_resolve_repo() {
     local repo_arg="${1:-}"
     echo "${repo_arg:-${GH_DEFAULT_REPO:-}}"
 }
 
-# Assert that a repo is available (either passed or configured as default).
-# Outputs error and returns 1 if no repo available.
-# Args: $1 = effective repo string (from _gh_resolve_repo)
+#######################################
+# Require a repository, passed or configured as the default.
+# Arguments:
+#   $1 effective repository, as _gh_resolve_repo returns it.
+# Outputs:
+#   An error message on stdout when the repository is empty.
+# Returns:
+#   0 when a repository is set, 1 otherwise.
+#######################################
 _gh_require_repo() {
     local effective_repo="$1"
     if [[ -z "${effective_repo}" ]]; then
@@ -114,11 +150,18 @@ _gh_require_repo() {
     fi
 }
 
-# Assert that a repo is available OR the working directory is inside a git repo.
+#######################################
+# Require a repository, or a working directory inside a git repository.
 # Tools using gh subcommands (gh pr view, gh issue list) that resolve from local
 # git context call this instead of _gh_require_repo to preserve the in-repo
 # "omit repo" workflow while still failing prescriptively in non-git contexts.
-# Args: $1 = effective repo string (from _gh_resolve_repo or _gh_resolve_owner_repo)
+# Arguments:
+#   $1 effective repository, from _gh_resolve_repo or _gh_resolve_owner_repo.
+# Outputs:
+#   An error message on stdout when neither is available.
+# Returns:
+#   0 when a repository or a git working directory is available, 1 otherwise.
+#######################################
 _gh_require_repo_or_git() {
     local effective_repo="$1"
     [[ -n "${effective_repo}" ]] && return 0
@@ -336,11 +379,17 @@ _gh_post_process() {
     echo "${output}"
 }
 
+#######################################
 # Parse a GitHub URL into owner, repo, ref, and path components.
 # Handles /tree/{ref}/{path} and /blob/{ref}/{path} URLs.
-# Sets globals: _GH_URL_OWNER, _GH_URL_REPO, _GH_URL_REF, _GH_URL_PATH
-# Returns 1 for non-GitHub URLs or unrecognized formats.
 # Limitation: refs with slashes (e.g. feature/branch) take only the first segment.
+# Globals:
+#   _GH_URL_OWNER, _GH_URL_REPO, _GH_URL_REF, _GH_URL_PATH (set)
+# Arguments:
+#   $1 URL.
+# Returns:
+#   0 when parsed, 1 for non-GitHub URLs or unrecognized formats.
+#######################################
 _gh_parse_github_url() {
     local url="$1"
     _GH_URL_OWNER="" _GH_URL_REPO="" _GH_URL_REF="" _GH_URL_PATH=""
@@ -391,9 +440,17 @@ _gh_parse_github_url() {
     return 0
 }
 
-# Validate a file path (reject traversal and leading slash).
-# Empty path is valid (means repo root).
-# Args: $1 = path string
+#######################################
+# Reject a repository path with a leading slash or a '..' anywhere in it, so
+# it cannot leave the repository. The substring check also refuses names such
+# as a..b.txt. An empty path is valid and means the root.
+# Arguments:
+#   $1 path string.
+# Outputs:
+#   An error message on stdout when the path is rejected.
+# Returns:
+#   0 when valid or empty, 1 otherwise.
+#######################################
 _gh_validate_path() {
     local path="$1"
     [[ -z "${path}" ]] && return 0
@@ -493,8 +550,15 @@ _gh_partial_finish() {
     _GH_DL_TMP=""
 }
 
-# Download a file from GitHub to a local path.
-# Args: $1=owner, $2=repo, $3=remote_path, $4=local_path, $5=ref (optional)
+#######################################
+# Download a file from GitHub to a local path, byte for byte.
+# Arguments:
+#   $1 owner, $2 repo, $3 remote path, $4 local path, $5 ref (optional).
+# Outputs:
+#   An error message on stdout when the download or the write fails.
+# Returns:
+#   0 when the file is in place at the local path, 1 otherwise.
+#######################################
 _gh_download_file() {
     local owner="$1" repo="$2" remote_path="$3" local_path="$4" ref="${5:-}"
     local -a cmd=("gh" "api" "repos/${owner}/${repo}/contents/${remote_path}")
@@ -544,10 +608,18 @@ _gh_download_file() {
     _gh_partial_finish
 }
 
+#######################################
 # Resolve owner/repo from multiple sources with priority:
-# url > owner+repo > repository (owner/repo string) > GH_DEFAULT_REPO
-# Sets globals: _GH_OWNER, _GH_REPO, _GH_REF, _GH_PATH
-# Args: $1=JSON args string
+# url > owner+repo > repository (owner/repo) > repo (owner/repo) > GH_DEFAULT_REPO
+# Globals:
+#   GH_DEFAULT_REPO (read); _GH_OWNER, _GH_REPO, _GH_REF, _GH_PATH (set)
+# Arguments:
+#   $1 JSON args string.
+# Outputs:
+#   An error message on stdout when no source resolves or one is malformed.
+# Returns:
+#   0 when owner and repo are set, 1 otherwise.
+#######################################
 _gh_resolve_owner_repo() {
     local args="$1"
     _GH_OWNER="" _GH_REPO="" _GH_REF="" _GH_PATH=""
@@ -647,10 +719,19 @@ _gh_require_tools_list() {
     fi
 }
 
+#######################################
 # Like _gh_resolve_owner_repo, but returns success with empty globals when no
 # repo source is provided. Use for tools that have a valid no-repo fallback
 # (e.g. gh's own git-context resolution for issue/PR subcommands inside a clone).
-# Args: $1 = JSON args string
+# Globals:
+#   GH_DEFAULT_REPO (read); _GH_OWNER, _GH_REPO, _GH_REF, _GH_PATH (set)
+# Arguments:
+#   $1 JSON args string.
+# Outputs:
+#   An error message on stdout when a provided source is malformed.
+# Returns:
+#   0 when resolved or when no source is provided, 1 otherwise.
+#######################################
 _gh_resolve_owner_repo_optional() {
     local args="$1"
     _GH_OWNER="" _GH_REPO="" _GH_REF="" _GH_PATH=""

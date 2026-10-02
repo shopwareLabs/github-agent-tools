@@ -2,9 +2,15 @@
 # Sub-issue tools for gh-tooling MCP server (GraphQL)
 # Write: sub_issue_add, sub_issue_remove
 
-# Helper: resolve an issue number to its GraphQL node ID.
-# Args: $1=repo (owner/repo format), $2=issue_number
-# Outputs: node ID string (e.g., "I_kwDOA...")
+#######################################
+# Resolve an issue number to its GraphQL node ID.
+# Arguments:
+#   $1 repository in owner/repo form, $2 issue number.
+# Outputs:
+#   The node ID on stdout, e.g. I_kwDOA...; gh's error on stderr.
+# Returns:
+#   gh's exit status.
+#######################################
 _gh_resolve_issue_node_id() {
     local repo="$1" issue_number="$2"
     local owner="${repo%%/*}"
