@@ -1468,33 +1468,50 @@ bats_test_function --description "pr_checks: fails without repo outside git"  --
     }
 }
 
-@test "workflow_jobs: partial API failure skips failed run" {
+@test "workflow_jobs: fails the call when one run's jobs cannot be fetched" {
     gh() {
         if [[ "$1" == "run" && "$2" == "list" ]]; then
             echo '[{"databaseId":100,"displayTitle":"Run 100","headBranch":"main","status":"completed","conclusion":"failure","createdAt":"2024-01-01T00:00:00Z"},{"databaseId":200,"displayTitle":"Run 200","headBranch":"main","status":"completed","conclusion":"success","createdAt":"2024-01-02T00:00:00Z"}]'
             return 0
         fi
-        if [[ "$1" == "api" ]]; then
-            # Run 100 fails, run 200 succeeds
-            if [[ "$2" == *"/100/"* ]]; then
-                echo "API error" >&2
-                return 1
-            fi
-            if [[ "$2" == *"/200/"* ]]; then
-                echo '{"jobs":[{"id":2001,"name":"PHPStan","status":"completed","conclusion":"success","html_url":"","started_at":"","completed_at":"","steps":[]}]}'
-                return 0
-            fi
+        if [[ "$2" == *"/100/"* ]]; then
+            echo "gh: Server Error (HTTP 502)" >&2
+            return 1
         fi
+        echo '{"jobs":[{"id":2001,"name":"PHPStan","status":"completed","conclusion":"success","html_url":"","started_at":"","completed_at":"","steps":[]}]}'
+    }
+    run tool_workflow_jobs '{"workflow":"CI"}'
+    assert_failure
+    assert_output "Error: could not fetch the jobs of run 100: gh: Server Error (HTTP 502)"
+}
+
+@test "workflow_jobs: returns the fallback when one run's jobs cannot be fetched" {
+    gh() {
+        if [[ "$1" == "run" && "$2" == "list" ]]; then
+            echo '[{"databaseId":100,"displayTitle":"Run 100","headBranch":"main","status":"completed","conclusion":"failure","createdAt":"2024-01-01T00:00:00Z"}]'
+            return 0
+        fi
+        echo "gh: Server Error (HTTP 502)" >&2
+        return 1
+    }
+    run tool_workflow_jobs '{"workflow":"CI","fallback":"no jobs"}'
+    assert_success
+    assert_output "no jobs"
+}
+
+@test "workflow_jobs: reads the jobs on every page of a paginated run" {
+    gh() {
+        if [[ "$1" == "run" && "$2" == "list" ]]; then
+            echo '[{"databaseId":100,"displayTitle":"Run 100","headBranch":"main","status":"completed","conclusion":"failure","createdAt":"2024-01-01T00:00:00Z"}]'
+            return 0
+        fi
+        # --paginate prints one JSON object per page.
+        echo '{"total_count":2,"jobs":[{"id":1001,"name":"Unit","status":"completed","conclusion":"success","html_url":"","started_at":"","completed_at":"","steps":[]}]}'
+        echo '{"total_count":2,"jobs":[{"id":1002,"name":"Lint","status":"completed","conclusion":"failure","html_url":"","started_at":"","completed_at":"","steps":[]}]}'
     }
     run tool_workflow_jobs '{"workflow":"CI"}'
     assert_success
-    # Should still return jobs from the successful run
-    local count
-    count=$(echo "${output}" | jq 'length')
-    [[ "${count}" == "1" ]] || {
-        echo "Expected 1 job (from successful run), got: ${count}"
-        return 1
-    }
+    assert_equal "$(printf '%s' "${output}" | jq -c '[.[].id]')" "[1001,1002]"
 }
 
 @test "workflow_jobs: suppress_errors hides run list stderr" {

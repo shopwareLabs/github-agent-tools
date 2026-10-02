@@ -246,7 +246,7 @@ Use gh-tooling run_logs with run_id 22245862281 and tail_lines 100
 
 ### `workflow_jobs`
 
-Aggregate jobs across workflow runs in a single call. Reduces N+1 tool calls (run_list + N x job_view) to one invocation. Fetches runs for a workflow, then retrieves jobs for each run.
+Aggregate jobs across workflow runs in a single call. Reduces N+1 tool calls (run_list + N x job_view) to one invocation. Fetches runs for a workflow, then retrieves jobs for each run. If the jobs of any run cannot be fetched, the call fails, or returns `fallback` when set, rather than returning the jobs of the other runs.
 
 ```
 Use gh-tooling workflow_jobs with workflow "CI" and repo "shopware/shopware" and job "PHPStan" and limit 3

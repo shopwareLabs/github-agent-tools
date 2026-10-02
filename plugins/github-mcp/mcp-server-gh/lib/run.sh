@@ -213,74 +213,76 @@ tool_workflow_jobs() {
     [[ -n "${branch}" ]] && list_cmd+=("--branch" "${branch}")
     [[ -n "${event}" ]] && list_cmd+=("--event" "${event}")
 
+    # Every step fails the call rather than returning fewer jobs: a list missing
+    # a run's jobs reads as a complete one.
     log "INFO" "workflow_jobs: ${list_cmd[*]}"
-    local runs_json __exit=0
-    if [[ "${suppress_errors}" == "true" ]]; then
-        runs_json=$("${list_cmd[@]}" 2>/dev/null) || __exit=$?
-    else
-        runs_json=$("${list_cmd[@]}" 2>&1) || __exit=$?
-    fi
+    local runs_json list_err __exit=0
+    _gh_capture_split runs_json list_err "${list_cmd[@]}" || __exit=$?
     if [[ ${__exit} -ne 0 ]]; then
         [[ -n "${fallback}" ]] && { echo "${fallback}"; return 0; }
-        echo "${runs_json}"; return ${__exit}
+        [[ "${suppress_errors}" == "true" ]] || echo "${list_err:-${runs_json}}"; return ${__exit}
     fi
 
-    # Extract run IDs
+    # Step 2: Extract run IDs
     local run_ids
-    run_ids=$(echo "${runs_json}" | jq -r '.[].databaseId // empty' 2>/dev/null)
+    run_ids=$(printf '%s\n' "${runs_json}" | jq -r '.[].databaseId' 2>/dev/null) || {
+        echo "Error: workflow_jobs could not read the run list gh returned"
+        return 1
+    }
     if [[ -z "${run_ids}" ]]; then
-        local result="[]"
-        _gh_post_process "${result}" "${jq_filter}" "" 0 0 false false "${max_lines}" "" || return $?
+        _gh_post_process "[]" "${jq_filter}" "" 0 0 false false "${max_lines}" "" || return $?
         return 0
     fi
 
-    # Step 2: Fetch jobs for each run via API
+    # Step 3: Fetch jobs for each run via API
     local all_jobs="[]"
     local run_id
     while IFS= read -r run_id; do
-        [[ -z "${run_id}" ]] && continue
         log "INFO" "workflow_jobs: fetching jobs for run ${run_id}"
 
-        local api_out api_exit=0
-        api_out=$(gh api "repos/${effective_repo}/actions/runs/${run_id}/jobs" --paginate 2>&1) || api_exit=$?
+        local api_out api_err api_exit=0
+        _gh_capture_split api_out api_err \
+            gh api "repos/${effective_repo}/actions/runs/${run_id}/jobs" --paginate || api_exit=$?
         if [[ ${api_exit} -ne 0 ]]; then
-            log "WARN" "workflow_jobs: failed to fetch jobs for run ${run_id}: ${api_out}"
-            continue
+            [[ -n "${fallback}" ]] && { echo "${fallback}"; return 0; }
+            [[ "${suppress_errors}" == "true" ]] || echo "Error: could not fetch the jobs of run ${run_id}: ${api_err:-${api_out}}"
+            return ${api_exit}
         fi
 
-        # Extract jobs and attach run context via jq -s (slurp) to avoid --argjson quoting issues
+        # --paginate prints one JSON object per page, so every slurped page is
+        # read, not only the first. The run context goes in through
+        # --slurpfile to avoid --argjson quoting issues.
         local run_jobs
         run_jobs=$(jq -c -n --arg rid "${run_id}" \
-            --slurpfile runs <(echo "${runs_json}") \
-            --slurpfile api <(echo "${api_out}") \
-            '($runs[0][] | select(.databaseId == ($rid | tonumber))) as $ctx | [$api[0].jobs[] | . + {run: $ctx}]' 2>/dev/null) || run_jobs="[]"
+            --slurpfile runs <(printf '%s\n' "${runs_json}") \
+            --slurpfile api <(printf '%s\n' "${api_out}") \
+            '($runs[0][] | select(.databaseId == ($rid | tonumber))) as $ctx | [$api[] | .jobs[] | . + {run: $ctx}]' 2>/dev/null) || {
+            echo "Error: workflow_jobs could not read the jobs gh returned for run ${run_id}"
+            return 1
+        }
 
-        all_jobs=$(printf '%s\n%s' "${all_jobs}" "${run_jobs}" | jq -s '.[0] + .[1]' 2>/dev/null) || true
+        all_jobs=$(printf '%s\n%s' "${all_jobs}" "${run_jobs}" | jq -c -s '.[0] + .[1]') || {
+            echo "Error: workflow_jobs could not merge the jobs of run ${run_id}"
+            return 1
+        }
     done <<< "${run_ids}"
 
-    # Step 3: Filter jobs by name (case-insensitive substring)
-    if [[ -n "${job}" ]]; then
-        all_jobs=$(echo "${all_jobs}" | jq -c --arg name "${job}" \
-            '[.[] | select((.name | ascii_downcase) | contains($name | ascii_downcase))]' 2>/dev/null) || all_jobs="[]"
-    fi
-
-    # Step 4: Filter by conclusion
-    if [[ -n "${conclusion}" ]]; then
-        all_jobs=$(echo "${all_jobs}" | jq -c --arg conc "${conclusion}" \
-            '[.[] | select((.conclusion // "" | ascii_downcase) == ($conc | ascii_downcase))]' 2>/dev/null) || all_jobs="[]"
-    fi
-
-    # Step 5: Filter and include steps (only when step filter is set)
-    if [[ -n "${step}" ]]; then
-        all_jobs=$(echo "${all_jobs}" | jq -c --arg sname "${step}" \
-            '[.[] | .steps = [.steps[]? | select((.name | ascii_downcase) | contains($sname | ascii_downcase))]]' 2>/dev/null) || all_jobs="[]"
-    else
-        # Exclude steps by default to reduce output size
-        all_jobs=$(echo "${all_jobs}" | jq -c '[.[] | del(.steps)]' 2>/dev/null) || true
-    fi
-
-    # Step 6: Slim down output — keep essential fields only
-    all_jobs=$(echo "${all_jobs}" | jq -c '[.[] | {id, name, status, conclusion, html_url, started_at, completed_at, run, steps}]' 2>/dev/null) || true
+    # Step 4: Filter by job name (case-insensitive substring), conclusion, and
+    # step name; drop steps unless a step filter asks for them; keep the
+    # essential fields. One program, so a failure cannot leave a partial list.
+    all_jobs=$(printf '%s\n' "${all_jobs}" | jq -c \
+        --arg name "${job}" --arg conc "${conclusion}" --arg sname "${step}" '
+        [ .[]
+          | select($name == "" or ((.name | ascii_downcase) | contains($name | ascii_downcase)))
+          | select($conc == "" or ((.conclusion // "" | ascii_downcase) == ($conc | ascii_downcase)))
+          | if $sname == "" then del(.steps)
+            else .steps = [.steps[]? | select((.name | ascii_downcase) | contains($sname | ascii_downcase))]
+            end
+          | {id, name, status, conclusion, html_url, started_at, completed_at, run, steps}
+        ]') || {
+        echo "Error: workflow_jobs could not filter the jobs"
+        return 1
+    }
 
     _gh_post_process "${all_jobs}" "${jq_filter}" "" 0 0 false false "${max_lines}" "" || return $?
 }

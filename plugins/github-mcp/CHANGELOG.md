@@ -25,10 +25,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on `gh api` returned the HTTP error's JSON body, which gh prints on stdout, as the result, and the
   project and issue-schema write tools returned gh's message when looking up a project, a status,
   or the organization's types or fields failed.
+- `workflow_jobs` now fails the call, or returns `fallback`, when fetching any run's jobs fails or
+  gh's output cannot be read. Before, it left that run out and returned the rest as if complete.
+  It also reads every page of a run's jobs. Before, only the first page reached the result.
 - gh's stderr no longer ends up in a value a tool parses from gh's stdout: the issue node IDs of
   `sub_issue_add` and `sub_issue_remove`, the head SHA `pr_review_submit` fetches, the project and
   status listings of the project tools, the organization's types and fields for `issue_type_set` and
-  `issue_field_set`. A gh warning on a successful call corrupted the value.
+  `issue_field_set`, and the run jobs of `workflow_jobs`. A gh warning on a successful call
+  corrupted the value.
 - A GitHub `url` naming only an owner, such as `https://github.com/acme`, is now rejected. Before,
   it resolved to owner `acme` and repository `acme`.
 - The project-not-found and status-not-found errors of `project_item_add` and `project_status_set`
