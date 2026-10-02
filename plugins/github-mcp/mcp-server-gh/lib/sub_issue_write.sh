@@ -56,6 +56,7 @@ tool_sub_issue_add() {
         printf '%s\n' "Error: repo is required for sub_issue_add (no default repo configured)"
         return 1
     fi
+    _gh_validate_repo "${effective_repo}" || return 1
 
     # Resolve both issue numbers to node IDs
     local parent_id sub_id
@@ -121,6 +122,7 @@ tool_sub_issue_remove() {
         printf '%s\n' "Error: repo is required for sub_issue_remove (no default repo configured)"
         return 1
     fi
+    _gh_validate_repo "${effective_repo}" || return 1
 
     local parent_id sub_id
     parent_id=$(_gh_resolve_issue_node_id "${effective_repo}" "${issue_number}" 2>&1) || {

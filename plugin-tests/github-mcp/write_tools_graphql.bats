@@ -59,6 +59,13 @@ setup() {
     assert_output --partial "repo is required"
 }
 
+@test "sub_issue_add rejects a repo that is not owner/repo before calling GitHub" {
+    run tool_sub_issue_add '{"issue_number": 1, "sub_issue_number": 2, "repo": "acme/app/extra"}'
+    assert_failure
+    assert_output --partial "repo must be in 'owner/repo' format"
+    [[ ! -f "${GH_ARGS_FILE}" ]]
+}
+
 @test "sub_issue_add handles resolution failure" {
     _gh_resolve_issue_node_id() {
         printf '%s\n' "not found" >&2
@@ -129,6 +136,13 @@ setup() {
     run tool_sub_issue_remove '{"issue_number": 1, "sub_issue_number": 2}'
     assert_failure
     assert_output --partial "repo is required"
+}
+
+@test "sub_issue_remove rejects a repo that is not owner/repo before calling GitHub" {
+    run tool_sub_issue_remove '{"issue_number": 1, "sub_issue_number": 2, "repo": "acme/app/extra"}'
+    assert_failure
+    assert_output --partial "repo must be in 'owner/repo' format"
+    [[ ! -f "${GH_ARGS_FILE}" ]]
 }
 
 @test "sub_issue_remove handles resolution failure" {
