@@ -503,6 +503,10 @@ _gh_parse_github_url() {
     # Strip scheme and host
     local path_part="${url#*github.com/}"
 
+    # Without a slash, the split below would read the one segment as both
+    # owner and repo.
+    [[ "${path_part}" == */* ]] || return 1
+
     # Extract owner/repo (first two segments)
     local owner repo remainder
     owner="${path_part%%/*}"

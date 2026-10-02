@@ -682,6 +682,11 @@ bats_test_function --description "pr_checks: fails without repo outside git"  --
     assert_equal "${_GH_URL_PATH}" "composer.json"
 }
 
+@test "_gh_parse_github_url: rejects a URL that names only an owner" {
+    run _gh_parse_github_url "https://github.com/shopware"
+    assert_failure
+}
+
 @test "_gh_parse_github_url: parses repo-only URL" {
     _gh_parse_github_url "https://github.com/shopware/shopware"
     assert_equal "${_GH_URL_OWNER}" "shopware"
