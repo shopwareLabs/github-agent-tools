@@ -8,16 +8,28 @@ on:
       - 'plugin-tests/**'
       - '.mcp-sdk.lock'
       - '.shellcheckrc'
+      - '.gitignore'
       - '.github/workflows/ci.yml'
       - '.github/scripts/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - 'eslint.config.mjs'
+      - '.github/workflows/npm-publish.yml'
   pull_request:
     paths:
       - 'plugins/**'
       - 'plugin-tests/**'
       - '.mcp-sdk.lock'
       - '.shellcheckrc'
+      - '.gitignore'
       - '.github/workflows/ci.yml'
       - '.github/scripts/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - 'eslint.config.mjs'
+      - '.github/workflows/npm-publish.yml'
 
 jobs:
   bash:
@@ -26,7 +38,24 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npx tsc --noEmit -p .
+
+      - name: Lint
+        run: npx eslint . --max-warnings 0
+
+      - name: Node unit tests
+        run: node --test 'plugin-tests/github-mcp/pi/*.test.ts'
 
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
@@ -52,7 +81,7 @@ jobs:
       - name: Setup BATS
         uses: bats-core/bats-action@77d6fb60505b4d0d1d73e48bd035b55074bbfb43 # 4.0.0
         with:
-          bats-version: 1.13.0
+          bats-version: 1.14.0
           support-install: true
           assert-install: true
           assert-version: 2.2.4

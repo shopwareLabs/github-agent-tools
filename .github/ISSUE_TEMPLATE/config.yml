@@ -16,3 +16,7 @@ contact_links:
   - name: 🤖 Codex Plugin Guide
     url: https://learn.chatgpt.com/docs/build-plugins
     about: "Learn how to install and manage Codex plugins"
+
+  - name: 📦 pi Package Guide
+    url: https://pi.dev/packages
+    about: "Learn how to install and manage pi packages"

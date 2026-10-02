@@ -13,6 +13,12 @@ bats_require_minimum_version 1.11.0
 load 'test_helper/common_setup'
 
 setup() {
+    # A private copy: these tests start the server directly, and the real
+    # plugin directory is shared with every other suite in this run —
+    # running it in place would append to its log on every test.
+    PLUGIN_COPY="${BATS_TEST_TMPDIR}/plugin"
+    cp -R "${PLUGIN_DIR}" "${PLUGIN_COPY}"
+    GH_SERVER_COPY_DIR="${PLUGIN_COPY}/mcp-server-gh"
     PROJECT_DIR="${BATS_TEST_TMPDIR}/project"
     mkdir -p "${PROJECT_DIR}"
 }
@@ -22,7 +28,7 @@ setup() {
 call_tool() {
     local server="$1" tool="$2" project_root="$3"
     printf '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"%s","arguments":{}}}\n' "$tool" \
-        | env PROJECT_ROOT="$project_root" bash "${GH_SERVER_DIR}/${server}" 2>/dev/null \
+        | env PROJECT_ROOT="$project_root" bash "${GH_SERVER_COPY_DIR}/${server}" 2>/dev/null \
         | tail -1 \
         | jq -r '.result.content[0].text // .error.message // "no answer"'
 }
@@ -101,12 +107,12 @@ undeclared_tools() {
     # startup-written list behind. What matters is that this run writes none.
     # The shipped tools-empty.json does not match the pattern.
     local before after
-    before=$(find "${GH_SERVER_DIR}" -maxdepth 1 -name 'tools-empty.*.json' | sort)
+    before=$(find "${GH_SERVER_COPY_DIR}" -maxdepth 1 -name 'tools-empty.*.json' | sort)
 
     printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \
-        | env PROJECT_ROOT="${PROJECT_DIR}" bash "${GH_SERVER_DIR}/server-write.sh" >/dev/null 2>&1
+        | env PROJECT_ROOT="${PROJECT_DIR}" bash "${GH_SERVER_COPY_DIR}/server-write.sh" >/dev/null 2>&1
 
-    after=$(find "${GH_SERVER_DIR}" -maxdepth 1 -name 'tools-empty.*.json' | sort)
+    after=$(find "${GH_SERVER_COPY_DIR}" -maxdepth 1 -name 'tools-empty.*.json' | sort)
 
     [[ "$before" == "$after" ]]
 }

@@ -1,0 +1,41 @@
+{
+  "name": "@shopware-ag/github-agent-tools",
+  "version": "4.3.0",
+  "description": "GitHub CLI MCP servers for pull requests, issues, CI, and repositories, with enforcement that keeps the agent on the MCP tools.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Shopware Labs",
+  "homepage": "https://github.com/shopwareLabs/github-agent-tools/tree/main/plugins/github-mcp",
+  "repository": { "type": "git", "url": "git+https://github.com/shopwareLabs/github-agent-tools.git" },
+  "bugs": "https://github.com/shopwareLabs/github-agent-tools/issues",
+  "keywords": ["pi-package", "github", "gh", "mcp"],
+  "pi": { "extensions": ["./plugins/github-mcp/pi/index.ts"] },
+  "files": [
+    "plugins/github-mcp/pi/",
+    "plugins/github-mcp/hooks/",
+    "plugins/github-mcp/mcp-server-gh/",
+    "plugins/github-mcp/shared/",
+    "plugins/github-mcp/README.md",
+    "plugins/github-mcp/REFERENCE.md",
+    "plugins/github-mcp/CHANGELOG.md",
+    "!**/*.log"
+  ],
+  "engines": { "node": ">=22.19.0" },
+  "publishConfig": { "access": "public" },
+  "peerDependencies": { "@earendil-works/pi-coding-agent": "*" },
+  "devDependencies": {
+    "@earendil-works/pi-ai": "1.0.0",
+    "@earendil-works/pi-coding-agent": "1.0.0",
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.19.1",
+    "eslint": "10.11.0",
+    "eslint-plugin-n": "18.4.0",
+    "eslint-plugin-perfectionist": "5.12.1",
+    "eslint-plugin-promise": "7.3.0",
+    "eslint-plugin-regexp": "3.3.1",
+    "eslint-plugin-sonarjs": "4.2.2",
+    "eslint-plugin-unicorn": "76.0.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.0"
+  }
+}

@@ -1,0 +1,74 @@
+name: npm Publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      # Trusted publishing needs npm 11.5.1 or later.
+      - name: Update npm
+        run: npm install -g npm@11.21.0
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Setup BATS
+        uses: bats-core/bats-action@77d6fb60505b4d0d1d73e48bd035b55074bbfb43 # 4.0.0
+        with:
+          bats-version: 1.14.0
+          support-install: true
+          assert-install: true
+          assert-version: 2.2.4
+          detik-install: false
+          file-install: false
+          support-path: ${{ github.workspace }}/.bats/bats-support
+          assert-path: ${{ github.workspace }}/.bats/bats-assert
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npx tsc --noEmit -p .
+
+      - name: Lint
+        run: npx eslint . --max-warnings 0
+
+      - name: Node unit tests
+        run: node --test 'plugin-tests/github-mcp/pi/*.test.ts'
+
+      - name: BATS
+        run: |
+          echo "Running BATS tests with timing..."
+          bats --timing -r plugin-tests/
+
+      - name: Verify tag matches package and plugin manifest versions
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PACKAGE_VERSION=$(jq -r '.version' package.json)
+          CLAUDE_VERSION=$(jq -r '.version' plugins/github-mcp/.claude-plugin/plugin.json)
+          CODEX_VERSION=$(jq -r '.version' plugins/github-mcp/.codex-plugin/plugin.json)
+          if ! { [[ "${TAG_VERSION}" == "${PACKAGE_VERSION}" ]] && [[ "${TAG_VERSION}" == "${CLAUDE_VERSION}" ]] && [[ "${TAG_VERSION}" == "${CODEX_VERSION}" ]]; }; then
+            echo "Version mismatch: tag=${TAG_VERSION} package.json=${PACKAGE_VERSION} claude-plugin=${CLAUDE_VERSION} codex-plugin=${CODEX_VERSION}" >&2
+            exit 1
+          fi
+
+      - name: Publish to npm
+        run: npm publish

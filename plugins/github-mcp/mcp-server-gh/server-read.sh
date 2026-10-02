@@ -23,57 +23,6 @@ source "${SHARED_DIR}/mcpserver_core.sh"
 GH_TOOLING_CONFIG_FILE=""
 GH_DEFAULT_REPO=""
 
-_load_gh_config() {
-    local project_root="$1"
-    local config_name=".mcp-gh-tooling.json"
-
-    if [[ -n "${MCP_GH_TOOLING_CONFIG:-}" ]]; then
-        if [[ -f "${MCP_GH_TOOLING_CONFIG}" ]]; then
-            GH_TOOLING_CONFIG_FILE="${MCP_GH_TOOLING_CONFIG}"
-            log "INFO" "Config from MCP_GH_TOOLING_CONFIG: ${GH_TOOLING_CONFIG_FILE}"
-        else
-            log "WARN" "MCP_GH_TOOLING_CONFIG set but file not found: ${MCP_GH_TOOLING_CONFIG}"
-        fi
-        return 0
-    fi
-
-    # Check standard config locations (last found wins). If both supported-host
-    # overrides exist, prefer the active host's directory.
-    local -a locations=(
-        "${project_root}/${config_name}"
-        "${project_root}/.aiassistant/${config_name}"
-        "${project_root}/.amazonq/${config_name}"
-        "${project_root}/.cline/${config_name}"
-        "${project_root}/.cursor/${config_name}"
-        "${project_root}/.kiro/${config_name}"
-        "${project_root}/.windsurf/${config_name}"
-        "${project_root}/.zed/${config_name}"
-    )
-
-    if [[ "${GITHUB_MCP_HOST:-claude}" == "codex" ]]; then
-        locations+=(
-            "${project_root}/.claude/${config_name}"
-            "${project_root}/.codex/${config_name}"
-        )
-    else
-        locations+=(
-            "${project_root}/.codex/${config_name}"
-            "${project_root}/.claude/${config_name}"
-        )
-    fi
-
-    for loc in "${locations[@]}"; do
-        if [[ -f "${loc}" ]]; then
-            GH_TOOLING_CONFIG_FILE="${loc}"
-            log "INFO" "Found config: ${loc}"
-        fi
-    done
-
-    if [[ -z "${GH_TOOLING_CONFIG_FILE}" ]]; then
-        log "INFO" "No .mcp-gh-tooling.json found - using defaults (no default repo)"
-    fi
-}
-
 _read_gh_config() {
     if [[ -z "${GH_TOOLING_CONFIG_FILE}" ]] || [[ ! -f "${GH_TOOLING_CONFIG_FILE}" ]]; then
         return 0
@@ -104,7 +53,7 @@ source "${SCRIPT_DIR}/lib/project.sh"
 
 trap 'log "ERROR" "Unexpected error on line ${LINENO}"' ERR
 
-_load_gh_config "${PROJECT_ROOT}"
+_load_gh_config "${PROJECT_ROOT}" "No .mcp-gh-tooling.json found - using defaults (no default repo)"
 _read_gh_config
 _gh_require_tools_list
 

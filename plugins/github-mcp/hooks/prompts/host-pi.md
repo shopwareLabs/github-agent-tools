@@ -1,0 +1,1 @@
+In pi, these tools are named `mcp__gh_tooling__<tool>` (read) and `mcp__gh_tooling_write__<tool>` (write), for example `mcp__gh_tooling__pr_view`. A tool that `tool_search` loads is callable from your next call.

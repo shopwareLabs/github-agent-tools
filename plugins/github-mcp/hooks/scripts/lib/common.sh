@@ -1,8 +1,8 @@
 #!/bin/bash
 # Shared functions for MCP tool enforcement hooks
 # ================================================
-# This library provides common functionality for Claude Code and Codex hooks
-# that block bash commands in favor of MCP tools.
+# This library provides common functionality for the hooks that block bash
+# commands in favor of MCP tools, on every host.
 #
 # Usage:
 #   source "${SCRIPT_DIR}/lib/common.sh"
@@ -15,21 +15,32 @@
 #   HOOK_INPUT - Raw hook input read from stdin
 #   COMMAND - The bash command being checked
 #   PROJECT_DIR - Project directory reported by the active host
-#   HOOK_HOST - Host inferred from the hook environment (claude/codex)
+#   HOOK_HOST - Host inferred from the hook environment (claude/codex/pi)
 #   CONFIG_FILE - Path to loaded config file (or empty)
 #   ENVIRONMENT - Environment from config (native/docker/vagrant/ddev)
 #   ENFORCE_MCP_TOOLS - Whether to enforce MCP tools (true/false)
 
+source "$(dirname "${BASH_SOURCE[0]}")/../../../shared/config-dirs.sh"
+
 # Resolve the active host and project directory from hook input.
-# Claude Code provides CLAUDE_PROJECT_DIR; Codex provides cwd in the JSON payload.
+# Claude Code provides CLAUDE_PROJECT_DIR, which selects claude even when
+# GITHUB_MCP_HOST is exported in the shell. Otherwise GITHUB_MCP_HOST=pi or
+# codex names the host, and codex is assumed. Codex and pi provide cwd in the
+# JSON payload.
 resolve_hook_context() {
     local input="${1:-}"
 
     if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]]; then
         HOOK_HOST="claude"
-        PROJECT_DIR="${CLAUDE_PROJECT_DIR}"
+    elif [[ "${GITHUB_MCP_HOST:-}" == "pi" || "${GITHUB_MCP_HOST:-}" == "codex" ]]; then
+        HOOK_HOST="${GITHUB_MCP_HOST}"
     else
         HOOK_HOST="codex"
+    fi
+
+    if [[ "$HOOK_HOST" == "claude" ]]; then
+        PROJECT_DIR="${CLAUDE_PROJECT_DIR}"
+    else
         PROJECT_DIR=""
         if command -v jq &>/dev/null; then
             PROJECT_DIR=$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null || true)
@@ -37,38 +48,28 @@ resolve_hook_context() {
     fi
 }
 
-# Find a project config, preferring the active host's directory and then the
-# other supported host's directory before the project-root fallback.
+# Find a project config in the host config directories, in the order
+# github_mcp_config_dirs gives for the active host, then in the project root.
+# First match wins.
 # Args: $1 = config prefix
 # Sets: CONFIG_FILE (global)
 find_mcp_config() {
     local config_prefix="$1"
-    local -a locations
     CONFIG_FILE=""
 
     [[ -z "${PROJECT_DIR:-}" ]] && return 0
 
-    if [[ "${HOOK_HOST:-claude}" == "codex" ]]; then
-        locations=(
-            ".codex/.mcp-${config_prefix}.json"
-            ".claude/.mcp-${config_prefix}.json"
-            ".mcp-${config_prefix}.json"
-        )
-    else
-        locations=(
-            ".claude/.mcp-${config_prefix}.json"
-            ".codex/.mcp-${config_prefix}.json"
-            ".mcp-${config_prefix}.json"
-        )
-    fi
-
-    local location
-    for location in "${locations[@]}"; do
-        if [[ -f "${PROJECT_DIR}/${location}" ]]; then
-            CONFIG_FILE="${PROJECT_DIR}/${location}"
-            break
+    local dir
+    while IFS= read -r dir; do
+        if [[ -f "${PROJECT_DIR}/${dir}/.mcp-${config_prefix}.json" ]]; then
+            CONFIG_FILE="${PROJECT_DIR}/${dir}/.mcp-${config_prefix}.json"
+            return 0
         fi
-    done
+    done < <(github_mcp_config_dirs "${HOOK_HOST:-claude}")
+
+    if [[ -f "${PROJECT_DIR}/.mcp-${config_prefix}.json" ]]; then
+        CONFIG_FILE="${PROJECT_DIR}/.mcp-${config_prefix}.json"
+    fi
 }
 
 # Parse hook input from stdin
@@ -119,7 +120,8 @@ block_tool() {
     local description="$2"
     local display_tool="$tool"
 
-    if [[ "${HOOK_HOST:-claude}" == "codex" ]]; then
+    # Claude Code is the only host that qualifies tool names with the plugin name.
+    if [[ "${HOOK_HOST:-claude}" != "claude" ]]; then
         display_tool="${display_tool//gh-tooling-write/gh_tooling_write}"
         display_tool="${display_tool//gh-tooling/gh_tooling}"
     else

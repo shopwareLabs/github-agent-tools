@@ -9,16 +9,19 @@ from [shopwareLabs/ai-coding-tools](https://github.com/shopwareLabs/ai-coding-to
 > **Plugin name vs. server names.** The installable plugin is `github-mcp`, but its two MCP
 > servers keep their original IDs `gh-tooling` (read) and `gh-tooling-write` (write). So you
 > install `github-mcp@github-agent-tools`, while `/mcp` and `.mcp-gh-tooling.json` use the raw
-> server IDs. Claude Code exposes names such as `mcp__plugin_github-mcp_gh-tooling__…`; Codex
-> exposes the same tools as `mcp__gh_tooling__…` after sanitizing the server ID.
+> server IDs. Claude Code exposes names such as `mcp__plugin_github-mcp_gh-tooling__…`; Codex and
+> pi expose the same tools as `mcp__gh_tooling__…` after sanitizing the server ID.
 
-## Dual-target: Claude Code and Codex
+## Hosts
 
 The plugin's core is assistant-neutral: `plugins/github-mcp/mcp-server-gh/server-{read,write}.sh`
-are plain stdio [MCP](https://modelcontextprotocol.io/) servers that both hosts spawn. Claude Code
-uses `.claude-plugin/marketplace.json`, `.claude-plugin/plugin.json`, and `.mcp.json`; Codex uses
-`.agents/plugins/marketplace.json` and `.codex-plugin/plugin.json`. The hook definition and scripts
-are shared. Keep the MCP server scripts and hook behavior as the single core across both hosts.
+are plain stdio [MCP](https://modelcontextprotocol.io/) servers that every host spawns. Claude
+Code uses `.claude-plugin/marketplace.json`, `.claude-plugin/plugin.json`, and `.mcp.json`; Codex
+uses `.agents/plugins/marketplace.json` and `.codex-plugin/plugin.json`; pi installs the repository
+root as an npm package and loads its extension from the package entry point
+`plugins/github-mcp/pi/index.ts`, declared in root `package.json`'s `pi.extensions`. The hook
+definition and scripts are shared. Keep the MCP server scripts and hook behavior as the single core
+for every host.
 
 The separate `plugin-setup` plugin remains Claude Code-only because its skill uses Claude Code
 interaction and permission-setting features. Do not list it in the Codex marketplace unless that
@@ -31,17 +34,21 @@ directly — treat them as you would any source file. For `github-mcp` these are
 
 - `.mcp.json` — Claude Code MCP server registration
 - `.codex-plugin/plugin.json` — Codex manifest and MCP server registration
+- `plugins/github-mcp/pi/` — pi extension (server registration, directive, and gates)
+- root `package.json` — pi npm package manifest, including `pi.extensions`
 - `mcp-server-gh/` — the read/write servers, tool definitions (`tools-*.json`), and `lib/*.sh`
 - `shared/mcpserver_core.sh` — JSON-RPC protocol handler
+- `shared/config-dirs.sh` — host config directory order, used by the hooks and the servers (not vendored)
 - `hooks/` — `hooks.json` plus the SessionStart/PreToolUse scripts
 
-The `github-mcp` plugin ships only MCP servers and hooks — no skills, slash commands, or agents.
+The `github-mcp` plugin ships MCP servers, hooks, and (for pi) the extension that adapts them —
+no skills, slash commands, or agents.
 The separate `plugin-setup` plugin ships one skill (`github-mcp-setting-up`); its `skills/*/SKILL.md`
 is a runtime file. If `github-mcp` gains its own `skills/*/SKILL.md`, `commands/*.md`, or
 `agents/*.md` later, those are runtime files too.
 
 **Developer documentation is not runtime.** Repository and plugin `README.md`, `AGENTS.md`,
-`CLAUDE.md` (where present), and `CHANGELOG.md` files are read by maintainers; neither host loads
+`CLAUDE.md` (where present), and `CHANGELOG.md` files are read by maintainers; no host loads
 them as installed plugin runtime. When changing runtime behavior, edit runtime files; when updating
 guides or architecture notes, edit the docs.
 
@@ -130,8 +137,8 @@ convention. Update `plugins/github-mcp/README.md` and `REFERENCE.md` when tool b
 
 ### Version bumps
 
-Edit the version in both `plugins/github-mcp/.claude-plugin/plugin.json` and
-`plugins/github-mcp/.codex-plugin/plugin.json`, then add a matching
+Edit the version in `plugins/github-mcp/.claude-plugin/plugin.json`,
+`plugins/github-mcp/.codex-plugin/plugin.json`, and root `package.json`, then add a matching
 `plugins/github-mcp/CHANGELOG.md` entry. `plugin-setup` is versioned independently in its own
 Claude Code manifest and `CHANGELOG.md`; keep the `version` in each of its skills' SKILL.md
 frontmatter equal to that manifest version.
@@ -153,8 +160,10 @@ fails the build if any dropdown is out of date.
 
 Choose the supported hosts first. Add the corresponding `.claude-plugin/plugin.json` and/or
 `.codex-plugin/plugin.json`, then register the plugin only in each compatible host marketplace.
-Keep shared runtime files host-neutral and keep host-specific launch wiring in the manifests. Run
-the relevant host validation and `.github/scripts/update-issue-templates.sh`.
+Keep shared runtime files host-neutral and keep host-specific launch wiring in the manifests. pi has
+no per-plugin manifest: root `package.json` is the one pi package, and its `files` and
+`pi.extensions` ship only `github-mcp`, so bringing another plugin to pi means extending that
+package. Run the relevant host validation and `.github/scripts/update-issue-templates.sh`.
 
 ## Testing & Validation
 
@@ -171,6 +180,20 @@ codex plugin list --available --json     # inspect the resolved Codex marketplac
 codex plugin add github-mcp@github-agent-tools
 ```
 
+### Node and pi
+
+```bash
+npm ci                                              # installs pi, TypeScript, and ESLint
+npx tsc --noEmit -p .                               # type-checks the extension and its tests
+npx eslint . --max-warnings 0                       # lints the same files (eslint.config.mjs)
+node --test 'plugin-tests/github-mcp/pi/*.test.ts'  # pi extension unit tests
+```
+
+`plugin-tests/github-mcp/pi_e2e.bats` drives the real `pi` binary against a scripted model and a
+stubbed `gh`, in both the git-clone and npm-tarball install layouts. It runs as part of the BATS
+suite below. `pi_e2e.bats` needs GNU coreutils'
+`timeout` (or `gtimeout`) on PATH; on macOS, install it with `brew install coreutils`.
+
 ### BATS
 
 ```bash
@@ -180,16 +203,20 @@ codex plugin add github-mcp@github-agent-tools
 
 Tests live in `plugin-tests/<name>/` mirroring the plugin structure and load the shared helper at
 `plugin-tests/test_helper/common_setup.bash` (it resolves the repo root by walking up to `.bats/`).
-CI (`.github/workflows/ci.yml`) runs ShellCheck over `plugins plugin-tests .github/scripts`,
-`vendor-mcp-sdk.sh --check` for the vendored SDK copy, and BATS over `plugin-tests/`; a separate
-`validate.yml` checks the issue-template dropdowns.
+CI (`.github/workflows/ci.yml`) runs `npm ci`, the type-check, ESLint, and the Node unit tests, then
+ShellCheck over `plugins plugin-tests .github/scripts`, `vendor-mcp-sdk.sh --check` for the
+vendored SDK copy, and BATS over `plugin-tests/` (including `pi_e2e.bats`); a separate `validate.yml` checks the issue-template dropdowns.
 
 ### Pre-release checklist
 
 - [ ] `claude plugin validate .` passes
 - [ ] Codex marketplace add, list, and plugin install smoke test passes
-- [ ] Plugin version bumped in both host manifests with a CHANGELOG entry
-- [ ] BATS green (`.bats/bats-core/bin/bats -r plugin-tests/`)
+- [ ] Plugin version bumped in the Claude Code and Codex manifests and root `package.json`, with a
+      CHANGELOG entry
+- [ ] `npx tsc --noEmit -p .` passes
+- [ ] `npx eslint . --max-warnings 0` passes
+- [ ] `node --test 'plugin-tests/github-mcp/pi/*.test.ts'` passes
+- [ ] BATS green (`.bats/bats-core/bin/bats -r plugin-tests/`), including `pi_e2e.bats`
 - [ ] ShellCheck clean
 - [ ] Issue-template dropdowns up to date (`.github/scripts/validate-issue-templates.sh`)
 - [ ] Vendored SDK matches its lock (`.github/scripts/vendor-mcp-sdk.sh --check`)
@@ -202,6 +229,19 @@ distribution. Claude Code installs with `/plugin marketplace add shopwareLabs/gi
 then `/plugin install github-mcp@github-agent-tools`. Codex installs with
 `codex plugin marketplace add shopwareLabs/github-agent-tools` then
 `codex plugin add github-mcp@github-agent-tools`.
+
+pi installs the repository as the npm package `@shopware-ag/github-agent-tools`, with
+`pi install npm:@shopware-ag/github-agent-tools` or `pi install git:github.com/shopwareLabs/github-agent-tools`.
+`.github/workflows/npm-publish.yml` publishes on a pushed tag matching `v*`: it type-checks, lints, runs
+the Node unit tests and the full BATS suite, checks the tag against `package.json` and both plugin
+manifests' versions, then runs `npm publish` using npm trusted publishing (no stored npm token).
+Releasing a version bumps `package.json`, both plugin manifests, and
+`plugins/github-mcp/CHANGELOG.md` in one commit, then tags `v<version>` on that commit and pushes
+the tag. Bootstrap, once: a maintainer with publish rights in the `@shopware-ag` npm organization
+publishes the first version by hand from a clean checkout of its release tag with `npm publish`,
+then runs
+`npm trust github @shopware-ag/github-agent-tools --file npm-publish.yml --repository shopwareLabs/github-agent-tools --allow-publish`
+(npm 11.15.0+). Every later version publishes from the workflow.
 
 ## Using Anthropic dev plugins
 

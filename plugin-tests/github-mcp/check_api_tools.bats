@@ -105,6 +105,12 @@ setup_read_blocking() {
     assert_success
 }
 
+@test "read api: block_api_tool_write alone leaves the read tool allowed" {
+    setup_config "gh-tooling" '{"block_api_tool_write": true}'
+    run_api_hook "$READ_TOOL" "repos/shopware/shopware/pulls/123/comments"
+    assert_success
+}
+
 @test "read api: enforce_mcp_tools false overrides API blocking" {
     setup_config "gh-tooling" '{"enforce_mcp_tools": false, "block_api_tool_read": true}'
     run_api_hook "$READ_TOOL" "repos/shopware/shopware/pulls/123/comments"
@@ -213,6 +219,12 @@ setup_write_blocking() {
 @test "write api: allows when block_api_tool_write is false" {
     setup_config "gh-tooling" '{"block_api_tool_write": false}'
     run_api_hook "$WRITE_TOOL" "repos/shopware/shopware/pulls" "POST"
+    assert_success
+}
+
+@test "write api: block_api_tool_read alone leaves the write tool allowed" {
+    setup_config "gh-tooling" '{"block_api_tool_read": true}'
+    run_api_hook "$WRITE_TOOL" "repos/shopware/shopware/pulls/123/comments" "GET"
     assert_success
 }
 

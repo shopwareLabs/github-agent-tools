@@ -12,6 +12,16 @@ _get_repo_root() {
 
 REPO_ROOT="$(_get_repo_root)"
 
+# The hooks select their host from GITHUB_MCP_HOST; a value from the developer's
+# shell would change their behavior. Tests that need a host set it explicitly.
+unset GITHUB_MCP_HOST
+
+# The servers honor MCP_GH_TOOLING_CONFIG and PROJECT_ROOT ahead of project
+# config locations; values from the developer's shell would redirect config
+# lookup. Tests that need either set them explicitly.
+unset MCP_GH_TOOLING_CONFIG
+unset PROJECT_ROOT
+
 # Load BATS helper libraries
 load "${REPO_ROOT}/.bats/bats-support/load"
 load "${REPO_ROOT}/.bats/bats-assert/load"
@@ -65,6 +75,13 @@ setup_codex_config() {
     unset CLAUDE_PROJECT_DIR
     mkdir -p "${CODEX_PROJECT_DIR}/.codex"
     printf '%s\n' "$content" > "${CODEX_PROJECT_DIR}/.codex/.mcp-${prefix}.json"
+}
+
+# Write a config file into a project directory, creating the directory.
+# Args: $1=project dir, $2=config dir relative to it ("" for the root), $3=JSON
+write_project_config() {
+    mkdir -p "${1}/${2}"
+    printf '%s\n' "$3" > "${1}/${2}/.mcp-gh-tooling.json"
 }
 
 # Default teardown for suites using setup_config; test files may override.

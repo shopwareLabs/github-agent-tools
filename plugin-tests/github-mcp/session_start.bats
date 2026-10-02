@@ -58,3 +58,74 @@ run_session_start() {
     assert_success
     assert_output ""
 }
+
+# ============================================================================
+# Host notes and config directory order
+# ============================================================================
+
+PI_HOST_NOTE=$(<"${PLUGIN_DIR}/hooks/prompts/host-pi.md")
+
+# Run session-start.sh in a fresh hook environment; $output is the parsed
+# additionalContext. Empty host or Claude project dir leaves that variable unset.
+# Args: $1=GITHUB_MCP_HOST, $2=CLAUDE_PROJECT_DIR, $3=payload cwd
+run_session_start_context() {
+    local -a hook_env=(-u GITHUB_MCP_HOST -u CLAUDE_PROJECT_DIR)
+    [[ -n "$1" ]] && hook_env+=("GITHUB_MCP_HOST=$1")
+    [[ -n "$2" ]] && hook_env+=("CLAUDE_PROJECT_DIR=$2")
+    local payload
+    mkdir -p "$3"
+    payload=$(jq -cn --arg cwd "$3" '{cwd: $cwd}')
+    run bash -c \
+        'set -o pipefail; printf "%s" "$1" | env "${@:3}" bash "$2" | jq -r ".hookSpecificOutput.additionalContext"' \
+        _ "$payload" "$SESSION_SCRIPT" "${hook_env[@]}"
+}
+
+# bats test_tags=host,pi
+@test "pi directive ends with the pi tool-naming note after a blank line" {
+    run_session_start_context "pi" "" "${BATS_TEST_TMPDIR}/pi-project"
+
+    assert_success
+    [[ "$output" == *$'\n\n'"${PI_HOST_NOTE}" ]]
+}
+
+@test "Claude directive omits the pi tool-naming note" {
+    local project="${BATS_TEST_TMPDIR}/claude-project"
+
+    run_session_start_context "" "$project" "$project"
+
+    assert_success
+    refute_output --partial "${PI_HOST_NOTE}"
+}
+
+@test "Codex directive omits the pi tool-naming note" {
+    run_session_start_context "" "" "${BATS_TEST_TMPDIR}/codex-project"
+
+    assert_success
+    refute_output --partial "${PI_HOST_NOTE}"
+}
+
+@test "pi takes enable_write_server from .pi over .claude and .codex" {
+    local project="${BATS_TEST_TMPDIR}/pi-project"
+    write_project_config "$project" ".pi" '{"enable_write_server": true}'
+    write_project_config "$project" ".claude" '{"enable_write_server": false}'
+    write_project_config "$project" ".codex" '{"enable_write_server": false}'
+
+    run_session_start_context "pi" "" "$project"
+
+    assert_success
+    assert_output --partial "## Write (gh-tooling-write)"
+}
+
+@test "pi takes labels from .pi over .claude and .codex" {
+    local project="${BATS_TEST_TMPDIR}/pi-project"
+    write_project_config "$project" ".pi" '{"labels": {"needs-triage": "New and not yet reviewed"}}'
+    write_project_config "$project" ".claude" '{"labels": {"claude-label": "From .claude"}}'
+    write_project_config "$project" ".codex" '{"labels": {"codex-label": "From .codex"}}'
+
+    run_session_start_context "pi" "" "$project"
+
+    assert_success
+    assert_output --partial "- needs-triage: New and not yet reviewed"
+    refute_output --partial "claude-label"
+    refute_output --partial "codex-label"
+}

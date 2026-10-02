@@ -152,6 +152,74 @@ bats_test_function --description "blocks gh run view in ; chain → suggests run
     assert_output --partial "mcp__gh_tooling__pr_view"
 }
 
+# Set the hook environment. Empty arguments leave the variable unset.
+# Args: $1=GITHUB_MCP_HOST, $2=payload cwd, $3=CLAUDE_PROJECT_DIR
+set_hook_env() {
+    if [[ -n "$1" ]]; then export GITHUB_MCP_HOST="$1"; else unset GITHUB_MCP_HOST; fi
+    if [[ -n "$2" ]]; then export HOOK_CWD="$2"; mkdir -p "$2"; else unset HOOK_CWD; fi
+    if [[ -n "$3" ]]; then export CLAUDE_PROJECT_DIR="$3"; mkdir -p "$3"; else unset CLAUDE_PROJECT_DIR; fi
+}
+
+# bats test_tags=host,pi
+@test "pi suggestions use the sanitized tool namespace" {
+    set_hook_env "pi" "${BATS_TEST_TMPDIR}/pi-project" ""
+
+    run_hook "check-gh-tools.sh" "gh pr view 14642"
+
+    assert_failure 2
+    assert_output --partial "mcp__gh_tooling__pr_view"
+}
+
+# ============================================================================
+# Host resolution and config directory order
+# ============================================================================
+
+@test "pi prefers a .pi config over .claude and .codex configs" {
+    local project="${BATS_TEST_TMPDIR}/pi-project"
+    write_project_config "$project" ".pi" '{"enforce_mcp_tools": false}'
+    write_project_config "$project" ".claude" '{"enforce_mcp_tools": true}'
+    write_project_config "$project" ".codex" '{"enforce_mcp_tools": true}'
+    set_hook_env "pi" "$project" ""
+
+    run_hook "check-gh-tools.sh" "gh pr view 14642"
+
+    assert_success
+}
+
+# A GITHUB_MCP_HOST exported in the shell does not override Claude Code: the
+# payload cwd disables enforcement, CLAUDE_PROJECT_DIR opts into API blocking.
+# Args: $1=GITHUB_MCP_HOST
+claude_project_dir_wins_over_host() {
+    local claude_project="${BATS_TEST_TMPDIR}/claude-project"
+    local payload_project="${BATS_TEST_TMPDIR}/payload-project"
+    write_project_config "$claude_project" ".claude" '{"enforce_mcp_tools": true, "block_api_commands": true}'
+    write_project_config "$payload_project" ".${1}" '{"enforce_mcp_tools": false}'
+    set_hook_env "$1" "$payload_project" "$claude_project"
+
+    run_hook "check-gh-tools.sh" "gh api repos/shopware/shopware/pulls/14642/files"
+
+    assert_failure 2
+    assert_output --partial "mcp__plugin_github-mcp_gh-tooling__pr_files"
+}
+
+bats_test_function \
+    --description "CLAUDE_PROJECT_DIR resolves as Claude Code even with GITHUB_MCP_HOST=pi" \
+    -- claude_project_dir_wins_over_host "pi"
+bats_test_function \
+    --description "CLAUDE_PROJECT_DIR resolves as Claude Code even with GITHUB_MCP_HOST=codex" \
+    -- claude_project_dir_wins_over_host "codex"
+
+@test "Claude prefers a .pi config over the project-root config" {
+    local project="${BATS_TEST_TMPDIR}/claude-project"
+    write_project_config "$project" ".pi" '{"enforce_mcp_tools": false}'
+    write_project_config "$project" "" '{"enforce_mcp_tools": true}'
+    set_hook_env "" "" "$project"
+
+    run_hook "check-gh-tools.sh" "gh pr view 14642"
+
+    assert_success
+}
+
 # ============================================================================
 # block_api_commands: true — blocks gh api endpoints with dedicated MCP tools
 # ============================================================================

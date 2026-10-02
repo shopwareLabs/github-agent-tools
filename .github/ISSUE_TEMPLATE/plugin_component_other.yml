@@ -47,6 +47,7 @@ body:
       options:
         - Claude Code
         - Codex
+        - pi
     validations:
       required: true
 
@@ -148,8 +149,8 @@ body:
       label: "Steps to Reproduce"
       description: "Provide step-by-step instructions to reproduce the issue"
       placeholder: |
-        1. Install the plugin in Claude Code or Codex
-        2. Restart Claude Code or start a new Codex task (if required)
+        1. Install the plugin in Claude Code, Codex, or pi
+        2. Restart Claude Code, start a new Codex task, or start a new pi session (if required)
         3. Observe [error/unexpected behavior]
         4. Expected [correct behavior]
     validations:
@@ -208,7 +209,7 @@ body:
     id: plugin-version
     attributes:
       label: "Plugin Version"
-      description: "Run `/plugin list` in Claude Code or `codex plugin list` in Codex and paste the version shown"
+      description: "Run `/plugin list` in Claude Code, `codex plugin list` in Codex, or `pi list` in pi and paste the entry shown"
       placeholder: "e.g., github-mcp@3.5.0"
     validations:
       required: true
@@ -217,7 +218,7 @@ body:
     id: host-version
     attributes:
       label: "Host Version"
-      description: "Run `claude --version` or `codex --version` and paste the output"
+      description: "Run `claude --version`, `codex --version`, or `pi --version` and paste the output"
       placeholder: "e.g., 0.1.23"
     validations:
       required: true

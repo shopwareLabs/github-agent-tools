@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- github-mcp runs in [pi](https://pi.dev) as a pi package. `plugins/github-mcp/pi/index.ts` is a pi
+  extension that registers the same two MCP servers, runs the same SessionStart directive script,
+  and runs the same `check-gh-tools.sh`/`check-api-tools.sh` gates through `pi/gate.ts` in place of
+  Claude Code's and Codex's PreToolUse hooks. The repository root is now also the npm package
+  `@shopware-ag/github-agent-tools`, installable with `pi install npm:@shopware-ag/github-agent-tools`
+  or `pi install git:github.com/shopwareLabs/github-agent-tools`, and published to the npm registry
+  by `.github/workflows/npm-publish.yml` on a pushed release tag.
+
+### Changed
+
+- `.pi/.mcp-gh-tooling.json` is a new config location, checked by the MCP servers and the
+  enforcement hooks on all three hosts, ahead of the project root. Claude Code and Codex now also
+  consult it: when it exists alongside a `.claude/` or `.codex/` file, the active host's own
+  directory still wins, but `.pi/` now ranks ahead of the project-root fallback for every host.
+
 ## [4.3.0] - 2026-10-02
 
 ### Fixed

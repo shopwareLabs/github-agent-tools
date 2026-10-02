@@ -1,7 +1,22 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
-  "enabledManagers": ["custom.regex"],
+  "enabledManagers": ["npm", "custom.regex"],
+  "packageRules": [
+    {
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["devDependencies"],
+      "matchPackageNames": ["@earendil-works/pi-coding-agent", "@earendil-works/pi-ai"],
+      "groupName": "pi packages",
+      "rangeStrategy": "pin"
+    },
+    {
+      "description": "typescript-eslint supports typescript only below 6.1.0; lift this once it supports 7.",
+      "matchManagers": ["npm"],
+      "matchPackageNames": ["typescript"],
+      "allowedVersions": "<6.1.0"
+    }
+  ],
   "customManagers": [
     {
       "customType": "regex",

@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "noEmit": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "es2022",
+    "types": ["node"],
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true
+  },
+  "include": [
+    "plugins/github-mcp/pi/**/*.ts",
+    "plugin-tests/github-mcp/pi/**/*.ts",
+    "plugin-tests/github-mcp/fixtures/pi/**/*.ts"
+  ]
+}
