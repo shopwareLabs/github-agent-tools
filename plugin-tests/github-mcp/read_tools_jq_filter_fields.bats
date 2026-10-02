@@ -22,12 +22,10 @@ setup() {
 
     gh() {
         touch "${GH_CALLED_FILE}"
-        [[ -n "${GH_STUB_OUTPUT:-}" ]] && printf '%s\n' "${GH_STUB_OUTPUT}"
-        return "${GH_STUB_EXIT:-0}"
+        gh_stub_respond
     }
 
-    GH_STUB_OUTPUT=""
-    GH_STUB_EXIT=0
+    reset_gh_stub
 }
 
 # Assert a tool rejects jq_filter without fields, before reaching gh.

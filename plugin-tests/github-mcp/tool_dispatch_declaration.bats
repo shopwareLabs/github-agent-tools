@@ -27,7 +27,7 @@ setup() {
 # answers "Tool not found"; one that is reports a missing parameter of its own.
 call_tool() {
     local server="$1" tool="$2" project_root="$3"
-    printf '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"%s","arguments":{}}}\n' "$tool" \
+    jsonrpc_request "tools/call" 1 "$(jq -nc --arg name "$tool" '{name: $name, arguments: {}}')" \
         | env PROJECT_ROOT="$project_root" bash "${GH_SERVER_COPY_DIR}/${server}" 2>/dev/null \
         | tail -1 \
         | jq -r '.result.content[0].text // .error.message // "no answer"'
@@ -109,7 +109,7 @@ undeclared_tools() {
     local before after
     before=$(find "${GH_SERVER_COPY_DIR}" -maxdepth 1 -name 'tools-empty.*.json' | sort)
 
-    printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \
+    jsonrpc_request "tools/list" 1 \
         | env PROJECT_ROOT="${PROJECT_DIR}" bash "${GH_SERVER_COPY_DIR}/server-write.sh" >/dev/null 2>&1
 
     after=$(find "${GH_SERVER_COPY_DIR}" -maxdepth 1 -name 'tools-empty.*.json' | sort)

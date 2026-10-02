@@ -22,6 +22,31 @@ SHARED_DIR="${PLUGIN_DIR}/shared"
 GH_SERVER_DIR="${PLUGIN_DIR}/mcp-server-gh"
 GH_LIB_DIR="${GH_SERVER_DIR}/lib"
 
+# Canned gh answer for the tool-function suites. A suite's gh() stub records
+# whatever its tests assert on, then answers through this: GH_STUB_STDERR on
+# stderr, GH_STUB_OUTPUT on stdout, exit status GH_STUB_EXIT.
+gh_stub_respond() {
+    [[ -n "${GH_STUB_STDERR:-}" ]] && printf '%s\n' "${GH_STUB_STDERR}" >&2
+    [[ -n "${GH_STUB_OUTPUT:-}" ]] && printf '%s\n' "${GH_STUB_OUTPUT}"
+    return "${GH_STUB_EXIT:-0}"
+}
+
+# Clear the canned gh answer; call from setup() so no test inherits another's.
+reset_gh_stub() {
+    GH_STUB_OUTPUT=""
+    GH_STUB_STDERR=""
+    GH_STUB_EXIT=0
+}
+
+# Print one JSON-RPC 2.0 request line for piping into a server script.
+# Args: $1=method, $2=id, $3=params JSON (default: {})
+jsonrpc_request() {
+    local method="$1" id="$2" params="${3:-}"
+    [[ -n "${params}" ]] || params='{}'
+    jq -nc --arg method "${method}" --argjson id "${id}" --argjson params "${params}" \
+        '{jsonrpc: "2.0", id: $id, method: $method, params: $params}'
+}
+
 # Default setup: enforcement enabled, written under the server/config identity.
 # Override CONFIG_PREFIX in a test file to target a different config file, or
 # define a custom setup() (tool-function suites do) to replace this entirely.

@@ -29,15 +29,11 @@ setup() {
             return 0
         fi
         printf '%s\n' "$@" > "${GH_ARGS_FILE}"
-        [[ -n "${GH_STUB_STDERR:-}" ]] && echo "${GH_STUB_STDERR}" >&2
-        [[ -n "${GH_STUB_OUTPUT:-}" ]] && printf '%s\n' "${GH_STUB_OUTPUT}"
-        return "${GH_STUB_EXIT:-0}"
+        gh_stub_respond
     }
 
     GH_HELP_OUTPUT="      --allow-escape-sequences   Allow printing terminal escape sequences"
-    GH_STUB_OUTPUT=""
-    GH_STUB_STDERR=""
-    GH_STUB_EXIT=0
+    reset_gh_stub
 }
 
 # Assert the captured gh argument list contains an exact argument.

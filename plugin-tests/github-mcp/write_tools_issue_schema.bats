@@ -26,12 +26,10 @@ setup() {
         esac
         printf '%s\n' "$@" > "${GH_ARGS_FILE}"
         cat > "${GH_BODY_FILE}"
-        [[ -n "${GH_STUB_EXIT:-}" ]] && return "${GH_STUB_EXIT}"
-        printf '%s\n' "${GH_STUB_OUTPUT}"
-        return 0
+        gh_stub_respond
     }
+    reset_gh_stub
     GH_STUB_OUTPUT='{"number":19952,"type":{"name":"Bug"}}'
-    GH_STUB_EXIT=""
 }
 
 body() { jq -c "$1" "${GH_BODY_FILE}"; }
@@ -191,6 +189,8 @@ body() { jq -c "$1" "${GH_BODY_FILE}"; }
 }
 
 @test "issue_field_set with suppress_errors returns no error text" {
+    GH_STUB_OUTPUT=""
+    GH_STUB_STDERR="HTTP 422: Validation Failed"
     GH_STUB_EXIT=1
     run tool_issue_field_set '{"number": 19952, "values": {}, "suppress_errors": true}'
     assert_failure

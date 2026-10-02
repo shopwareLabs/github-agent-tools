@@ -10,7 +10,8 @@
 - `tests.fixture_sources` =
   - `plugin-tests/test_helper/common_setup.bash` — `run_hook`, `assert_hook_blocks`, `setup_config`, `setup_codex_config` for hook-script suites.
   - `plugin-tests/github-mcp/test_helper/common_setup.bash` — path constants `PLUGIN_DIR`, `SCRIPTS_DIR`, `SESSION_SCRIPT`, `SHARED_DIR`, `GH_SERVER_DIR`, `GH_LIB_DIR`, and the default `setup()`; load it with `load 'test_helper/common_setup'` instead of hardcoding `plugins/github-mcp/` paths.
-  - Stubbing `gh` in tool-function suites: define a `gh()` function override in `setup()` driven by `GH_STUB_OUTPUT`, `GH_STUB_STDERR`, and `GH_STUB_EXIT`, reset in `setup()`.
+  - Stubbing `gh` in tool-function suites: define a `gh()` function override in `setup()` that records what the tests assert on, then answers through `gh_stub_respond` (`plugin-tests/github-mcp/test_helper/common_setup.bash`: `GH_STUB_STDERR` on stderr, `GH_STUB_OUTPUT` on stdout, exit `GH_STUB_EXIT`); call `reset_gh_stub` in `setup()`.
+  - JSON-RPC requests to `server-read.sh` / `server-write.sh`: `jsonrpc_request <method> <id> [params-json]` from the same helper, never a hand-formatted JSON string.
   - pi end-to-end only: `plugin-tests/github-mcp/fixtures/pi/gh-stub.sh` (PATH-shim `gh`, logs to `$GH_LOG`) and the `$SCENARIO`-selected scripts in `fixtures/pi/driver.ts`.
   - `node:test`: per-test temp directories from `mkdtempSync(join(tmpdir(), …))` removed in `t.after`.
 - `tests.parallelism` = Both runners currently execute serially: CI runs `bats --timing -r plugin-tests/` without `--jobs`, and no `plugin-tests/github-mcp/pi/*.test.ts` file sets `concurrency`. Write every test to stay correct under `bats --jobs`: per-test state lives in `BATS_TEST_TMPDIR`, `setup_file` state in `BATS_FILE_TMPDIR`, and nothing under `PLUGIN_DIR`, `GH_SERVER_DIR`, or `SCRIPTS_DIR` is mutated in place — copy it into the temp directory first, as `plugin-tests/github-mcp/server_startup_tools_list.bats` does.

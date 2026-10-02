@@ -20,11 +20,10 @@ setup() {
     GH_ARGS_FILE="${BATS_TEST_TMPDIR}/gh_args"
     gh() {
         printf '%s\n' "$*" > "${GH_ARGS_FILE}"
-        [[ -n "${GH_STUB_OUTPUT:-}" ]] && printf '%s\n' "${GH_STUB_OUTPUT}"
-        return "${GH_STUB_EXIT:-0}"
+        gh_stub_respond
     }
+    reset_gh_stub
     GH_STUB_OUTPUT='{"data":{"addSubIssue":{"issue":{"number":1,"title":"Parent"},"subIssue":{"number":2,"title":"Child"}}}}'
-    GH_STUB_EXIT=0
 }
 
 # ============================================================================

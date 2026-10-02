@@ -27,13 +27,9 @@ setup() {
             printf '%s\n' "${GH_STUB_HEAD_SHA:-0123456789abcdef0123456789abcdef01234567}"
             return 0
         fi
-        [[ -n "${GH_STUB_STDERR:-}" ]] && echo "${GH_STUB_STDERR}" >&2
-        [[ -n "${GH_STUB_OUTPUT:-}" ]] && printf '%s\n' "${GH_STUB_OUTPUT}"
-        return "${GH_STUB_EXIT:-0}"
+        gh_stub_respond
     }
-    GH_STUB_OUTPUT=""
-    GH_STUB_STDERR=""
-    GH_STUB_EXIT=0
+    reset_gh_stub
     GH_STUB_HEAD_SHA="0123456789abcdef0123456789abcdef01234567"
 }
 

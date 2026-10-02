@@ -26,17 +26,8 @@ setup() {
     source "${GH_LIB_DIR}/issue.sh"
     source "${GH_LIB_DIR}/job.sh"
 
-    # Configurable gh stub: control via GH_STUB_OUTPUT / GH_STUB_STDERR / GH_STUB_EXIT
-    gh() {
-        [[ -n "${GH_STUB_STDERR:-}" ]] && echo "${GH_STUB_STDERR}" >&2
-        [[ -n "${GH_STUB_OUTPUT:-}" ]] && printf '%s\n' "${GH_STUB_OUTPUT}"
-        return "${GH_STUB_EXIT:-0}"
-    }
-
-    # Reset stub state between tests
-    GH_STUB_OUTPUT=""
-    GH_STUB_STDERR=""
-    GH_STUB_EXIT=0
+    gh() { gh_stub_respond; }
+    reset_gh_stub
 }
 
 # =============================================================================
