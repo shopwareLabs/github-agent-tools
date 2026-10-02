@@ -185,7 +185,7 @@ codex plugin add github-mcp@github-agent-tools
 npm ci                                              # installs pi, TypeScript, and ESLint
 npx tsc --noEmit -p .                               # type-checks the extension and its tests
 npx eslint . --max-warnings 0                       # lints the same files (eslint.config.mjs)
-node --test 'plugin-tests/github-mcp/pi/*.test.ts'  # gate.ts unit tests
+node --test 'plugin-tests/github-mcp/pi/*.test.ts'  # pi extension unit tests
 ```
 
 `plugin-tests/github-mcp/pi_e2e.bats` drives the real `pi` binary against a scripted model and a

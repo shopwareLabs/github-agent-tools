@@ -215,7 +215,7 @@ tools: mcp__gh_tooling_write__pr_create, mcp__gh_tooling_write__pr_comment, mcp_
 
 ## Testing
 
-BATS tests for hook scripts and MCP tool functions are in `plugin-tests/github-mcp/`; the pi gate's
+BATS tests for hook scripts and MCP tool functions are in `plugin-tests/github-mcp/`; the pi extension's
 own unit tests are Node tests under `plugin-tests/github-mcp/pi/`:
 
 | Test File | Coverage |
@@ -249,6 +249,7 @@ own unit tests are Node tests under `plugin-tests/github-mcp/pi/`:
 | `write_tools_project.bats` | `project_item_add` and `project_status_set` name-to-ID resolution |
 | `write_tools_review.bats` | `pr_review_submit`/`pr_comment`/`pr_review_reply` parameter handling and REST payloads |
 | `pi/gate.test.ts` | `runGate()`/`runScript()`: exit codes, stderr capture, stdin handling, and the timeout that kills a gate's background children |
+| `pi/index.test.ts` | The extension's event handlers on a fake pi: the `github_mcp` section from session-start output (malformed output and non-zero exits add none), and which `bash` and `api_read` calls the gates block or let through |
 
 The vendored SDK's own surface — argument validation and logging — is tested upstream in
 `shopwareLabs/bash-mcp-sdk`, not here.
