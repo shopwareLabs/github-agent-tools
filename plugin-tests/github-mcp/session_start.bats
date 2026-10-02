@@ -60,16 +60,10 @@ run_session_start() {
 }
 
 # ============================================================================
-# Host pi (GITHUB_MCP_HOST=pi): tool-naming note and .pi/ config
+# Host notes and config directory order
 # ============================================================================
 
 PI_HOST_NOTE=$(<"${PLUGIN_DIR}/hooks/prompts/host-pi.md")
-
-# Args: $1=project dir, $2=config dir relative to it ("" for the root), $3=JSON
-write_project_config() {
-    mkdir -p "${1}/${2}"
-    printf '%s\n' "$3" > "${1}/${2}/.mcp-gh-tooling.json"
-}
 
 # Run session-start.sh in a fresh hook environment; $output is the parsed
 # additionalContext. Empty host or Claude project dir leaves that variable unset.
@@ -100,14 +94,14 @@ run_session_start_context() {
     run_session_start_context "" "$project" "$project"
 
     assert_success
-    refute_output --partial "In pi, these tools are named"
+    refute_output --partial "${PI_HOST_NOTE}"
 }
 
 @test "Codex directive omits the pi tool-naming note" {
     run_session_start_context "" "" "${BATS_TEST_TMPDIR}/codex-project"
 
     assert_success
-    refute_output --partial "In pi, these tools are named"
+    refute_output --partial "${PI_HOST_NOTE}"
 }
 
 @test "pi takes enable_write_server from .pi over .claude and .codex" {

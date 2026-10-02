@@ -41,14 +41,6 @@ run_server_request() {
     run bash -c 'echo "$1" | bash "$2" 2>/dev/null | tail -1' _ "${requests}" "${SERVER_SCRIPT}"
 }
 
-run_codex_server_request() {
-    local project_root="$1"
-    local requests="$2"
-
-    printf '%s' "$requests" | env PROJECT_ROOT="$project_root" GITHUB_MCP_HOST=codex \
-        bash "$SERVER_SCRIPT" 2>/dev/null | tail -1
-}
-
 @test "write server returns empty tools list when enable_write_server is false" {
     run_server_request '{"enable_write_server": false}' "tools/list"
     assert_success
@@ -88,26 +80,8 @@ run_codex_server_request() {
     [[ "$tool_count" -eq 0 ]]
 }
 
-@test "Codex server prefers .codex config over .claude config" {
-    local project_root="${BATS_TEST_TMPDIR}/codex-priority"
-    mkdir -p "${project_root}/.claude" "${project_root}/.codex"
-    printf '%s\n' '{"enable_write_server": false}' > "${project_root}/.claude/.mcp-gh-tooling.json"
-    printf '%s\n' '{"enable_write_server": true}' > "${project_root}/.codex/.mcp-gh-tooling.json"
-
-    local requests
-    requests=$(send_jsonrpc "initialize" 1)
-    requests+=$'\n'
-    requests+=$(send_jsonrpc "tools/list" 2)
-    run run_codex_server_request "$project_root" "$requests"
-
-    assert_success
-    local tool_count
-    tool_count=$(echo "$output" | jq '.result.tools | length')
-    [[ "$tool_count" -gt 0 ]]
-}
-
 # ============================================================================
-# Per-host config precedence with the .pi/ location
+# Config directory order
 # ============================================================================
 
 # Run the write server for a host and print the tools/list response.
@@ -126,17 +100,22 @@ run_host_server_tools_list() {
         bash "$SERVER_SCRIPT" 2>/dev/null | tail -1
 }
 
-# Args: $1=project root, $2=config dir relative to it ("" for the root), $3=JSON
-write_server_config() {
-    mkdir -p "${1}/${2}"
-    printf '%s\n' "$3" > "${1}/${2}/.mcp-gh-tooling.json"
+@test "Codex server prefers .codex config over .claude config" {
+    local project_root="${BATS_TEST_TMPDIR}/codex-priority"
+    write_project_config "$project_root" ".codex" '{"enable_write_server": true}'
+    write_project_config "$project_root" ".claude" '{"enable_write_server": false}'
+
+    run run_host_server_tools_list "codex" "$project_root"
+
+    assert_success
+    [[ "$(jq '.result.tools | length' <<<"$output")" -gt 0 ]]
 }
 
 @test "pi server prefers .pi config over .claude and .codex configs" {
     local project_root="${BATS_TEST_TMPDIR}/pi-priority"
-    write_server_config "$project_root" ".pi" '{"enable_write_server": true}'
-    write_server_config "$project_root" ".claude" '{"enable_write_server": false}'
-    write_server_config "$project_root" ".codex" '{"enable_write_server": false}'
+    write_project_config "$project_root" ".pi" '{"enable_write_server": true}'
+    write_project_config "$project_root" ".claude" '{"enable_write_server": false}'
+    write_project_config "$project_root" ".codex" '{"enable_write_server": false}'
 
     run run_host_server_tools_list "pi" "$project_root"
 
@@ -146,8 +125,8 @@ write_server_config() {
 
 @test "Claude server prefers .claude config over .pi config" {
     local project_root="${BATS_TEST_TMPDIR}/claude-over-pi"
-    write_server_config "$project_root" ".claude" '{"enable_write_server": true}'
-    write_server_config "$project_root" ".pi" '{"enable_write_server": false}'
+    write_project_config "$project_root" ".claude" '{"enable_write_server": true}'
+    write_project_config "$project_root" ".pi" '{"enable_write_server": false}'
 
     run run_host_server_tools_list "" "$project_root"
 
@@ -157,8 +136,8 @@ write_server_config() {
 
 @test "Claude server prefers .pi config over the project-root config" {
     local project_root="${BATS_TEST_TMPDIR}/claude-pi-over-root"
-    write_server_config "$project_root" ".pi" '{"enable_write_server": true}'
-    write_server_config "$project_root" "" '{"enable_write_server": false}'
+    write_project_config "$project_root" ".pi" '{"enable_write_server": true}'
+    write_project_config "$project_root" "" '{"enable_write_server": false}'
 
     run run_host_server_tools_list "" "$project_root"
 

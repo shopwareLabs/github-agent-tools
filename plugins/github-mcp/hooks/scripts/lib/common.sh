@@ -1,8 +1,8 @@
 #!/bin/bash
 # Shared functions for MCP tool enforcement hooks
 # ================================================
-# This library provides common functionality for Claude Code, Codex, and pi hooks
-# that block bash commands in favor of MCP tools.
+# This library provides common functionality for the hooks that block bash
+# commands in favor of MCP tools, on every host.
 #
 # Usage:
 #   source "${SCRIPT_DIR}/lib/common.sh"
@@ -120,7 +120,8 @@ block_tool() {
     local description="$2"
     local display_tool="$tool"
 
-    if [[ "${HOOK_HOST:-claude}" == "codex" || "${HOOK_HOST:-claude}" == "pi" ]]; then
+    # Claude Code is the only host that qualifies tool names with the plugin name.
+    if [[ "${HOOK_HOST:-claude}" != "claude" ]]; then
         display_tool="${display_tool//gh-tooling-write/gh_tooling_write}"
         display_tool="${display_tool//gh-tooling/gh_tooling}"
     else

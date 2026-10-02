@@ -10,19 +10,18 @@ from [shopwareLabs/ai-coding-tools](https://github.com/shopwareLabs/ai-coding-to
 > servers keep their original IDs `gh-tooling` (read) and `gh-tooling-write` (write). So you
 > install `github-mcp@github-agent-tools`, while `/mcp` and `.mcp-gh-tooling.json` use the raw
 > server IDs. Claude Code exposes names such as `mcp__plugin_github-mcp_gh-tooling__…`; Codex and
-> pi expose the same tools as `mcp__gh_tooling__…` after sanitizing the server ID — pi's tool
-> names match Codex's.
+> pi expose the same tools as `mcp__gh_tooling__…` after sanitizing the server ID.
 
-## Three hosts: Claude Code, Codex, and pi
+## Hosts
 
 The plugin's core is assistant-neutral: `plugins/github-mcp/mcp-server-gh/server-{read,write}.sh`
-are plain stdio [MCP](https://modelcontextprotocol.io/) servers that all three hosts spawn. Claude
+are plain stdio [MCP](https://modelcontextprotocol.io/) servers that every host spawns. Claude
 Code uses `.claude-plugin/marketplace.json`, `.claude-plugin/plugin.json`, and `.mcp.json`; Codex
 uses `.agents/plugins/marketplace.json` and `.codex-plugin/plugin.json`; pi installs the repository
 root as an npm package and loads its extension from the package entry point
 `plugins/github-mcp/pi/index.ts`, declared in root `package.json`'s `pi.extensions`. The hook
 definition and scripts are shared. Keep the MCP server scripts and hook behavior as the single core
-across all three hosts.
+for every host.
 
 The separate `plugin-setup` plugin remains Claude Code-only because its skill uses Claude Code
 interaction and permission-setting features. Do not list it in the Codex marketplace unless that
@@ -161,8 +160,10 @@ fails the build if any dropdown is out of date.
 
 Choose the supported hosts first. Add the corresponding `.claude-plugin/plugin.json` and/or
 `.codex-plugin/plugin.json`, then register the plugin only in each compatible host marketplace.
-Keep shared runtime files host-neutral and keep host-specific launch wiring in the manifests. Run
-the relevant host validation and `.github/scripts/update-issue-templates.sh`.
+Keep shared runtime files host-neutral and keep host-specific launch wiring in the manifests. pi has
+no per-plugin manifest: root `package.json` is the one pi package, and its `files` and
+`pi.extensions` ship only `github-mcp`, so bringing another plugin to pi means extending that
+package. Run the relevant host validation and `.github/scripts/update-issue-templates.sh`.
 
 ## Testing & Validation
 

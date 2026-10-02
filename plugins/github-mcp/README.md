@@ -50,8 +50,8 @@ Start a new Codex task after installation. Open `/hooks` to review and trust the
 
 ### pi
 
-See the root [README](../../README.md#pi) for the install commands. pi needs no restart beyond a
-new session or `/reload`.
+See the root [README](../../README.md#pi) for the install commands. A new pi session or `/reload`
+loads the package.
 
 ### Interactive Setup (Claude Code only)
 
@@ -65,7 +65,7 @@ Install the `plugin-setup` plugin, then ask Claude to help you set up github-mcp
 Help me set up github-mcp
 ```
 
-The `github-mcp-setting-up` skill verifies prerequisites (`gh`, `jq`) and optionally creates a config file with a default repository. It uses Claude Code-specific interaction and permission settings, so it is not listed in the Codex marketplace. Codex users configure the plugin manually as described below.
+The `github-mcp-setting-up` skill verifies prerequisites (`gh`, `jq`) and optionally creates a config file with a default repository. It uses Claude Code-specific interaction and permission settings, so it is not listed in the Codex marketplace. Codex and pi users configure the plugin manually as described below.
 
 ### Verification
 
@@ -148,7 +148,7 @@ Configuration is loaded in the following priority order:
    - `.kiro/.mcp-gh-tooling.json` (Kiro)
    - `.windsurf/.mcp-gh-tooling.json` (Windsurf/Codeium)
    - `.zed/.mcp-gh-tooling.json` (Zed editor)
-   - Host override directories: `.claude/.mcp-gh-tooling.json`, `.codex/.mcp-gh-tooling.json`, and `.pi/.mcp-gh-tooling.json`. The active host's directory has the highest priority, followed by the other two in the fixed order `.claude/`, `.codex/`, `.pi/`: Claude Code prefers `.claude/`, then `.codex/`, then `.pi/`; Codex prefers `.codex/`, then `.claude/`, then `.pi/`; pi prefers `.pi/`, then `.claude/`, then `.codex/`. The servers take the host from `GITHUB_MCP_HOST` (`pi` or `codex`; any other value or none means Claude Code). The enforcement hooks use the same order, then the project root, and take the first match.
+   - Host override directories: `.claude/.mcp-gh-tooling.json`, `.codex/.mcp-gh-tooling.json`, and `.pi/.mcp-gh-tooling.json`. The active host's directory has the highest priority, followed by the others in the fixed order `.claude/`, `.codex/`, `.pi/`. The servers take the host from `GITHUB_MCP_HOST` (`pi` or `codex`; any other value or none means Claude Code). The enforcement hooks use the same order, then the project root, and take the first match.
 
 **Prerequisites:**
 - `gh` CLI installed: `brew install gh` (macOS) or see [GitHub CLI installation](https://cli.github.com/)
@@ -240,10 +240,11 @@ Blocks bash commands that match known `gh` subcommands and redirects to the corr
 
 Optionally blocks the `api_read` and `api` tools when they target endpoints that have dedicated MCP tools. Configured separately via `block_api_tool_read` and `block_api_tool_write`. Implemented in `hooks/scripts/check-api-tools.sh`.
 
-On pi, there is no PreToolUse hook; the extension's `tool_call` handler runs the same
-`check-gh-tools.sh` and `check-api-tools.sh` scripts and blocks the call on the same output. A
-gate script that fails any other way than exiting `2` — a crash, a timeout, a missing script — fails
-open: the call goes through rather than being blocked.
+On pi, the extension's `tool_call` handler runs `check-gh-tools.sh` and `check-api-tools.sh` and
+blocks the call when a script exits `2`.
+
+A gate script blocks only by exiting `2`. Any other outcome — a crash, a timeout, a missing script —
+lets the call through, on every host.
 
 All hook layers respect the `enforce_mcp_tools` setting and are disabled when set to `false`.
 
@@ -354,8 +355,7 @@ Use the identifiers exposed by the active host rather than copying the other hos
   gives the server. The entry needs its own `command`, since it does not inherit the extension's,
   and must set `env: {"GITHUB_MCP_HOST": "pi"}`; without it the server uses the Claude Code config
   order while the hooks use pi's.
-- The servers need bash 4.1+ and jq 1.7+ on the `PATH` pi runs with, same as under Claude Code and
-  Codex.
+- The servers need bash 4.1+ and jq 1.7+ on the `PATH` pi runs with.
 - pi support covers macOS and Linux.
 
 ## Troubleshooting

@@ -1,5 +1,5 @@
 #!/bin/bash
-# MCP API Tool Enforcer (Claude Code, Codex, and pi)
+# MCP API Tool Enforcer
 # =========================================================
 # Blocks MCP api/api_read tool calls when a dedicated tool exists.
 # Controlled by block_api_tool_read and block_api_tool_write in .mcp-gh-tooling.json.

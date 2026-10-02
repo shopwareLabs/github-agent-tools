@@ -46,15 +46,13 @@ pi install git:github.com/shopwareLabs/github-agent-tools
 
 Run one of the two, never both: installing from both sources loads the extension twice.
 
-pi needs no restart beyond a new session or `/reload`. The read server works without configuration.
+A new pi session or `/reload` loads the package.
 
 The read server (`gh-tooling`) is always active. The write server (`gh-tooling-write`) is opt-in via `enable_write_server: true` in a `.mcp-gh-tooling.json` config file. Configuration is optional — the read server works out of the box when `gh` is authenticated.
 
-**Optional Claude Code setup:** the companion `plugin-setup` plugin remains Claude Code-only because it uses Claude Code interaction and permission settings. Install it with `/plugin install plugin-setup@github-agent-tools`, ask Claude to *"set up github-mcp"*, then uninstall it when setup is complete. Codex users configure `.mcp-gh-tooling.json` manually as described in the plugin guide.
+**Optional Claude Code setup:** the companion `plugin-setup` plugin remains Claude Code-only because it uses Claude Code interaction and permission settings. Install it with `/plugin install plugin-setup@github-agent-tools`, ask Claude to *"set up github-mcp"*, then uninstall it when setup is complete. Codex and pi users configure `.mcp-gh-tooling.json` manually as described in the plugin guide.
 
 ## 🧩 What's Inside
-
-Supported hosts: Claude Code, Codex, and pi.
 
 | Component  | Description                                                                                          |
 |------------|------------------------------------------------------------------------------------------------------|

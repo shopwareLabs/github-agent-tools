@@ -11,7 +11,7 @@ body:
         **Before submitting:**
         - Search existing issues to avoid duplicates
         - Make sure you're using the latest plugin version
-        - Confirm you restarted Claude Code or started a new Codex task after installing the plugin
+        - Confirm you restarted Claude Code, started a new Codex task, or started a new pi session after installing the plugin
         - Have clear examples of the hook's behavior
 
   - type: checkboxes
@@ -23,7 +23,7 @@ body:
           required: true
         - label: "I am using the latest plugin version"
           required: true
-        - label: "I restarted Claude Code or started a new Codex task after installing/updating the plugin"
+        - label: "I restarted Claude Code, started a new Codex task, or started a new pi session after installing/updating the plugin"
           required: true
         - label: "I can provide clear examples showing the problem"
           required: true
@@ -47,6 +47,7 @@ body:
       options:
         - Claude Code
         - Codex
+        - pi
     validations:
       required: true
 
@@ -244,8 +245,8 @@ body:
       label: "Steps to Reproduce"
       description: "Provide step-by-step instructions to reproduce the issue"
       placeholder: |
-        1. Install the plugin in Claude Code or Codex
-        2. Restart Claude Code or start a new Codex task
+        1. Install the plugin in Claude Code, Codex, or pi
+        2. Restart Claude Code, start a new Codex task, or start a new pi session
         3. In Codex, review and trust the plugin hooks in `/hooks`
         4. Ask the coding agent to run [specific command]
         5. Observe [incorrect hook behavior]
@@ -325,7 +326,7 @@ body:
     id: plugin-version
     attributes:
       label: "Plugin Version"
-      description: "Run `/plugin list` in Claude Code or `codex plugin list` in Codex and paste the version shown"
+      description: "Run `/plugin list` in Claude Code, `codex plugin list` in Codex, or `pi list` in pi and paste the entry shown"
       placeholder: "e.g., github-mcp@3.5.0"
     validations:
       required: true
@@ -334,7 +335,7 @@ body:
     id: host-version
     attributes:
       label: "Host Version"
-      description: "Run `claude --version` or `codex --version` and paste the output"
+      description: "Run `claude --version`, `codex --version`, or `pi --version` and paste the output"
       placeholder: "e.g., 0.1.23"
     validations:
       required: true

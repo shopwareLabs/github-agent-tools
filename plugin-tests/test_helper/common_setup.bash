@@ -77,6 +77,13 @@ setup_codex_config() {
     printf '%s\n' "$content" > "${CODEX_PROJECT_DIR}/.codex/.mcp-${prefix}.json"
 }
 
+# Write a config file into a project directory, creating the directory.
+# Args: $1=project dir, $2=config dir relative to it ("" for the root), $3=JSON
+write_project_config() {
+    mkdir -p "${1}/${2}"
+    printf '%s\n' "$3" > "${1}/${2}/.mcp-gh-tooling.json"
+}
+
 # Default teardown for suites using setup_config; test files may override.
 teardown() {
     unset CLAUDE_PROJECT_DIR

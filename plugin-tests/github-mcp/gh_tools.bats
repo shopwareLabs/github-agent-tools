@@ -152,22 +152,12 @@ bats_test_function --description "blocks gh run view in ; chain → suggests run
     assert_output --partial "mcp__gh_tooling__pr_view"
 }
 
-# ============================================================================
-# Host pi (GITHUB_MCP_HOST=pi) and the .pi/ config location
-# ============================================================================
-
 # Set the hook environment. Empty arguments leave the variable unset.
 # Args: $1=GITHUB_MCP_HOST, $2=payload cwd, $3=CLAUDE_PROJECT_DIR
 set_hook_env() {
     if [[ -n "$1" ]]; then export GITHUB_MCP_HOST="$1"; else unset GITHUB_MCP_HOST; fi
     if [[ -n "$2" ]]; then export HOOK_CWD="$2"; mkdir -p "$2"; else unset HOOK_CWD; fi
     if [[ -n "$3" ]]; then export CLAUDE_PROJECT_DIR="$3"; mkdir -p "$3"; else unset CLAUDE_PROJECT_DIR; fi
-}
-
-# Args: $1=project dir, $2=config dir relative to it ("" for the root), $3=JSON
-write_project_config() {
-    mkdir -p "${1}/${2}"
-    printf '%s\n' "$3" > "${1}/${2}/.mcp-gh-tooling.json"
 }
 
 # bats test_tags=host,pi
@@ -179,6 +169,10 @@ write_project_config() {
     assert_failure 2
     assert_output --partial "mcp__gh_tooling__pr_view"
 }
+
+# ============================================================================
+# Host resolution and config directory order
+# ============================================================================
 
 @test "pi prefers a .pi config over .claude and .codex configs" {
     local project="${BATS_TEST_TMPDIR}/pi-project"

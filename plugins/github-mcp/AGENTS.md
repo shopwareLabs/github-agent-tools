@@ -25,7 +25,7 @@ plugins/github-mcp/
 │   │   ├── write-operations-enabled.md # {{WRITE_SECTION}} filler when enable_write_server is true
 │   │   ├── write-operations-disabled.md # {{WRITE_SECTION}} filler when enable_write_server is false/absent
 │   │   ├── label-definitions-header.md # {{LABEL_SECTION}} header, followed by one generated line per label
-│   │   └── host-pi.md                  # Appended after the assembled template when the host is pi
+│   │   └── host-pi.md                  # host-<host>.md: appended after the assembled template for that host
 │   └── scripts/
 │       ├── session-start.sh            # SessionStart hook: assembles prompt from template + conditional sections
 │       ├── check-gh-tools.sh           # Blocks common gh CLI bash commands (read + write)
@@ -187,7 +187,7 @@ Captures `__raw` and `__exit` separately; branches on `suppress_errors` for `2>/
 - Config is optional (no config = works with no default repo)
 - Uses bash arrays instead of string eval for injection safety
 - Read/write separation: read server always active, write server gated by config flag
-- Claude Code and Codex launch the same server scripts; do not fork the MCP implementation by host
+- Every host launches the same server scripts; do not fork the MCP implementation by host
 - The Codex launcher locates the installed plugin but leaves `cwd` unset so the server inherits the
   active project directory used for GitHub repository inference and project config discovery
 - Hook has three enforcement layers: `enforce_mcp_tools` (default `true`) blocks high-level subcommands; `block_api_commands` (default `false`, opt-in) blocks `gh api` bash calls; `block_api_tool_read`/`block_api_tool_write` (default `false`, opt-in) blocks MCP API tool bypass
@@ -202,8 +202,6 @@ the host:
 | Claude Code | `mcp__plugin_github-mcp_gh-tooling__<tool_name>` | `mcp__plugin_github-mcp_gh-tooling-write__<tool_name>` |
 | Codex | `mcp__gh_tooling__<tool_name>` | `mcp__gh_tooling_write__<tool_name>` |
 | pi | `mcp__gh_tooling__<tool_name>` | `mcp__gh_tooling_write__<tool_name>` |
-
-pi's tool names match Codex's: both sanitize the server ID the same way.
 
 ```yaml
 # Codex read tools
@@ -223,7 +221,7 @@ own unit tests are Node tests under `plugin-tests/github-mcp/pi/`:
 | `api_read_restriction.bats` | `api_read`'s GET-only method allow-list versus `api`'s full method access |
 | `check_api_tools.bats` | Dedicated API-tool enforcement for the Claude Code tool namespace and the sanitized one Codex and pi share |
 | `download_cancel_cleanup.bats` | Partial-file cleanup when a `repo_file` or `search_code` download is cancelled mid-write |
-| `gh_tools.bats` | GitHub CLI read-command blocking (gh pr, gh issue, gh run, gh search, gh api) and host and config resolution across Claude Code, Codex, and pi |
+| `gh_tools.bats` | GitHub CLI read-command blocking (gh pr, gh issue, gh run, gh search, gh api) and host and config resolution |
 | `gh_tools_write.bats` | GitHub CLI blocking for the write-server commands (gh pr/issue create/edit/close/reopen/review/comment, gh project item-add/item-edit) and for `gh label list` and `gh project list`/`view` |
 | `mcp_tool_gh.bats` | MCP tool shared parameters (`_gh_validate_jq_filter`, `_gh_post_process`, `suppress_errors`, `fallback`) and core read tool behavior (`pr_view`/`diff`/`list`/`checks`/`comments`/`reviews`/`files`/`commits`, `issue_view`/`list`, `run_view`/`list`/`logs`, `workflow_jobs`, `commit_pulls`, `search`/`search_code`/`search_repos`/`search_commits`/`search_discussions`, `repo_tree`/`repo_file`, `job_view`/`logs`/`annotations`) |
 | `pi_e2e.bats` | End-to-end `pi` binary runs against a scripted model and stubbed `gh`, in both git-clone and npm-install layouts, plus codemode and config-override cases |
