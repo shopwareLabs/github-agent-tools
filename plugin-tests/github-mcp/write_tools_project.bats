@@ -92,6 +92,22 @@ setup() {
     assert_output ""
 }
 
+@test "an unknown project name lists the available projects comma-separated" {
+    source "${GH_LIB_DIR}/project.sh"  # the real resolver instead of setup's mock
+    GH_STUB_OUTPUT='{"projects":[{"title":"Roadmap","number":1},{"title":"Sprint Board","number":2},{"title":"Backlog","number":3}]}'
+    run _gh_resolve_project_number "Missing" "acme" "false"
+    assert_failure
+    assert_output "Error: project 'Missing' not found. Available projects: Roadmap, Sprint Board, Backlog"
+}
+
+@test "an unknown status lists the available options comma-separated" {
+    source "${GH_LIB_DIR}/project.sh"  # the real resolver instead of setup's mock
+    GH_STUB_OUTPUT='{"fields":[{"id":"FIELD_1","name":"Status","type":"ProjectV2SingleSelectField","options":[{"id":"o1","name":"In Progress"},{"id":"o2","name":"Done"},{"id":"o3","name":"Won'"'"'t Do"}]}]}'
+    run _gh_resolve_status_option 42 "acme" "Missing" "false"
+    assert_failure
+    assert_output "Error: status 'Missing' not found in project 42. Available options: In Progress, Done, Won't Do"
+}
+
 # ============================================================================
 # project_status_set
 # ============================================================================

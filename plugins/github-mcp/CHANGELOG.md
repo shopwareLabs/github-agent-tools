@@ -29,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `sub_issue_add` and `sub_issue_remove`, the head SHA `pr_review_submit` fetches, the project and
   status listings of the project tools, the organization's types and fields for `issue_type_set` and
   `issue_field_set`. A gh warning on a successful call corrupted the value.
+- The project-not-found and status-not-found errors of `project_item_add` and `project_status_set`
+  now separate the listed names with `, `. Before, the separator alternated between `,` and a space.
 
 ## [5.0.0] - 2026-10-02
 

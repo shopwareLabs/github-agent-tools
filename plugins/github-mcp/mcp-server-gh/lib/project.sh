@@ -123,7 +123,7 @@ _gh_resolve_project_number() {
 
     if [[ -z "${number}" ]]; then
         local available
-        available=$(printf '%s\n' "${projects_json}" | jq -r '.projects[].title' 2>/dev/null | paste -sd ', ' -)
+        available=$(printf '%s\n' "${projects_json}" | jq -r '[.projects[].title] | join(", ")' 2>/dev/null)
         printf '%s\n' "Error: project '${project_name}' not found. Available projects: ${available:-<none>}"
         return 1
     fi
@@ -168,7 +168,7 @@ _gh_resolve_status_option() {
 
     if [[ -z "${option_id}" ]]; then
         local available
-        available=$(printf '%s\n' "${fields_json}" | jq -r '.fields[] | select(.name == "Status") | .options[].name' 2>/dev/null | paste -sd ', ' -)
+        available=$(printf '%s\n' "${fields_json}" | jq -r '[.fields[] | select(.name == "Status") | .options[].name] | join(", ")' 2>/dev/null)
         printf '%s\n' "Error: status '${status_name}' not found in project ${project_number}. Available options: ${available:-<none>}"
         return 1
     fi
