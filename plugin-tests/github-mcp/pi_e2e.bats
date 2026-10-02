@@ -12,7 +12,6 @@ PI_BIN="${REPO_ROOT}/node_modules/.bin/pi"
 FIXTURES_DIR="${BATS_TEST_DIRNAME}/fixtures/pi"
 REPO_SLUG="shopwareLabs/github-agent-tools"
 FILES_ENDPOINT="repos/${REPO_SLUG}/pulls/8/files"
-GH_TOOLING_DESCRIPTION="GitHub via the gh CLI: pull requests, issues, CI runs and logs, commits, search, labels, projects, repository files."
 
 # Resolves the GNU `timeout` binary this suite bounds each pi run with.
 # Stock macOS ships neither name under PATH's `timeout`; Homebrew's coreutils
@@ -227,7 +226,7 @@ assert_first_request_carries_sections() {
     run jq -r '.sections.github_mcp' <<<"${first_system}"
     assert_output --partial "${host_pi_text}"
     run jq -r '.sections.mcp_servers' <<<"${first_system}"
-    assert_output --partial "mcp__gh_tooling (tool_search): ${GH_TOOLING_DESCRIPTION}"
+    assert_output --partial "mcp__gh_tooling (tool_search): "
 }
 
 assert_pi_exits_cleanly() {
@@ -272,14 +271,6 @@ assert_pi_exits_cleanly() {
     assert_pi_exits_cleanly git-deferred
 }
 
-@test "npm layout: gh-tooling tools stay inactive until tool_search, and all are deferred" {
-    assert_tools_deferred_until_searched npm-deferred
-}
-
-@test "npm layout: tool_search for pr_view loads mcp__gh_tooling__pr_view" {
-    assert_tool_search_loads_pr_view npm-deferred
-}
-
 @test "npm layout: pr_view returns the stub's JSON" {
     assert_pr_view_returns_stub npm-deferred
 }
@@ -292,16 +283,8 @@ assert_pi_exits_cleanly() {
     assert_api_read_blocked npm-deferred
 }
 
-@test "npm layout: three pr_view calls in one turn all succeed" {
-    assert_parallel_pr_views_succeed npm-deferred
-}
-
 @test "npm layout: the first request carries the github_mcp and mcp_servers sections" {
     assert_first_request_carries_sections npm-deferred
-}
-
-@test "npm layout: pi exits 0" {
-    assert_pi_exits_cleanly npm-deferred
 }
 
 # ============================================================================

@@ -221,7 +221,7 @@ own unit tests are Node tests under `plugin-tests/github-mcp/pi/`:
 | Test File | Coverage |
 |-----------|----------|
 | `api_read_restriction.bats` | `api_read`'s GET-only method allow-list versus `api`'s full method access |
-| `check_api_tools.bats` | Dedicated API-tool enforcement for the Claude Code, Codex, and pi tool namespaces |
+| `check_api_tools.bats` | Dedicated API-tool enforcement for the Claude Code tool namespace and the sanitized one Codex and pi share |
 | `download_cancel_cleanup.bats` | Partial-file cleanup when a `repo_file` or `search_code` download is cancelled mid-write |
 | `gh_tools.bats` | GitHub CLI read-command blocking (gh pr, gh issue, gh run, gh search, gh api) and host and config resolution across Claude Code, Codex, and pi |
 | `gh_tools_write.bats` | GitHub CLI blocking for the write-server commands (gh pr/issue create/edit/close/reopen/review/comment, gh project item-add/item-edit) and for `gh label list` and `gh project list`/`view` |

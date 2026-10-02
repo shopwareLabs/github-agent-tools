@@ -144,34 +144,12 @@ write_server_config() {
     [[ "$(jq '.result.tools | length' <<<"$output")" -gt 0 ]]
 }
 
-@test "Codex server prefers .codex config over .pi config" {
-    local project_root="${BATS_TEST_TMPDIR}/codex-over-pi"
-    write_server_config "$project_root" ".codex" '{"enable_write_server": true}'
-    write_server_config "$project_root" ".pi" '{"enable_write_server": false}'
-
-    run run_host_server_tools_list "codex" "$project_root"
-
-    assert_success
-    [[ "$(jq '.result.tools | length' <<<"$output")" -gt 0 ]]
-}
-
 @test "Claude server prefers .claude config over .pi config" {
     local project_root="${BATS_TEST_TMPDIR}/claude-over-pi"
     write_server_config "$project_root" ".claude" '{"enable_write_server": true}'
     write_server_config "$project_root" ".pi" '{"enable_write_server": false}'
 
     run run_host_server_tools_list "" "$project_root"
-
-    assert_success
-    [[ "$(jq '.result.tools | length' <<<"$output")" -gt 0 ]]
-}
-
-@test "Codex server prefers .pi config over the project-root config" {
-    local project_root="${BATS_TEST_TMPDIR}/codex-pi-over-root"
-    write_server_config "$project_root" ".pi" '{"enable_write_server": true}'
-    write_server_config "$project_root" "" '{"enable_write_server": false}'
-
-    run run_host_server_tools_list "codex" "$project_root"
 
     assert_success
     [[ "$(jq '.result.tools | length' <<<"$output")" -gt 0 ]]

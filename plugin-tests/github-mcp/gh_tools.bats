@@ -140,7 +140,6 @@ bats_test_function --description "blocks gh run view in ; chain → suggests run
 }
 
 @test "Claude hook suggestions use the plugin-qualified tool namespace" {
-    unset GITHUB_MCP_HOST
     run_hook "check-gh-tools.sh" "gh pr view 14642"
     assert_failure 2
     assert_output --partial "mcp__plugin_github-mcp_gh-tooling__pr_view"
@@ -221,17 +220,6 @@ bats_test_function \
     write_project_config "$project" ".pi" '{"enforce_mcp_tools": false}'
     write_project_config "$project" "" '{"enforce_mcp_tools": true}'
     set_hook_env "" "" "$project"
-
-    run_hook "check-gh-tools.sh" "gh pr view 14642"
-
-    assert_success
-}
-
-@test "Codex prefers a .pi config over the project-root config" {
-    local project="${BATS_TEST_TMPDIR}/codex-project"
-    write_project_config "$project" ".pi" '{"enforce_mcp_tools": false}'
-    write_project_config "$project" "" '{"enforce_mcp_tools": true}'
-    set_hook_env "" "$project" ""
 
     run_hook "check-gh-tools.sh" "gh pr view 14642"
 

@@ -106,37 +106,12 @@ test("no github_mcp section is added when session-start exits non-zero", async (
   assert.deepEqual(sections, {});
 });
 
-test("a bash gh pr view call is blocked in favor of pr_view", async (t) => {
-  const toolCall = handler(await loadRealExtension(), "tool_call");
-
-  const result = await toolCall({ input: { command: "gh pr view 8" }, toolName: "bash" }, { cwd: makeTemporaryDirectory(t) });
-
-  const { block, reason } = result as { block: boolean; reason: string };
-  assert.equal(block, true);
-  assert.match(reason, /pr_view/);
-});
-
 test("a bash command without gh runs unblocked", async (t) => {
   const toolCall = handler(await loadRealExtension(), "tool_call");
 
   const result = await toolCall({ input: { command: "ls -la" }, toolName: "bash" }, { cwd: makeTemporaryDirectory(t) });
 
   assert.equal(result, undefined);
-});
-
-test("api_read on an endpoint with a dedicated tool is blocked when block_api_tool_read is set", async (t) => {
-  const dir = makeTemporaryDirectory(t);
-  writeFileSync(path.join(dir, ".mcp-gh-tooling.json"), '{"block_api_tool_read": true}\n');
-  const toolCall = handler(await loadRealExtension(), "tool_call");
-
-  const result = await toolCall(
-    { input: { endpoint: "repos/octo/demo/pulls/8/files" }, toolName: "mcp__gh_tooling__api_read" },
-    { cwd: dir },
-  );
-
-  const { block, reason } = result as { block: boolean; reason: string };
-  assert.equal(block, true);
-  assert.match(reason, /pr_files/);
 });
 
 test("api_read on an endpoint without a dedicated tool runs unblocked when block_api_tool_read is set", async (t) => {

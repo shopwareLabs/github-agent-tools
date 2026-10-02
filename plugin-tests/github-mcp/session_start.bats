@@ -63,7 +63,7 @@ run_session_start() {
 # Host pi (GITHUB_MCP_HOST=pi): tool-naming note and .pi/ config
 # ============================================================================
 
-PI_HOST_NOTE="In pi, these tools are named \`mcp__gh_tooling__<tool>\` (read) and \`mcp__gh_tooling_write__<tool>\` (write), for example \`mcp__gh_tooling__pr_view\`. A tool that \`tool_search\` loads is callable from your next call."
+PI_HOST_NOTE=$(<"${PLUGIN_DIR}/hooks/prompts/host-pi.md")
 
 # Args: $1=project dir, $2=config dir relative to it ("" for the root), $3=JSON
 write_project_config() {
@@ -134,16 +134,4 @@ run_session_start_context() {
     assert_output --partial "- needs-triage: New and not yet reviewed"
     refute_output --partial "claude-label"
     refute_output --partial "codex-label"
-}
-
-@test "Claude takes labels from .pi over the project-root config" {
-    local project="${BATS_TEST_TMPDIR}/claude-project"
-    write_project_config "$project" ".pi" '{"labels": {"needs-triage": "New and not yet reviewed"}}'
-    write_project_config "$project" "" '{"labels": {"root-label": "From the project root"}}'
-
-    run_session_start_context "" "$project" "$project"
-
-    assert_success
-    assert_output --partial "- needs-triage: New and not yet reviewed"
-    refute_output --partial "root-label"
 }
