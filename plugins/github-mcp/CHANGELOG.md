@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   extension that registers the same two MCP servers, runs the same SessionStart directive script,
   and runs the same `check-gh-tools.sh`/`check-api-tools.sh` gates through `pi/gate.ts` in place of
   Claude Code's and Codex's PreToolUse hooks. The repository root is now also the npm package
-  `@shopware-ag/github-agent-tools`, installable with `pi install npm:@shopware-ag/github-agent-tools`
+  `@shopwarelabs/github-agent-tools`, installable with `pi install npm:@shopwarelabs/github-agent-tools`
   or `pi install git:github.com/shopwareLabs/github-agent-tools`, and published to the npm registry
   by `.github/workflows/npm-publish.yml` on a pushed release tag.
 

@@ -35,7 +35,7 @@ Start a new Codex task after installation. Open `/hooks` to review and trust the
 Install from npm:
 
 ```bash
-pi install npm:@shopware-ag/github-agent-tools
+pi install npm:@shopwarelabs/github-agent-tools
 ```
 
 Or install from git:

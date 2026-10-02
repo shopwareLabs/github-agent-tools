@@ -69,7 +69,7 @@ run_pi_scenario() {
     local run_dir="${BATS_FILE_TMPDIR}/${variant}-${scenario}" package_dir
     case "${variant}" in
         git) package_dir="${BATS_FILE_TMPDIR}/git-layout" ;;
-        npm) package_dir="${BATS_FILE_TMPDIR}/npm-prefix/node_modules/@shopware-ag/github-agent-tools" ;;
+        npm) package_dir="${BATS_FILE_TMPDIR}/npm-prefix/node_modules/@shopwarelabs/github-agent-tools" ;;
     esac
 
     mkdir -p "${run_dir}/project/.pi" "${run_dir}/bin" "${run_dir}/agent"

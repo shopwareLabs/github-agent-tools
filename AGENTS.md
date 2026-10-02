@@ -230,17 +230,17 @@ then `/plugin install github-mcp@github-agent-tools`. Codex installs with
 `codex plugin marketplace add shopwareLabs/github-agent-tools` then
 `codex plugin add github-mcp@github-agent-tools`.
 
-pi installs the repository as the npm package `@shopware-ag/github-agent-tools`, with
-`pi install npm:@shopware-ag/github-agent-tools` or `pi install git:github.com/shopwareLabs/github-agent-tools`.
+pi installs the repository as the npm package `@shopwarelabs/github-agent-tools`, with
+`pi install npm:@shopwarelabs/github-agent-tools` or `pi install git:github.com/shopwareLabs/github-agent-tools`.
 `.github/workflows/npm-publish.yml` publishes on a pushed tag matching `v*`: it type-checks, lints, runs
 the Node unit tests and the full BATS suite, checks the tag against `package.json` and both plugin
 manifests' versions, then runs `npm publish` using npm trusted publishing (no stored npm token).
 Releasing a version bumps `package.json`, both plugin manifests, and
 `plugins/github-mcp/CHANGELOG.md` in one commit, then tags `v<version>` on that commit and pushes
-the tag. Bootstrap, once: a maintainer with publish rights in the `@shopware-ag` npm organization
+the tag. Bootstrap, once: a maintainer with publish rights in the `@shopwarelabs` npm organization
 publishes the first version by hand from a clean checkout of its release tag with `npm publish`,
 then runs
-`npm trust github @shopware-ag/github-agent-tools --file npm-publish.yml --repository shopwareLabs/github-agent-tools --allow-publish`
+`npm trust github @shopwarelabs/github-agent-tools --file npm-publish.yml --repository shopwareLabs/github-agent-tools --allow-publish`
 (npm 11.15.0+). Every later version publishes from the workflow.
 
 ## Using Anthropic dev plugins
