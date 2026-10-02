@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- An invalid `grep_pattern` now fails the tool call with `Error: grep_pattern failed on output`.
+  Before, grep's exit status was discarded and the call succeeded, returning grep's error message
+  as the tool's output.
+- `issue_schema` called without `org`, `owner`, or a repository now reports why
+  `gh repo view` could not supply the organization (for example an authentication failure),
+  instead of only saying that `org` is required. `suppress_errors: true` leaves gh's message out.
+
 ## [5.0.0] - 2026-10-02
 
 ### Added

@@ -192,11 +192,13 @@ _gh_validate_org() {
 # Resolve the organization owning org-level resources (issue types, issue fields).
 # Priority: org > owner > repo-shaped args > GH_DEFAULT_REPO > git remote.
 # Globals:
-#   GH_DEFAULT_REPO, _GH_OWNER
+#   GH_DEFAULT_REPO, _GH_OWNER, MCP_CALL_TMPDIR (read)
 # Arguments:
 #   $1 JSON args string, $2 tool name for the error message.
 # Outputs:
-#   Organization login on stdout, or an error message on stdout.
+#   Organization login on stdout, or an error message on stdout. When the
+#   git-remote lookup fails, the message carries gh's reason unless the args
+#   set suppress_errors.
 # Returns:
 #   0 when an organization was resolved, 1 otherwise.
 #######################################
@@ -229,20 +231,42 @@ _gh_resolve_org() {
         return 0
     fi
 
-    local name_with_owner
-    name_with_owner=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null) || true
-    if [[ -n "${name_with_owner}" ]]; then
-        _gh_validate_org "${name_with_owner%%/*}" "${tool}" || return 1
-        printf '%s\n' "${name_with_owner%%/*}"
+    # stderr goes to its own file: a failed lookup can then say why (an auth or
+    # network failure otherwise reads as "no org was given"), and a warning on
+    # a successful lookup never joins the value.
+    local repo_view repo_view_err repo_view_exit=0 err_file
+    err_file=$(mktemp "${MCP_CALL_TMPDIR:-${TMPDIR:-/tmp}}/gh-repo-view.XXXXXX") || {
+        printf '%s\n' "Error: cannot create a temporary file to resolve the org for ${tool}"
+        return 1
+    }
+    repo_view=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>"${err_file}") || repo_view_exit=$?
+    repo_view_err=$(<"${err_file}")
+    rm -f -- "${err_file}"
+    if [[ ${repo_view_exit} -eq 0 && -n "${repo_view}" ]]; then
+        _gh_validate_org "${repo_view%%/*}" "${tool}" || return 1
+        printf '%s\n' "${repo_view%%/*}"
         return 0
     fi
 
-    printf '%s\n' "Error: org is required for ${tool}. Pass 'org', 'owner', or a repository ('repository', 'repo', or 'owner'+'repo'), or set 'repo' in .mcp-gh-tooling.json"
+    local message="Error: org is required for ${tool}. Pass 'org', 'owner', or a repository ('repository', 'repo', or 'owner'+'repo'), or set 'repo' in .mcp-gh-tooling.json"
+    local suppress_errors
+    suppress_errors=$(printf '%s\n' "${args}" | jq -r '.suppress_errors // false')
+    if [[ ${repo_view_exit} -ne 0 && -n "${repo_view_err}" && "${suppress_errors}" != "true" ]]; then
+        message+=". The current directory's repository could not be read: ${repo_view_err}"
+    fi
+    printf '%s\n' "${message}"
     return 1
 }
 
-# Read a value from the gh-tooling config file
-# Args: $1 = jq path (e.g. '.repo'), $2 = default value
+#######################################
+# Read a value from the gh-tooling config file.
+# Globals:
+#   GH_TOOLING_CONFIG_FILE (read)
+# Arguments:
+#   $1 jq path, e.g. '.repo'; $2 value to use when the file or key is absent.
+# Outputs:
+#   The value, or the default, on stdout.
+#######################################
 _gh_config_value() {
     local path="$1"
     local default="${2:-}"
@@ -252,17 +276,28 @@ _gh_config_value() {
     [[ -n "${value}" ]] && echo "${value}" || echo "${default}"
 }
 
-# Validate jq filter syntax before execution.
-# Only rejects definitive compile/parse/lexical errors; runtime errors on null are acceptable.
-# Args: $1 = filter expression, $2 = field name for error message (default: jq_filter)
-# Outputs error message to stdout and returns 1 on compile-time syntax failure.
+#######################################
+# Reject a jq filter that does not compile, before any gh call is made.
+# The filter runs once against null input. A compile error exits 3 and
+# reports "compile error"; the message check matters because a valid
+# halt_error(3) also exits 3. Any other outcome, including a runtime error on
+# the null input (exit 5), means the filter compiled and is left for
+# _gh_post_process to apply.
+# Arguments:
+#   $1 filter expression, $2 field name for the error message (default: jq_filter).
+# Outputs:
+#   An error message carrying jq's diagnostic on stdout when the filter does
+#   not compile.
+# Returns:
+#   0 when the filter is empty or compiles, 1 otherwise.
+#######################################
 _gh_validate_jq_filter() {
     local filter="$1"
     local field="${2:-jq_filter}"
     [[ -z "${filter}" ]] && return 0
-    local err
-    err=$(jq -n "${filter}" 2>&1 1>/dev/null) || true
-    if [[ -n "${err}" ]] && echo "${err}" | grep -qiE "compile error|unexpected \\\$end|parse error|lexical error"; then
+    local err jq_exit=0
+    err=$(jq -n "${filter}" 2>&1 1>/dev/null) || jq_exit=$?
+    if [[ ${jq_exit} -eq 3 && "${err}" == *"compile error"* ]]; then
         echo "Error: Invalid ${field}: ${err}"
         return 1
     fi
@@ -335,11 +370,19 @@ _gh_strip_ansi() {
         -e $'s|\033||g'
 }
 
+#######################################
 # Apply optional pipeline post-processing steps in order: jq → grep → head → tail.
 # Each step is a no-op when its controlling parameter is empty/zero.
-# Args: $1=output $2=jq_filter $3=grep_pattern $4=grep_before $5=grep_after
-#       $6=grep_ignore_case $7=grep_invert $8=max_lines $9=tail_lines
-# Outputs processed text to stdout; returns 1 if jq filter fails on the output.
+# Arguments:
+#   $1 output, $2 jq_filter, $3 grep_pattern, $4 grep_before, $5 grep_after,
+#   $6 grep_ignore_case, $7 grep_invert, $8 max_lines, $9 tail_lines.
+# Outputs:
+#   The processed text on stdout, or an error message on stdout when a step
+#   fails.
+# Returns:
+#   0 on success, including a grep that matches nothing; 1 when the jq filter
+#   fails on the output or grep rejects the pattern.
+#######################################
 _gh_post_process() {
     local output="$1"
     local jq_filter="${2:-}"
@@ -365,7 +408,15 @@ _gh_post_process() {
         [[ "${grep_before}" -gt 0 ]]          && gcmd+=("-B" "${grep_before}")
         [[ "${grep_after}" -gt 0 ]]           && gcmd+=("-A" "${grep_after}")
         gcmd+=("--" "${grep_pattern}")
-        output=$(echo "${output}" | "${gcmd[@]}") || true
+        # grep exits 1 for "no line matched", which is an empty result; 2 and
+        # above is an error such as an invalid pattern.
+        local grep_output grep_exit=0
+        grep_output=$(echo "${output}" | "${gcmd[@]}") || grep_exit=$?
+        if [[ ${grep_exit} -gt 1 ]]; then
+            echo "Error: grep_pattern failed on output: ${grep_pattern}"
+            return 1
+        fi
+        output="${grep_output}"
     fi
 
     if [[ -n "${max_lines}" && "${max_lines}" -gt 0 ]]; then

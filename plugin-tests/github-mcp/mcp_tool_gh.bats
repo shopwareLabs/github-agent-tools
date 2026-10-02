@@ -326,6 +326,13 @@ bats_test_function --description "pr_checks: fails without repo outside git"  --
     assert_success
 }
 
+@test "_gh_validate_jq_filter: accepts a filter that halts with exit status 3" {
+    # halt_error(3) exits with the same status as a compile error.
+    run _gh_validate_jq_filter 'halt_error(3)'
+    assert_success
+    assert_output ""
+}
+
 @test "_gh_validate_jq_filter: uses custom field name in error message" {
     run _gh_validate_jq_filter '{{bad' "my_filter"
     assert_failure
@@ -382,6 +389,13 @@ bats_test_function --description "pr_checks: fails without repo outside git"  --
 @test "_gh_post_process: grep no matches returns success with empty output" {
     run _gh_post_process $'line1\nline2' "" "NOMATCH_XYZ" 0 0 false false "" ""
     assert_success
+    assert_output ""
+}
+
+@test "_gh_post_process: invalid grep_pattern fails with error message" {
+    run _gh_post_process $'line1\nline2' "" "(" 0 0 false false "" ""
+    assert_failure
+    assert_output --partial "grep_pattern failed"
 }
 
 @test "_gh_post_process: jq filter transforms JSON output" {

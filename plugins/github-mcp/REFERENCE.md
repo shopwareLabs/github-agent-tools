@@ -29,6 +29,8 @@ Tools with large text output (`run_logs`, `job_logs`, `pr_diff`) additionally ac
 | `grep_ignore_case`    | boolean | Case-insensitive matching (-i)                              |
 | `grep_invert`         | boolean | Return non-matching lines (-v)                              |
 
+A `grep_pattern` that grep rejects, such as an unbalanced `(`, fails the call with `Error: grep_pattern failed on output`. Unlike `jq_filter`, the pattern is checked only after `gh` returns, so the call still fetches its output first. A pattern that matches nothing is not an error. The result is empty.
+
 `max_lines` and `tail_lines` are also available on `pr_view`, `pr_checks`, `pr_comments`, `pr_reviews`, `issue_view`, `api_read`, `label_list`, `project_list`, and `project_view` for output size control.
 
 `job_logs`, `repo_file`, and `api_read` remove terminal escape sequences from the text they return, so `grep_pattern`, `max_lines`, and `tail_lines` work on the words rather than on the colour codes wrapped around them. `repo_file` with `download_to` is the exception: it writes the file's bytes unchanged.
@@ -172,7 +174,8 @@ Use gh-tooling issue_list with search "TODO label:component/core" and limit 20
 
 List an organization's issue types and issue fields, including each single-select field's options.
 The organization comes from `org`, `owner`, a repository parameter, the configured default repo, or the
-current clone's remote.
+current clone's remote. When none of them supplies one, the error says `org` is required and, when
+reading the clone's remote failed, includes gh's message unless `suppress_errors` is set.
 
 Types and fields are independent. GitHub lets an organization pin fields to a type, but that pinning
 only drives the web UI: any organization field can be set on an issue of any type, so this tool
