@@ -333,6 +333,19 @@ bats_test_function --description "pr_checks: fails without repo outside git"  --
     assert_output ""
 }
 
+@test "_gh_capture_split: keeps stdout and stderr apart and returns the command's status" {
+    emit_both() {
+        printf '%s\n' "shopware/shopware"
+        printf '%s\n' "A new release of gh is available" >&2
+        return 3
+    }
+    local out err rc=0
+    _gh_capture_split out err emit_both || rc=$?
+    assert_equal "${out}" "shopware/shopware"
+    assert_equal "${err}" "A new release of gh is available"
+    assert_equal "${rc}" "3"
+}
+
 @test "_gh_validate_jq_filter: uses custom field name in error message" {
     run _gh_validate_jq_filter '{{bad' "my_filter"
     assert_failure
@@ -1060,6 +1073,15 @@ bats_test_function --description "pr_checks: fails without repo outside git"  --
     assert_failure
     # The captured stderr must appear in tool output (proves __dl_err was set)
     assert_output --partial "API error: Not Found"
+}
+
+@test "repo_file: download_to on failure returns no error text under suppress_errors" {
+    local dl_path="${BATS_TEST_TMPDIR}/suppressed.json"
+    GH_STUB_EXIT=1
+    GH_STUB_STDERR="API error: Not Found"
+    run tool_repo_file '{"repository":"shopware/shopware","path":"missing.txt","download_to":"'"${dl_path}"'","suppress_errors":true}'
+    assert_failure
+    assert_output ""
 }
 
 @test "repo_file: download_to on failure returns fallback when provided" {

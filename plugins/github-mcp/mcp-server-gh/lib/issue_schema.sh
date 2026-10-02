@@ -100,7 +100,7 @@ _gh_issue_schema_fetch() {
         __raw=$("${cmd[@]}" 2>&1) || __exit=$?
     fi
     if [[ ${__exit} -ne 0 ]]; then
-        printf '%s\n' "${__raw}"
+        [[ "${suppress_errors}" == "true" ]] || printf '%s\n' "${__raw}"
         return ${__exit}
     fi
     printf '%s\n' "${__raw}"

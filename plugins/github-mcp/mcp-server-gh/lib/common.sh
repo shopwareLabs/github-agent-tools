@@ -189,10 +189,42 @@ _gh_validate_org() {
 }
 
 #######################################
+# Run a command with its stdout and stderr captured apart, so a warning on a
+# successful run never joins the value and a failed run can still say why.
+# stderr goes through a file in MCP_CALL_TMPDIR, which the server removes
+# when the call ends, even a cancelled one.
+# Globals:
+#   MCP_CALL_TMPDIR (read)
+# Arguments:
+#   $1 name of the caller's variable that receives stdout,
+#   $2 name of the caller's variable that receives stderr,
+#   $3... the command and its arguments.
+# Returns:
+#   The command's exit status, or 1 with a message in the stderr variable when
+#   the temporary file cannot be created.
+#######################################
+_gh_capture_split() {
+    local __gh_cs_out_var="$1" __gh_cs_err_var="$2"
+    shift 2
+    local __gh_cs_file __gh_cs_out __gh_cs_exit=0
+    __gh_cs_file=$(mktemp "${MCP_CALL_TMPDIR:-${TMPDIR:-/tmp}}/gh-stderr.XXXXXX") || {
+        printf -v "${__gh_cs_out_var}" '%s' ""
+        printf -v "${__gh_cs_err_var}" '%s' "cannot create a temporary file for the command's stderr"
+        return 1
+    }
+    __gh_cs_out=$("$@" 2>"${__gh_cs_file}") || __gh_cs_exit=$?
+    printf -v "${__gh_cs_out_var}" '%s' "${__gh_cs_out}"
+    printf -v "${__gh_cs_err_var}" '%s' "$(<"${__gh_cs_file}")"
+    rm -f -- "${__gh_cs_file}"
+    return "${__gh_cs_exit}"
+}
+
+#######################################
 # Resolve the organization owning org-level resources (issue types, issue fields).
 # Priority: org > owner > repo-shaped args > GH_DEFAULT_REPO > git remote.
 # Globals:
-#   GH_DEFAULT_REPO, _GH_OWNER, MCP_CALL_TMPDIR (read)
+#   GH_DEFAULT_REPO (read); _GH_OWNER, _GH_REPO, _GH_REF, _GH_PATH (set by
+#   _gh_resolve_owner_repo_optional)
 # Arguments:
 #   $1 JSON args string, $2 tool name for the error message.
 # Outputs:
@@ -231,17 +263,11 @@ _gh_resolve_org() {
         return 0
     fi
 
-    # stderr goes to its own file: a failed lookup can then say why (an auth or
-    # network failure otherwise reads as "no org was given"), and a warning on
-    # a successful lookup never joins the value.
-    local repo_view repo_view_err repo_view_exit=0 err_file
-    err_file=$(mktemp "${MCP_CALL_TMPDIR:-${TMPDIR:-/tmp}}/gh-repo-view.XXXXXX") || {
-        printf '%s\n' "Error: cannot create a temporary file to resolve the org for ${tool}"
-        return 1
-    }
-    repo_view=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>"${err_file}") || repo_view_exit=$?
-    repo_view_err=$(<"${err_file}")
-    rm -f -- "${err_file}"
+    # A failed lookup must say why: an auth or network failure otherwise reads
+    # as "no org was given".
+    local repo_view repo_view_err repo_view_exit=0
+    _gh_capture_split repo_view repo_view_err \
+        gh repo view --json nameWithOwner -q .nameWithOwner || repo_view_exit=$?
     if [[ ${repo_view_exit} -eq 0 && -n "${repo_view}" ]]; then
         _gh_validate_org "${repo_view%%/*}" "${tool}" || return 1
         printf '%s\n' "${repo_view%%/*}"

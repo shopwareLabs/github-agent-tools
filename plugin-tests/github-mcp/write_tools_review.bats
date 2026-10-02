@@ -114,6 +114,20 @@ assert_gh_stdin_contain() {
     assert_gh_stdin_contain '"line": 42'
 }
 
+@test "pr_review_submit with suppress_errors returns no error text when the head SHA lookup fails" {
+    gh() {
+        printf '%s\n' "gh: Not Found (HTTP 404)" >&2
+        return 1
+    }
+    run tool_pr_review_submit '{
+        "number": 100,
+        "comments": [{"path": "x.php", "line": 1, "body": "n"}],
+        "suppress_errors": true
+    }'
+    assert_failure
+    assert_output ""
+}
+
 @test "pr_review_submit with comments auto-fetches commit_id from PR head" {
     GH_STUB_HEAD_SHA="feedfacefeedfacefeedfacefeedfacefeedface"
     GH_STUB_OUTPUT='{"id": 99}'

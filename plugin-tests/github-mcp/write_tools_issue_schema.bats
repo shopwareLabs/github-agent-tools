@@ -56,6 +56,16 @@ body() { jq -c "$1" "${GH_BODY_FILE}"; }
     assert_equal "$(printf '%s' "${output}" | jq -r '.type')" 'null'
 }
 
+@test "issue_type_set with suppress_errors returns no error text when listing the types fails" {
+    gh() {
+        printf '%s\n' "gh: Not Found (HTTP 404)" >&2
+        return 1
+    }
+    run tool_issue_type_set '{"number": 19952, "type": "bug", "suppress_errors": true}'
+    assert_failure
+    assert_output ""
+}
+
 @test "issue_type_set rejects an unknown type before calling the API" {
     run tool_issue_type_set '{"number": 19952, "type": "Bogus"}'
     assert_failure
@@ -189,8 +199,9 @@ body() { jq -c "$1" "${GH_BODY_FILE}"; }
 }
 
 @test "issue_field_set with suppress_errors returns no error text" {
-    GH_STUB_OUTPUT=""
-    GH_STUB_STDERR="HTTP 422: Validation Failed"
+    # gh api prints an HTTP error's JSON body on stdout and its summary on stderr.
+    GH_STUB_OUTPUT='{"message":"Not Found","documentation_url":"https://docs.github.com/rest","status":"404"}'
+    GH_STUB_STDERR="gh: Not Found (HTTP 404)"
     GH_STUB_EXIT=1
     run tool_issue_field_set '{"number": 19952, "values": {}, "suppress_errors": true}'
     assert_failure

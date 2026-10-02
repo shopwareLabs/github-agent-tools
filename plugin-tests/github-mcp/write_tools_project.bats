@@ -76,6 +76,15 @@ setup() {
     assert_output --partial "Available projects"
 }
 
+@test "project_item_add with suppress_errors returns no error text when listing projects fails" {
+    source "${GH_LIB_DIR}/project.sh"  # the real resolver instead of setup's mock
+    GH_STUB_STDERR="HTTP 401: Bad credentials (https://api.github.com/graphql)"
+    GH_STUB_EXIT=1
+    run tool_project_item_add '{"number": 1, "type": "issue", "project": "Board A", "suppress_errors": true}'
+    assert_failure
+    assert_output ""
+}
+
 # ============================================================================
 # project_status_set
 # ============================================================================

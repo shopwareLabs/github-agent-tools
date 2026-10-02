@@ -115,7 +115,7 @@ tool_release_list() {
         if [[ ${__exit} -ne 0 ]]; then
             [[ -n "${fallback}" ]] && { echo "${fallback}"; return 0; }
             [[ "${suppress_errors}" == "true" ]] && continue
-            echo "${__raw}"; return ${__exit}
+            [[ "${suppress_errors}" == "true" ]] || echo "${__raw}"; return ${__exit}
         fi
 
         repo_result=$(echo "${__raw}" | jq -c \

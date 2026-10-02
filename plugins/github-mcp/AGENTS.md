@@ -131,7 +131,9 @@ Tools in `tools-read.json` and `tools-write.json` map to bash functions with `to
 
 ### Standard execution block
 
-Captures `__raw` and `__exit` separately; branches on `suppress_errors` for `2>/dev/null` vs `2>&1`; checks `fallback` before re-echoing error output. Always calls `_gh_post_process()` on success.
+Captures `__raw` and `__exit` separately. It branches on `suppress_errors` for `2>/dev/null` vs `2>&1`. On failure it returns `fallback` when set, otherwise re-echoes the error output unless `suppress_errors` is set. Discarding stderr is not enough there: `gh api` prints an HTTP error's JSON body on stdout. Always calls `_gh_post_process()` on success.
+
+Where gh's stdout is a value the tool parses (an ID, a SHA, a JSON listing) rather than the tool's own output, capture it with `_gh_capture_split` so a gh warning on stderr never becomes part of the value.
 
 ## Key Navigation Points
 

@@ -66,6 +66,16 @@ setup() {
     [[ ! -f "${GH_ARGS_FILE}" ]]
 }
 
+@test "sub_issue_add with suppress_errors returns no error text when a lookup fails" {
+    _gh_resolve_issue_node_id() {
+        printf '%s\n' "Could not resolve to an Issue with the number of 999." >&2
+        return 1
+    }
+    run tool_sub_issue_add '{"issue_number": 999, "sub_issue_number": 2, "suppress_errors": true}'
+    assert_failure
+    assert_output ""
+}
+
 @test "sub_issue_add handles resolution failure" {
     _gh_resolve_issue_node_id() {
         printf '%s\n' "not found" >&2
@@ -143,6 +153,16 @@ setup() {
     assert_failure
     assert_output --partial "repo must be in 'owner/repo' format"
     [[ ! -f "${GH_ARGS_FILE}" ]]
+}
+
+@test "sub_issue_remove with suppress_errors returns no error text when a lookup fails" {
+    _gh_resolve_issue_node_id() {
+        printf '%s\n' "Could not resolve to an Issue with the number of 999." >&2
+        return 1
+    }
+    run tool_sub_issue_remove '{"issue_number": 999, "sub_issue_number": 2, "suppress_errors": true}'
+    assert_failure
+    assert_output ""
 }
 
 @test "sub_issue_remove handles resolution failure" {

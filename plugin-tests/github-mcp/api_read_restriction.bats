@@ -16,6 +16,16 @@ setup() {
     reset_gh_stub
 }
 
+@test "tool_api_read with suppress_errors returns no error text when the call fails" {
+    # gh api prints an HTTP error's JSON body on stdout and its summary on stderr.
+    GH_STUB_OUTPUT='{"message":"Not Found","documentation_url":"https://docs.github.com/rest","status":"404"}'
+    GH_STUB_STDERR="gh: Not Found (HTTP 404)"
+    GH_STUB_EXIT=1
+    run tool_api_read '{"endpoint": "repos/shopware/shopware/pulls/0", "suppress_errors": true}'
+    assert_failure
+    assert_output ""
+}
+
 @test "tool_api_read allows GET method" {
     GH_STUB_OUTPUT='{"id": 1}'
     run tool_api_read '{"endpoint": "repos/shopware/shopware/pulls/123", "method": "GET"}'

@@ -48,7 +48,7 @@ tool_project_list() {
     fi
     if [[ ${__exit} -ne 0 ]]; then
         [[ -n "${fallback}" ]] && { echo "${fallback}"; return 0; }
-        echo "${__raw}"; return ${__exit}
+        [[ "${suppress_errors}" == "true" ]] || echo "${__raw}"; return ${__exit}
     fi
     _gh_post_process "${__raw}" "${jq_filter}" "" 0 0 false false "${max_lines}" "" || return $?
 }
@@ -91,7 +91,7 @@ tool_project_view() {
     fi
     if [[ ${__exit} -ne 0 ]]; then
         [[ -n "${fallback}" ]] && { echo "${fallback}"; return 0; }
-        echo "${__raw}"; return ${__exit}
+        [[ "${suppress_errors}" == "true" ]] || echo "${__raw}"; return ${__exit}
     fi
     _gh_post_process "${__raw}" "${jq_filter}" "" 0 0 false false "${max_lines}" "" || return $?
 }
@@ -99,21 +99,24 @@ tool_project_view() {
 #######################################
 # Resolve a project title to its project number.
 # Arguments:
-#   $1 project title, $2 owner login.
+#   $1 project title, $2 owner login, $3 suppress_errors flag.
 # Outputs:
 #   The project number on stdout, or an error on stdout that lists the
-#   owner's project titles.
+#   owner's project titles. When gh fails, its error, or nothing under
+#   suppress_errors.
 # Returns:
 #   0 when the title matched, 1 otherwise.
 #######################################
 _gh_resolve_project_number() {
-    local project_name="$1" owner="$2"
+    local project_name="$1" owner="$2" suppress_errors="$3"
 
-    local projects_json
-    projects_json=$(gh project list --owner "${owner}" --format json 2>&1) || {
-        printf '%s\n' "Error: could not list projects for '${owner}': ${projects_json}"
+    local projects_json list_err list_exit=0
+    _gh_capture_split projects_json list_err \
+        gh project list --owner "${owner}" --format json || list_exit=$?
+    if [[ ${list_exit} -ne 0 ]]; then
+        [[ "${suppress_errors}" == "true" ]] || printf '%s\n' "Error: could not list projects for '${owner}': ${list_err:-${projects_json}}"
         return 1
-    }
+    fi
 
     local number
     number=$(printf '%s\n' "${projects_json}" | jq -r --arg name "${project_name}" '.projects[] | select(.title == $name) | .number' 2>/dev/null)
@@ -131,21 +134,25 @@ _gh_resolve_project_number() {
 #######################################
 # Resolve a Status option name to the Status field ID and the option ID.
 # Arguments:
-#   $1 project number, $2 owner login, $3 status option name.
+#   $1 project number, $2 owner login, $3 status option name,
+#   $4 suppress_errors flag.
 # Outputs:
 #   "field_id<TAB>option_id" on stdout with no trailing newline, or an error
-#   on stdout that lists the available options.
+#   on stdout that lists the available options. When gh fails, its error, or
+#   nothing under suppress_errors.
 # Returns:
 #   0 when the option matched, 1 otherwise.
 #######################################
 _gh_resolve_status_option() {
-    local project_number="$1" owner="$2" status_name="$3"
+    local project_number="$1" owner="$2" status_name="$3" suppress_errors="$4"
 
-    local fields_json
-    fields_json=$(gh project field-list "${project_number}" --owner "${owner}" --format json 2>&1) || {
-        printf '%s\n' "Error: could not list fields for project ${project_number}: ${fields_json}"
+    local fields_json list_err list_exit=0
+    _gh_capture_split fields_json list_err \
+        gh project field-list "${project_number}" --owner "${owner}" --format json || list_exit=$?
+    if [[ ${list_exit} -ne 0 ]]; then
+        [[ "${suppress_errors}" == "true" ]] || printf '%s\n' "Error: could not list fields for project ${project_number}: ${list_err:-${fields_json}}"
         return 1
-    }
+    fi
 
     # Find the Status single-select field
     local field_id
@@ -203,9 +210,10 @@ tool_project_item_add() {
 
     # Resolve project name to number
     local project_number
-    project_number=$(_gh_resolve_project_number "${project}" "${effective_owner}" 2>&1) || {
+    project_number=$(_gh_resolve_project_number "${project}" "${effective_owner}" "${suppress_errors}") || {
         [[ -n "${fallback}" ]] && { printf '%s\n' "${fallback}"; return 0; }
-        printf '%s\n' "${project_number}"; return 1
+        [[ -z "${project_number}" ]] || printf '%s\n' "${project_number}"
+        return 1
     }
 
     # Build the item URL
@@ -227,7 +235,7 @@ tool_project_item_add() {
     fi
     if [[ ${__exit} -ne 0 ]]; then
         [[ -n "${fallback}" ]] && { printf '%s\n' "${fallback}"; return 0; }
-        printf '%s\n' "${__raw}"; return ${__exit}
+        [[ "${suppress_errors}" == "true" ]] || printf '%s\n' "${__raw}"; return ${__exit}
     fi
     printf '%s\n' "${__raw}"
 }
@@ -268,16 +276,18 @@ tool_project_status_set() {
 
     # Resolve project name to number
     local project_number
-    project_number=$(_gh_resolve_project_number "${project}" "${effective_owner}" 2>&1) || {
+    project_number=$(_gh_resolve_project_number "${project}" "${effective_owner}" "${suppress_errors}") || {
         [[ -n "${fallback}" ]] && { printf '%s\n' "${fallback}"; return 0; }
-        printf '%s\n' "${project_number}"; return 1
+        [[ -z "${project_number}" ]] || printf '%s\n' "${project_number}"
+        return 1
     }
 
     # Resolve status name to field_id + option_id
     local status_ids
-    status_ids=$(_gh_resolve_status_option "${project_number}" "${effective_owner}" "${status}" 2>&1) || {
+    status_ids=$(_gh_resolve_status_option "${project_number}" "${effective_owner}" "${status}" "${suppress_errors}") || {
         [[ -n "${fallback}" ]] && { printf '%s\n' "${fallback}"; return 0; }
-        printf '%s\n' "${status_ids}"; return 1
+        [[ -z "${status_ids}" ]] || printf '%s\n' "${status_ids}"
+        return 1
     }
     local field_id option_id
     IFS=$'\t' read -r field_id option_id <<< "${status_ids}"
@@ -317,7 +327,7 @@ tool_project_status_set() {
     fi
     if [[ ${__exit} -ne 0 ]]; then
         [[ -n "${fallback}" ]] && { printf '%s\n' "${fallback}"; return 0; }
-        printf '%s\n' "${__raw}"; return ${__exit}
+        [[ "${suppress_errors}" == "true" ]] || printf '%s\n' "${__raw}"; return ${__exit}
     fi
     printf '%s\n' "${__raw}"
 }

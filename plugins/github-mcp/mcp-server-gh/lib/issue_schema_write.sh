@@ -7,34 +7,39 @@
 # Arguments:
 #   $1 organization login, $2 endpoint segment ("issue-types" or "issue-fields").
 # Outputs:
-#   The endpoint's JSON array on stdout, or gh's error text on stdout.
+#   The endpoint's JSON array on stdout; on failure gh's error text (its
+#   stderr, or the error body it printed when stderr is empty) on stdout.
 # Returns:
 #   gh's exit status.
 #######################################
 _gh_issue_org_collection() {
     local org="$1" endpoint="$2"
 
-    local __raw __exit=0
-    __raw=$(gh api "orgs/${org}/${endpoint}" 2>&1) || __exit=$?
-    printf '%s\n' "${__raw}"
-    return ${__exit}
+    local out err gh_exit=0
+    _gh_capture_split out err gh api "orgs/${org}/${endpoint}" || gh_exit=$?
+    if [[ ${gh_exit} -ne 0 ]]; then
+        printf '%s\n' "${err:-${out}}"
+        return ${gh_exit}
+    fi
+    printf '%s\n' "${out}"
 }
 
 #######################################
 # Resolve an issue type name to the organization's canonical spelling.
 # Arguments:
-#   $1 organization login, $2 requested type name.
+#   $1 organization login, $2 requested type name, $3 suppress_errors flag.
 # Outputs:
 #   The canonical type name on stdout, or an error listing the available types.
+#   When gh fails, its error, or nothing under suppress_errors.
 # Returns:
 #   0 when the name resolved, 1 otherwise.
 #######################################
 _gh_resolve_issue_type() {
-    local org="$1" wanted="$2"
+    local org="$1" wanted="$2" suppress_errors="$3"
 
     local types_json
     types_json=$(_gh_issue_org_collection "${org}" "issue-types") || {
-        printf '%s\n' "Error: could not list issue types for '${org}': ${types_json}"
+        [[ "${suppress_errors}" == "true" ]] || printf '%s\n' "Error: could not list issue types for '${org}': ${types_json}"
         return 1
     }
 
@@ -58,18 +63,20 @@ _gh_resolve_issue_type() {
 # field's data type, so a bad name fails here naming the valid options rather
 # than reaching GitHub, which reports a wrong option name for an unknown field.
 # Arguments:
-#   $1 organization login, $2 values object keyed by field name.
+#   $1 organization login, $2 values object keyed by field name,
+#   $3 suppress_errors flag.
 # Outputs:
-#   The issue_field_values JSON array on stdout, or an error message.
+#   The issue_field_values JSON array on stdout, or an error message. When gh
+#   fails, its error, or nothing under suppress_errors.
 # Returns:
 #   0 when every entry resolved, 1 otherwise.
 #######################################
 _gh_resolve_issue_field_values() {
-    local org="$1" values="$2"
+    local org="$1" values="$2" suppress_errors="$3"
 
     local fields_json
     fields_json=$(_gh_issue_org_collection "${org}" "issue-fields") || {
-        printf '%s\n' "Error: could not list issue fields for '${org}': ${fields_json}"
+        [[ "${suppress_errors}" == "true" ]] || printf '%s\n' "Error: could not list issue fields for '${org}': ${fields_json}"
         return 1
     }
 
@@ -185,8 +192,8 @@ tool_issue_type_set() {
         fi
 
         local canonical
-        canonical=$(_gh_resolve_issue_type "${effective_repo%%/*}" "${type}") || {
-            printf '%s\n' "${canonical}"
+        canonical=$(_gh_resolve_issue_type "${effective_repo%%/*}" "${type}" "${suppress_errors}") || {
+            [[ -z "${canonical}" ]] || printf '%s\n' "${canonical}"
             return 1
         }
         body=$(jq -nc --arg type "${canonical}" '{type: $type}')
@@ -241,8 +248,8 @@ tool_issue_field_set() {
     _gh_validate_repo "${effective_repo}" || return 1
 
     local field_values
-    field_values=$(_gh_resolve_issue_field_values "${effective_repo%%/*}" "${values}") || {
-        printf '%s\n' "${field_values}"
+    field_values=$(_gh_resolve_issue_field_values "${effective_repo%%/*}" "${values}" "${suppress_errors}") || {
+        [[ -z "${field_values}" ]] || printf '%s\n' "${field_values}"
         return 1
     }
 
@@ -266,9 +273,10 @@ tool_issue_field_set() {
 #   $1 HTTP method, $2 endpoint, $3 request body JSON, $4 jq filter for the
 #   response, $5 tool name, $6 suppress_errors, $7 fallback.
 # Outputs:
-#   The filtered response on stdout, or gh's error text on stdout.
+#   The filtered response on stdout; on failure the fallback when one is set,
+#   otherwise gh's error text, or nothing under suppress_errors.
 # Returns:
-#   0 on success, gh's exit status on failure.
+#   0 on success or when the fallback answers, gh's exit status otherwise.
 #######################################
 _gh_issue_schema_write() {
     local method="$1" endpoint="$2" body="$3" response_filter="$4"
@@ -285,7 +293,9 @@ _gh_issue_schema_write() {
     fi
     if [[ ${__exit} -ne 0 ]]; then
         [[ -n "${fallback}" ]] && { printf '%s\n' "${fallback}"; return 0; }
-        printf '%s\n' "${__raw}"
+        # gh api prints an HTTP error's JSON body on stdout, so discarding
+        # stderr alone would still return the error.
+        [[ "${suppress_errors}" == "true" ]] || printf '%s\n' "${__raw}"
         return ${__exit}
     fi
 

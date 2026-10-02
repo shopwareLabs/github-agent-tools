@@ -58,18 +58,23 @@ tool_sub_issue_add() {
     fi
     _gh_validate_repo "${effective_repo}" || return 1
 
-    # Resolve both issue numbers to node IDs
-    local parent_id sub_id
-    parent_id=$(_gh_resolve_issue_node_id "${effective_repo}" "${issue_number}" 2>&1) || {
+    # Resolve both issue numbers to node IDs. stdout and stderr stay apart, so
+    # a gh warning on a successful lookup never becomes part of an ID.
+    local parent_id sub_id node_err node_exit=0
+    _gh_capture_split parent_id node_err \
+        _gh_resolve_issue_node_id "${effective_repo}" "${issue_number}" || node_exit=$?
+    if [[ ${node_exit} -ne 0 ]]; then
         [[ -n "${fallback}" ]] && { printf '%s\n' "${fallback}"; return 0; }
-        printf '%s\n' "Error: could not resolve issue #${issue_number}: ${parent_id}"
+        [[ "${suppress_errors}" == "true" ]] || printf '%s\n' "Error: could not resolve issue #${issue_number}: ${node_err}"
         return 1
-    }
-    sub_id=$(_gh_resolve_issue_node_id "${effective_repo}" "${sub_issue_number}" 2>&1) || {
+    fi
+    _gh_capture_split sub_id node_err \
+        _gh_resolve_issue_node_id "${effective_repo}" "${sub_issue_number}" || node_exit=$?
+    if [[ ${node_exit} -ne 0 ]]; then
         [[ -n "${fallback}" ]] && { printf '%s\n' "${fallback}"; return 0; }
-        printf '%s\n' "Error: could not resolve issue #${sub_issue_number}: ${sub_id}"
+        [[ "${suppress_errors}" == "true" ]] || printf '%s\n' "Error: could not resolve issue #${sub_issue_number}: ${node_err}"
         return 1
-    }
+    fi
 
     log "INFO" "sub_issue_add: parent=${parent_id} sub=${sub_id}"
 
@@ -88,7 +93,7 @@ tool_sub_issue_add() {
     fi
     if [[ ${__exit} -ne 0 ]]; then
         [[ -n "${fallback}" ]] && { printf '%s\n' "${fallback}"; return 0; }
-        printf '%s\n' "${__raw}"; return ${__exit}
+        [[ "${suppress_errors}" == "true" ]] || printf '%s\n' "${__raw}"; return ${__exit}
     fi
     printf '%s\n' "${__raw}"
 }
@@ -124,17 +129,21 @@ tool_sub_issue_remove() {
     fi
     _gh_validate_repo "${effective_repo}" || return 1
 
-    local parent_id sub_id
-    parent_id=$(_gh_resolve_issue_node_id "${effective_repo}" "${issue_number}" 2>&1) || {
+    local parent_id sub_id node_err node_exit=0
+    _gh_capture_split parent_id node_err \
+        _gh_resolve_issue_node_id "${effective_repo}" "${issue_number}" || node_exit=$?
+    if [[ ${node_exit} -ne 0 ]]; then
         [[ -n "${fallback}" ]] && { printf '%s\n' "${fallback}"; return 0; }
-        printf '%s\n' "Error: could not resolve issue #${issue_number}: ${parent_id}"
+        [[ "${suppress_errors}" == "true" ]] || printf '%s\n' "Error: could not resolve issue #${issue_number}: ${node_err}"
         return 1
-    }
-    sub_id=$(_gh_resolve_issue_node_id "${effective_repo}" "${sub_issue_number}" 2>&1) || {
+    fi
+    _gh_capture_split sub_id node_err \
+        _gh_resolve_issue_node_id "${effective_repo}" "${sub_issue_number}" || node_exit=$?
+    if [[ ${node_exit} -ne 0 ]]; then
         [[ -n "${fallback}" ]] && { printf '%s\n' "${fallback}"; return 0; }
-        printf '%s\n' "Error: could not resolve issue #${sub_issue_number}: ${sub_id}"
+        [[ "${suppress_errors}" == "true" ]] || printf '%s\n' "Error: could not resolve issue #${sub_issue_number}: ${node_err}"
         return 1
-    }
+    fi
 
     log "INFO" "sub_issue_remove: parent=${parent_id} sub=${sub_id}"
 
@@ -153,7 +162,7 @@ tool_sub_issue_remove() {
     fi
     if [[ ${__exit} -ne 0 ]]; then
         [[ -n "${fallback}" ]] && { printf '%s\n' "${fallback}"; return 0; }
-        printf '%s\n' "${__raw}"; return ${__exit}
+        [[ "${suppress_errors}" == "true" ]] || printf '%s\n' "${__raw}"; return ${__exit}
     fi
     printf '%s\n' "${__raw}"
 }

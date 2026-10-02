@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of only saying that `org` is required. `suppress_errors: true` leaves gh's message out.
 - `sub_issue_add` and `sub_issue_remove` now reject a `repo` that is not in `owner/repo` form before
   any GitHub call. Before, `acme/app/extra` was read as owner `acme` and repository `extra`.
+- Under `suppress_errors: true`, a failed call now returns no error text on every tool. Tools built
+  on `gh api` returned the HTTP error's JSON body, which gh prints on stdout, as the result, and the
+  project and issue-schema write tools returned gh's message when looking up a project, a status,
+  or the organization's types or fields failed.
+- gh's stderr no longer ends up in a value a tool parses from gh's stdout: the issue node IDs of
+  `sub_issue_add` and `sub_issue_remove`, the head SHA `pr_review_submit` fetches, the project and
+  status listings of the project tools, the organization's types and fields for `issue_type_set` and
+  `issue_field_set`. A gh warning on a successful call corrupted the value.
 
 ## [5.0.0] - 2026-10-02
 

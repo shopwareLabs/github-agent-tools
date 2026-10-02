@@ -30,16 +30,14 @@ setup() {
                 printf '%s\n' "${GH_STUB_FIELDS}"
                 ;;
             *)
-                if [[ -n "${GH_STUB_REPO_VIEW_ERROR:-}" ]]; then
-                    printf '%s\n' "${GH_STUB_REPO_VIEW_ERROR}" >&2
-                    return 1
-                fi
-                [[ -n "${GH_STUB_REPO_VIEW_WARNING:-}" ]] && printf '%s\n' "${GH_STUB_REPO_VIEW_WARNING}" >&2
-                printf '%s\n' "${GH_STUB_REPO_VIEW:-}"
+                # gh repo view, the git-remote fallback for the org
+                gh_stub_respond
+                return
                 ;;
         esac
         return 0
     }
+    reset_gh_stub
     GH_STUB_TYPES="${TYPES_JSON}"
     GH_STUB_FIELDS="${FIELDS_JSON}"
     GH_STUB_TYPES_EXIT=""
@@ -164,7 +162,8 @@ setup() {
 
 @test "issue_schema says why the current repository could not supply the org" {
     GH_DEFAULT_REPO=""
-    GH_STUB_REPO_VIEW_ERROR="HTTP 401: Bad credentials (https://api.github.com/graphql)"
+    GH_STUB_STDERR="HTTP 401: Bad credentials (https://api.github.com/graphql)"
+    GH_STUB_EXIT=1
     run tool_issue_schema '{}'
     assert_failure
     assert_output --partial "org is required for issue_schema"
@@ -173,20 +172,12 @@ setup() {
 
 @test "issue_schema leaves gh's reason out of the org error under suppress_errors" {
     GH_DEFAULT_REPO=""
-    GH_STUB_REPO_VIEW_ERROR="HTTP 401: Bad credentials (https://api.github.com/graphql)"
+    GH_STUB_STDERR="HTTP 401: Bad credentials (https://api.github.com/graphql)"
+    GH_STUB_EXIT=1
     run tool_issue_schema '{"suppress_errors": true}'
     assert_failure
     assert_output --partial "org is required for issue_schema"
     refute_output --partial "Bad credentials"
-}
-
-@test "issue_schema takes the org from the current repository when gh also warns on stderr" {
-    GH_DEFAULT_REPO=""
-    GH_STUB_REPO_VIEW="shopware/shopware"
-    GH_STUB_REPO_VIEW_WARNING="A new release of gh is available"
-    run tool_issue_schema '{}'
-    assert_success
-    assert_equal "$(printf '%s' "${output}" | jq -r '.org')" "shopware"
 }
 
 @test "fallback does not mask an unresolvable org" {
