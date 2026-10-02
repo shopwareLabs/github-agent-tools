@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [5.0.0] - 2026-10-02
 
 ### Added
 
@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   enforcement hooks on all three hosts, ahead of the project root. Claude Code and Codex now also
   consult it: when it exists alongside a `.claude/` or `.codex/` file, the active host's own
   directory still wins, but `.pi/` now ranks ahead of the project-root fallback for every host.
+  **Breaking for** Claude Code and Codex projects that have both a `.pi/.mcp-gh-tooling.json` and a
+  project-root `.mcp-gh-tooling.json` but no file in `.claude/` or `.codex/`: the `.pi/` file now
+  applies instead of the root file.
 
 ## [4.3.0] - 2026-10-02
 
