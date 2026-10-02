@@ -76,6 +76,13 @@ setup() {
     assert_output --partial "Available projects"
 }
 
+@test "project_item_add rejects a repo that is not owner/repo before calling GitHub" {
+    run tool_project_item_add '{"number": 1, "type": "issue", "project": "Board A", "repo": "acme/app/extra"}'
+    assert_failure
+    assert_output --partial "repo must be in 'owner/repo' format"
+    [[ ! -f "${GH_ARGS_FILE}" ]]
+}
+
 @test "project_item_add with suppress_errors returns no error text when listing projects fails" {
     source "${GH_LIB_DIR}/project.sh"  # the real resolver instead of setup's mock
     GH_STUB_STDERR="HTTP 401: Bad credentials (https://api.github.com/graphql)"
@@ -105,6 +112,13 @@ setup() {
     run tool_project_status_set '{"number": 1, "type": "issue", "status": "Done"}'
     assert_failure
     assert_output --partial "project name is required"
+}
+
+@test "project_status_set rejects a repo that is not owner/repo before calling GitHub" {
+    run tool_project_status_set '{"number": 1, "type": "issue", "project": "Board A", "status": "Done", "repo": "acme/app/extra"}'
+    assert_failure
+    assert_output --partial "repo must be in 'owner/repo' format"
+    [[ ! -f "${GH_ARGS_FILE}" ]]
 }
 
 @test "project_status_set calls item-edit with resolved IDs" {

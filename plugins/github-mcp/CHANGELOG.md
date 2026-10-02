@@ -18,8 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `issue_schema` called without `org`, `owner`, or a repository now reports why
   `gh repo view` could not supply the organization (for example an authentication failure),
   instead of only saying that `org` is required. `suppress_errors: true` leaves gh's message out.
-- `sub_issue_add` and `sub_issue_remove` now reject a `repo` that is not in `owner/repo` form before
-  any GitHub call. Before, `acme/app/extra` was read as owner `acme` and repository `extra`.
+- `sub_issue_add`, `sub_issue_remove`, `project_item_add`, and `project_status_set` now reject a
+  `repo` that is not in `owner/repo` form before any GitHub call. Before, `acme/app/extra` was read
+  as owner `acme` and repository `extra`, or built a wrong item URL.
 - Under `suppress_errors: true`, a failed call now returns no error text on every tool. Tools built
   on `gh api` returned the HTTP error's JSON body, which gh prints on stdout, as the result, and the
   project and issue-schema write tools returned gh's message when looking up a project, a status,

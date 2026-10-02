@@ -204,6 +204,7 @@ tool_project_item_add() {
         printf '%s\n' "Error: repo is required for project_item_add"
         return 1
     fi
+    _gh_validate_repo "${effective_repo}" || return 1
 
     local effective_owner
     effective_owner="${effective_repo%%/*}"
@@ -270,6 +271,7 @@ tool_project_status_set() {
         printf '%s\n' "Error: repo is required for project_status_set"
         return 1
     fi
+    _gh_validate_repo "${effective_repo}" || return 1
 
     local effective_owner
     effective_owner="${effective_repo%%/*}"
