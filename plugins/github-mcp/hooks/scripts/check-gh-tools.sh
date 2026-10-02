@@ -1,5 +1,5 @@
 #!/bin/bash
-# Dev Tooling MCP Enforcer (GitHub CLI, Claude Code and Codex)
+# Dev Tooling MCP Enforcer (GitHub CLI, Claude Code, Codex, and pi)
 # =========================================================
 # Blocks common gh CLI bash commands in favor of gh-tooling MCP tools.
 # Controlled by two fields in .mcp-gh-tooling.json:

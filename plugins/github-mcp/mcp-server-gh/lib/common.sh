@@ -2,6 +2,64 @@
 # Common utilities for gh-tooling MCP server
 # Provides input validation and repo resolution helpers
 
+source "$(dirname "${BASH_SOURCE[0]}")/../../shared/config-dirs.sh"
+
+# Locate .mcp-gh-tooling.json. MCP_GH_TOOLING_CONFIG wins outright; otherwise
+# the last existing file of the list wins: project root, editor directories,
+# then the host directories of github_mcp_config_dirs in reverse, so the
+# active host's directory is checked last.
+# Args: $1 = project root, $2 = log line when no config is found
+# Sets: GH_TOOLING_CONFIG_FILE (global)
+_load_gh_config() {
+    local project_root="$1"
+    local no_config_message="$2"
+    local config_name=".mcp-gh-tooling.json"
+
+    if [[ -n "${MCP_GH_TOOLING_CONFIG:-}" ]]; then
+        if [[ -f "${MCP_GH_TOOLING_CONFIG}" ]]; then
+            GH_TOOLING_CONFIG_FILE="${MCP_GH_TOOLING_CONFIG}"
+            log "INFO" "Config from MCP_GH_TOOLING_CONFIG: ${GH_TOOLING_CONFIG_FILE}"
+        else
+            log "WARN" "MCP_GH_TOOLING_CONFIG set but file not found: ${MCP_GH_TOOLING_CONFIG}"
+        fi
+        return 0
+    fi
+
+    local -a locations=(
+        "${project_root}/${config_name}"
+        "${project_root}/.aiassistant/${config_name}"
+        "${project_root}/.amazonq/${config_name}"
+        "${project_root}/.cline/${config_name}"
+        "${project_root}/.cursor/${config_name}"
+        "${project_root}/.kiro/${config_name}"
+        "${project_root}/.windsurf/${config_name}"
+        "${project_root}/.zed/${config_name}"
+    )
+
+    local -a host_dirs=()
+    local dir
+    while IFS= read -r dir; do
+        host_dirs+=("${dir}")
+    done < <(github_mcp_config_dirs "${GITHUB_MCP_HOST:-}")
+
+    local i
+    for (( i = ${#host_dirs[@]} - 1; i >= 0; i-- )); do
+        locations+=("${project_root}/${host_dirs[i]}/${config_name}")
+    done
+
+    local loc
+    for loc in "${locations[@]}"; do
+        if [[ -f "${loc}" ]]; then
+            GH_TOOLING_CONFIG_FILE="${loc}"
+            log "INFO" "Found config: ${loc}"
+        fi
+    done
+
+    if [[ -z "${GH_TOOLING_CONFIG_FILE}" ]]; then
+        log "INFO" "${no_config_message}"
+    fi
+}
+
 # Validate a GitHub number (PR, issue, run, job ID - positive integer)
 # Args: $1 = value, $2 = field name for error message
 # Outputs error message to stdout and returns 1 on failure

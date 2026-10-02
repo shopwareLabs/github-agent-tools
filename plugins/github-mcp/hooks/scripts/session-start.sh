@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # SessionStart hook: inject gh-tooling MCP tool usage directives into conversation context.
 # Reads template from hooks/prompts/mcp-tool-directives.md, assembles dynamic sections
-# from .mcp-gh-tooling.json config, and outputs to stdout as JSON additionalContext.
+# from .mcp-gh-tooling.json config, appends hooks/prompts/host-pi.md under pi, and
+# outputs to stdout as JSON additionalContext.
 set -euo pipefail
 
 HOOK_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -48,6 +49,11 @@ fi
 # Assemble: replace placeholders
 assembled="${template/\{\{WRITE_SECTION\}\}/$write_section}"
 assembled="${assembled/\{\{LABEL_SECTION\}\}/$label_section}"
+
+# pi: append the host's tool-naming note after one blank line
+if [[ "$HOOK_HOST" == "pi" ]]; then
+    assembled="${assembled%$'\n'}"$'\n\n'"$(<"${PROMPTS_DIR}/host-pi.md")"
+fi
 
 # Output as JSON additionalContext
 context=$(printf '%s' "$assembled" | jq -Rs '.')

@@ -48,6 +48,11 @@ codex plugin add github-mcp@github-agent-tools
 
 Start a new Codex task after installation. Open `/hooks` to review and trust the bundled hooks; Codex skips plugin hooks until they are trusted.
 
+### pi
+
+See the root [README](../../README.md#pi) for the install commands. pi needs no restart beyond a
+new session or `/reload`.
+
 ### Interactive Setup (Claude Code only)
 
 Install the `plugin-setup` plugin, then ask Claude to help you set up github-mcp:
@@ -143,7 +148,7 @@ Configuration is loaded in the following priority order:
    - `.kiro/.mcp-gh-tooling.json` (Kiro)
    - `.windsurf/.mcp-gh-tooling.json` (Windsurf/Codeium)
    - `.zed/.mcp-gh-tooling.json` (Zed editor)
-   - Host override directories: `.claude/.mcp-gh-tooling.json` and `.codex/.mcp-gh-tooling.json`. When both exist, the active host's directory has highest priority; the other host's file remains a fallback.
+   - Host override directories: `.claude/.mcp-gh-tooling.json`, `.codex/.mcp-gh-tooling.json`, and `.pi/.mcp-gh-tooling.json`. The active host's directory has the highest priority, followed by the other two in the fixed order `.claude/`, `.codex/`, `.pi/`: Claude Code prefers `.claude/`, then `.codex/`, then `.pi/`; Codex prefers `.codex/`, then `.claude/`, then `.pi/`; pi prefers `.pi/`, then `.claude/`, then `.codex/`. The servers take the host from `GITHUB_MCP_HOST` (`pi` or `codex`; any other value or none means Claude Code). The enforcement hooks use the same order, then the project root, and take the first match.
 
 **Prerequisites:**
 - `gh` CLI installed: `brew install gh` (macOS) or see [GitHub CLI installation](https://cli.github.com/)
@@ -234,6 +239,11 @@ Blocks bash commands that match known `gh` subcommands and redirects to the corr
 ### Layer 3: MCP API Tool Blocking (PreToolUse)
 
 Optionally blocks the `api_read` and `api` tools when they target endpoints that have dedicated MCP tools. Configured separately via `block_api_tool_read` and `block_api_tool_write`. Implemented in `hooks/scripts/check-api-tools.sh`.
+
+On pi, there is no PreToolUse hook; the extension's `tool_call` handler runs the same
+`check-gh-tools.sh` and `check-api-tools.sh` scripts and blocks the call on the same output. A
+gate script that fails any other way than exiting `2` — a crash, a timeout, a missing script — fails
+open: the call goes through rather than being blocked.
 
 All hook layers respect the `enforce_mcp_tools` setting and are disabled when set to `false`.
 
@@ -327,15 +337,35 @@ The raw server IDs stay `gh-tooling` and `gh-tooling-write`, but each host rende
 |---|---|---|
 | Claude Code | `mcp__plugin_github-mcp_gh-tooling__pr_view` | `mcp__plugin_github-mcp_gh-tooling-write__pr_create` |
 | Codex | `mcp__gh_tooling__pr_view` | `mcp__gh_tooling_write__pr_create` |
+| pi | `mcp__gh_tooling__pr_view` | `mcp__gh_tooling_write__pr_create` |
 
 Use the identifiers exposed by the active host rather than copying the other host's spelling.
+
+## pi
+
+- Both servers are registered with `exposure: "deferred"`: pi lists `gh-tooling` and
+  `gh-tooling-write` in its system prompt's `mcp_servers` section, and a tool is undeclared — so
+  the model does not see it as a direct tool call option — until `tool_search` loads it. A codemode
+  script can call a deferred tool whether or not it has been declared.
+- An MCP result over 20 KB reaches the model with the middle cut out. Pass `max_lines`, `fields`,
+  or `jq_filter` to keep a result under that limit.
+- A `gh-tooling` entry in pi's `mcp.json` (`~/.pi/agent/mcp.json` or a trusted project's
+  `.pi/mcp.json`) overrides the extension's registration — this is how to change the exposure pi
+  gives the server. The entry needs its own `command`, since it does not inherit the extension's,
+  and must set `env: {"GITHUB_MCP_HOST": "pi"}`; without it the server uses the Claude Code config
+  order while the hooks use pi's.
+- The servers need bash 4.1+ and jq 1.7+ on the `PATH` pi runs with, same as under Claude Code and
+  Codex.
+- pi support covers macOS and Linux.
 
 ## Troubleshooting
 
 ### MCP Server Not Starting
 
-1. Restart Claude Code or start a new Codex task after plugin installation
-2. Check `/mcp` for connection status
+1. Restart Claude Code or start a new Codex task, or start a new pi session or run `/reload`, after
+   plugin installation
+2. Check `/mcp` for connection status; under pi, `gh-tooling` and `gh-tooling-write` show the
+   extension as their source
 3. In Codex, open `/hooks` and confirm the plugin hooks are trusted if enforcement is missing
 4. Verify `jq` is installed: `which jq`
 5. Verify `gh` is installed and authenticated: `gh auth status`

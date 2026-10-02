@@ -12,6 +12,16 @@ _get_repo_root() {
 
 REPO_ROOT="$(_get_repo_root)"
 
+# The hooks select their host from GITHUB_MCP_HOST; a value from the developer's
+# shell would change their behavior. Tests that need a host set it explicitly.
+unset GITHUB_MCP_HOST
+
+# The servers honor MCP_GH_TOOLING_CONFIG and PROJECT_ROOT ahead of project
+# config locations; values from the developer's shell would redirect config
+# lookup. Tests that need either set them explicitly.
+unset MCP_GH_TOOLING_CONFIG
+unset PROJECT_ROOT
+
 # Load BATS helper libraries
 load "${REPO_ROOT}/.bats/bats-support/load"
 load "${REPO_ROOT}/.bats/bats-assert/load"

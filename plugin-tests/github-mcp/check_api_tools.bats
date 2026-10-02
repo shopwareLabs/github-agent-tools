@@ -229,3 +229,43 @@ setup_write_blocking() {
     assert_failure 2
     assert_output --partial "pr_create"
 }
+
+# ============================================================================
+# Host pi (GITHUB_MCP_HOST=pi): same tool names as Codex, .pi/ config
+# ============================================================================
+
+# Write a config into the .pi/ directory of a pi project passed as payload cwd.
+setup_pi_config() {
+    local content="$1"
+    unset CLAUDE_PROJECT_DIR
+    export GITHUB_MCP_HOST=pi
+    export HOOK_CWD="${BATS_TEST_TMPDIR}/pi-project"
+    mkdir -p "${HOOK_CWD}/.pi"
+    printf '%s\n' "$content" > "${HOOK_CWD}/.pi/.mcp-gh-tooling.json"
+}
+
+@test "pi read api: block_api_tool_read in .pi blocks the read tool" {
+    setup_pi_config '{"block_api_tool_read": true}'
+    run_api_hook "$CODEX_READ_TOOL" "repos/shopware/shopware/pulls/123/comments"
+    assert_failure 2
+    assert_output --partial "pr_comments"
+}
+
+@test "pi read api: block_api_tool_write alone leaves the read tool allowed" {
+    setup_pi_config '{"block_api_tool_write": true}'
+    run_api_hook "$CODEX_READ_TOOL" "repos/shopware/shopware/pulls/123/comments"
+    assert_success
+}
+
+@test "pi write api: block_api_tool_write in .pi blocks the write tool" {
+    setup_pi_config '{"block_api_tool_write": true}'
+    run_api_hook "$CODEX_WRITE_TOOL" "repos/shopware/shopware/pulls" "POST"
+    assert_failure 2
+    assert_output --partial "pr_create"
+}
+
+@test "pi write api: block_api_tool_read alone leaves the write tool allowed" {
+    setup_pi_config '{"block_api_tool_read": true}'
+    run_api_hook "$CODEX_WRITE_TOOL" "repos/shopware/shopware/pulls/123/comments" "GET"
+    assert_success
+}

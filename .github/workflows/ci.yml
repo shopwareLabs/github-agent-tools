@@ -8,16 +8,26 @@ on:
       - 'plugin-tests/**'
       - '.mcp-sdk.lock'
       - '.shellcheckrc'
+      - '.gitignore'
       - '.github/workflows/ci.yml'
       - '.github/scripts/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - '.github/workflows/npm-publish.yml'
   pull_request:
     paths:
       - 'plugins/**'
       - 'plugin-tests/**'
       - '.mcp-sdk.lock'
       - '.shellcheckrc'
+      - '.gitignore'
       - '.github/workflows/ci.yml'
       - '.github/scripts/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - '.github/workflows/npm-publish.yml'
 
 jobs:
   bash:
@@ -27,6 +37,20 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npx tsc --noEmit -p .
+
+      - name: Node unit tests
+        run: node --test 'plugin-tests/github-mcp/pi/*.test.ts'
 
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
