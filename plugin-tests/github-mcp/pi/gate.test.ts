@@ -76,7 +76,7 @@ test("a nonexistent gate script does not block", async (t) => {
   assert.deepEqual(result, { block: false });
 });
 
-test("a gate that closes its stdin before reading a 1 MB input does not block and raises no unhandled error", async (t) => {
+test("a gate that exits 2 without reading its 1 MB input still blocks and raises no unhandled error", async (t) => {
   const unhandled: unknown[] = [];
   const record = (error: unknown): void => {
     unhandled.push(error);
@@ -87,13 +87,13 @@ test("a gate that closes its stdin before reading a 1 MB input does not block an
     process.off("uncaughtException", record);
     process.off("unhandledRejection", record);
   });
-  const script = writeScript(makeTemporaryDirectory(t), "exec 0<&-\nexit 0\n");
+  const script = writeScript(makeTemporaryDirectory(t), "exec 0<&-\nprintf 'Use pr_view.' >&2\nexit 2\n");
 
   const result = await runGate(script, { payload: "x".repeat(1024 * 1024) }, 5000);
   // A late EPIPE would surface after settling; give it a few event-loop turns to arrive.
   await delay(100);
 
-  assert.deepEqual(result, { block: false });
+  assert.deepEqual(result, { block: true, reason: "Use pr_view." });
   assert.deepEqual(unhandled, []);
 });
 

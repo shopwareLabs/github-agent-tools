@@ -9,9 +9,9 @@ export interface ScriptResult {
 export type GateResult = { block: true; reason: string } | { block: false };
 
 /**
- * Runs `bash <script>` with `input` as JSON on stdin. Never rejects: a failed spawn, a stdin error,
- * or the timeout resolves `{ code: null, stdout: "", stderr: "" }`. On timeout the script's whole
- * process group is killed.
+ * Runs `bash <script>` with `input` as JSON on stdin. Never rejects: a failed spawn or the timeout
+ * resolves `{ code: null, stdout: "", stderr: "" }`. A script that exits without reading all of its
+ * input still reports its own exit code. On timeout the script's whole process group is killed.
  */
 export function runScript(script: string, input: unknown, timeoutMs: number): Promise<ScriptResult> {
   return new Promise((resolve) => {
@@ -51,7 +51,10 @@ export function runScript(script: string, input: unknown, timeoutMs: number): Pr
     }, timeoutMs);
 
     child.on("error", fail);
-    child.stdin.on("error", fail);
+    child.stdin.on("error", () => {
+      // EPIPE: the script exited without reading all of its input. Its exit code, which `close`
+      // reports, still decides the outcome.
+    });
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
     child.stdout.on("data", (chunk: string) => {
