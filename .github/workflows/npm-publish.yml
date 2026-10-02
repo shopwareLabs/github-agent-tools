@@ -48,6 +48,9 @@ jobs:
       - name: Type-check
         run: npx tsc --noEmit -p .
 
+      - name: Lint
+        run: npx eslint . --max-warnings 0
+
       - name: Node unit tests
         run: node --test 'plugin-tests/github-mcp/pi/*.test.ts'
 

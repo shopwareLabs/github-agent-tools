@@ -182,8 +182,9 @@ codex plugin add github-mcp@github-agent-tools
 ### Node and pi
 
 ```bash
-npm ci                                              # installs the pi devDependencies
+npm ci                                              # installs pi, TypeScript, and ESLint
 npx tsc --noEmit -p .                               # type-checks the extension and its tests
+npx eslint . --max-warnings 0                       # lints the same files (eslint.config.mjs)
 node --test 'plugin-tests/github-mcp/pi/*.test.ts'  # gate.ts unit tests
 ```
 
@@ -201,7 +202,7 @@ npm package. All three run as part of the BATS suite below. `pi_e2e.bats` needs 
 
 Tests live in `plugin-tests/<name>/` mirroring the plugin structure and load the shared helper at
 `plugin-tests/test_helper/common_setup.bash` (it resolves the repo root by walking up to `.bats/`).
-CI (`.github/workflows/ci.yml`) runs `npm ci`, the type-check, and the Node unit tests, then
+CI (`.github/workflows/ci.yml`) runs `npm ci`, the type-check, ESLint, and the Node unit tests, then
 ShellCheck over `plugins plugin-tests .github/scripts`, `vendor-mcp-sdk.sh --check` for the
 vendored SDK copy, and BATS over `plugin-tests/` (including `pi_e2e.bats` and
 `package_contents.bats`); a separate `validate.yml` checks the issue-template dropdowns.
@@ -213,6 +214,7 @@ vendored SDK copy, and BATS over `plugin-tests/` (including `pi_e2e.bats` and
 - [ ] Plugin version bumped in the Claude Code and Codex manifests and root `package.json`, with a
       CHANGELOG entry
 - [ ] `npx tsc --noEmit -p .` passes
+- [ ] `npx eslint . --max-warnings 0` passes
 - [ ] `node --test 'plugin-tests/github-mcp/pi/*.test.ts'` passes
 - [ ] BATS green (`.bats/bats-core/bin/bats -r plugin-tests/`), including `pi_e2e.bats` and
       `package_contents.bats`
@@ -231,7 +233,7 @@ then `/plugin install github-mcp@github-agent-tools`. Codex installs with
 
 pi installs the repository as the npm package `@shopware-ag/github-agent-tools`, with
 `pi install npm:@shopware-ag/github-agent-tools` or `pi install git:github.com/shopwareLabs/github-agent-tools`.
-`.github/workflows/npm-publish.yml` publishes on a pushed tag matching `v*`: it type-checks, runs
+`.github/workflows/npm-publish.yml` publishes on a pushed tag matching `v*`: it type-checks, lints, runs
 the Node unit tests and the full BATS suite, checks the tag against `package.json` and both plugin
 manifests' versions, then runs `npm publish` using npm trusted publishing (no stored npm token).
 Releasing a version bumps `package.json`, both plugin manifests, and

@@ -2,8 +2,8 @@ import { spawn } from "node:child_process";
 
 export interface ScriptResult {
   code: number | null;
-  stdout: string;
   stderr: string;
+  stdout: string;
 }
 
 export type GateResult = { block: true; reason: string } | { block: false };
@@ -18,24 +18,32 @@ export function runScript(script: string, input: unknown, timeoutMs: number): Pr
     const env: NodeJS.ProcessEnv = { ...process.env, GITHUB_MCP_HOST: "pi" };
     delete env.CLAUDE_PROJECT_DIR;
     // Own process group, so the timeout can kill grandchildren that hold the stdio pipes open
-    // and would otherwise keep `close` from firing.
-    const child = spawn("bash", [script], { env, detached: true });
+    // and would otherwise keep `close` from firing. `bash` comes from PATH, as it does for the hooks
+    // on Claude Code and Codex.
+    // eslint-disable-next-line sonarjs/no-os-command-from-path
+    const child = spawn("bash", [script], { detached: true, env });
     let stdout = "";
     let stderr = "";
-    let settled = false;
+    let isSettled = false;
 
     const settle = (result: ScriptResult): void => {
-      if (settled) return;
-      settled = true;
+      if (isSettled) {
+        return;
+      }
+      isSettled = true;
       clearTimeout(timer);
       resolve(result);
     };
-    const fail = (): void => settle({ code: null, stdout: "", stderr: "" });
+    const fail = (): void => {
+      settle({ code: null, stderr: "", stdout: "" });
+    };
 
     const timer = setTimeout(() => {
       try {
         // A failed spawn leaves `pid` undefined, but its `error` settles and clears this timer first.
-        if (child.pid !== undefined) process.kill(-child.pid, "SIGKILL");
+        if (child.pid !== undefined) {
+          process.kill(-child.pid, "SIGKILL");
+        }
       } catch {
         // ESRCH: the group is already gone.
       }
@@ -52,7 +60,9 @@ export function runScript(script: string, input: unknown, timeoutMs: number): Pr
     child.stderr.on("data", (chunk: string) => {
       stderr += chunk;
     });
-    child.on("close", (code) => settle({ code, stdout, stderr }));
+    child.on("close", (code) => {
+      settle({ code, stderr, stdout });
+    });
     child.stdin.end(JSON.stringify(input));
   });
 }

@@ -2,26 +2,28 @@
 // model request with the next turn of the $SCENARIO script, and records what the package
 // extension does: every request's messages go to $TRACE, and every tool call's view of the
 // gh-tooling tools goes to $PROBE. Loaded with -e, so it sees each call before the package's gate.
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { appendFileSync } from "node:fs";
 import {
   fauxAssistantMessage,
   fauxProvider,
+  type FauxResponseFactory,
   fauxText,
   fauxToolCall,
-  type FauxResponseFactory,
   type ToolCall,
 } from "@earendil-works/pi-ai";
-import { appendFileSync } from "node:fs";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-function requiredEnv(name: string): string {
+function requiredEnvironmentVariable(name: string): string {
   const value = process.env[name];
-  if (value === undefined || value === "") throw new Error(`driver.ts: ${name} must be set`);
+  if (value === undefined || value === "") {
+    throw new Error(`driver.ts: ${name} must be set`);
+  }
   return value;
 }
 
-const SCENARIO = requiredEnv("SCENARIO");
-const TRACE = requiredEnv("TRACE");
-const PROBE = requiredEnv("PROBE");
+const SCENARIO = requiredEnvironmentVariable("SCENARIO");
+const TRACE = requiredEnvironmentVariable("TRACE");
+const PROBE = requiredEnvironmentVariable("PROBE");
 
 const REPO = "shopwareLabs/github-agent-tools";
 const FILES_ENDPOINT = `repos/${REPO}/pulls/8/files`;
@@ -29,24 +31,17 @@ const FILES_ENDPOINT = `repos/${REPO}/pulls/8/files`;
 function prView(number: number): ToolCall {
   return fauxToolCall(
     "mcp__gh_tooling__pr_view",
-    { repo: REPO, number, fields: "number,title" },
-    { id: `pr-view-${number}` },
+    { fields: "number,title", number, repo: REPO },
+    { id: `pr-view-${String(number)}` },
   );
 }
 
 const ghPrViewInBash = fauxToolCall("bash", { command: "gh pr view 8" }, { id: "bash-gh-pr-view" });
 
-/** One assistant turn per model request; the last turn ends the run with plain text. */
+/**
+ * One assistant turn per model request; the last turn ends the run with plain text.
+ */
 const SCENARIOS: Record<string, (ToolCall | ToolCall[] | string)[]> = {
-  deferred: [
-    fauxToolCall("tool_search", { query: "pr_view" }, { id: "search-pr-view" }),
-    prView(8),
-    ghPrViewInBash,
-    fauxToolCall("tool_search", { query: "api_read" }, { id: "search-api-read" }),
-    fauxToolCall("mcp__gh_tooling__api_read", { endpoint: FILES_ENDPOINT }, { id: "api-read-files" }),
-    [prView(11), prView(12), prView(13)],
-    "done",
-  ],
   codemode: [
     fauxToolCall(
       "codemode",
@@ -67,12 +62,23 @@ return JSON.stringify({ results, caught });
     ),
     "done",
   ],
+  deferred: [
+    fauxToolCall("tool_search", { query: "pr_view" }, { id: "search-pr-view" }),
+    prView(8),
+    ghPrViewInBash,
+    fauxToolCall("tool_search", { query: "api_read" }, { id: "search-api-read" }),
+    fauxToolCall("mcp__gh_tooling__api_read", { endpoint: FILES_ENDPOINT }, { id: "api-read-files" }),
+    [prView(11), prView(12), prView(13)],
+    "done",
+  ],
   "environment-leak": [ghPrViewInBash, "done"],
   "mcp-override": [prView(8), ghPrViewInBash, "done"],
 };
 
 const turns = SCENARIOS[SCENARIO];
-if (turns === undefined) throw new Error(`driver.ts: unknown SCENARIO ${SCENARIO}`);
+if (turns === undefined) {
+  throw new Error(`driver.ts: unknown SCENARIO ${SCENARIO}`);
+}
 
 const responses: FauxResponseFactory[] = turns.map((turn) => (context) => {
   appendFileSync(TRACE, `${JSON.stringify(context.messages)}\n`);
@@ -88,15 +94,15 @@ export default function driver(pi: ExtensionAPI): void {
 
   pi.on("tool_call", (event) => {
     const ghTools = pi.getAllTools().filter((tool) => isGhTooling(tool.name));
+    const exposures = [...new Set(ghTools.map((tool) => tool.exposure))];
     appendFileSync(
       PROBE,
       `${JSON.stringify({
-        tool: event.toolName,
+        active: pi.getActiveTools().filter((name) => isGhTooling(name)).length,
         all: ghTools.length,
-        exposures: [...new Set(ghTools.map((tool) => tool.exposure))],
-        active: pi.getActiveTools().filter(isGhTooling).length,
+        exposures,
+        tool: event.toolName,
       })}\n`,
     );
-    return undefined;
   });
 }
