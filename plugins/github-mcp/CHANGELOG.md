@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An invalid `grep_pattern` now fails the tool call with `Error: grep_pattern failed on output`.
   Before, grep's exit status was discarded and the call succeeded, returning grep's error message
   as the tool's output.
+- Checking a `jq_filter` no longer runs it. A filter such as `until(.done; .next)` hung the call, and
+  a valid filter that halts with exit status 3 and the text `compile error` was rejected.
 - `issue_schema` called without `org`, `owner`, or a repository now reports why
   `gh repo view` could not supply the organization (for example an authentication failure),
   instead of only saying that `org` is required. `suppress_errors: true` leaves gh's message out.

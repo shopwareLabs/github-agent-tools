@@ -304,11 +304,10 @@ _gh_config_value() {
 
 #######################################
 # Reject a jq filter that does not compile, before any gh call is made.
-# The filter runs once against null input. A compile error exits 3 and
-# reports "compile error"; the message check matters because a valid
-# halt_error(3) also exits 3. Any other outcome, including a runtime error on
-# the null input (exit 5), means the filter compiled and is left for
-# _gh_post_process to apply.
+# The filter is compiled behind `empty |`, so it never runs: running it on
+# null input would hang on a filter such as until(.done; .next), and a
+# halt_error would read as a compile error. The newlines keep a trailing
+# `# comment` in the filter from swallowing the closing parenthesis.
 # Arguments:
 #   $1 filter expression, $2 field name for the error message (default: jq_filter).
 # Outputs:
@@ -322,8 +321,10 @@ _gh_validate_jq_filter() {
     local field="${2:-jq_filter}"
     [[ -z "${filter}" ]] && return 0
     local err jq_exit=0
-    err=$(jq -n "${filter}" 2>&1 1>/dev/null) || jq_exit=$?
-    if [[ ${jq_exit} -eq 3 && "${err}" == *"compile error"* ]]; then
+    err=$(jq -n "empty | (
+${filter}
+)" 2>&1 1>/dev/null) || jq_exit=$?
+    if [[ ${jq_exit} -ne 0 ]]; then
         echo "Error: Invalid ${field}: ${err}"
         return 1
     fi

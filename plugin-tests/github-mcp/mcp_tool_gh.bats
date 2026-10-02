@@ -326,9 +326,16 @@ bats_test_function --description "pr_checks: fails without repo outside git"  --
     assert_success
 }
 
-@test "_gh_validate_jq_filter: accepts a filter that halts with exit status 3" {
-    # halt_error(3) exits with the same status as a compile error.
-    run _gh_validate_jq_filter 'halt_error(3)'
+@test "_gh_validate_jq_filter: compiles the filter without running it" {
+    # Run on null input, this filter halts with the exit status and the text of
+    # a compile error; a filter such as until(.done; .next) would never return.
+    run _gh_validate_jq_filter '"compile error" | halt_error(3)'
+    assert_success
+    assert_output ""
+}
+
+@test "_gh_validate_jq_filter: accepts a filter ending in a comment" {
+    run _gh_validate_jq_filter '.title # the PR title'
     assert_success
     assert_output ""
 }
