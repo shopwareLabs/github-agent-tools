@@ -8,6 +8,7 @@ plugins/github-mcp/
 ├── REFERENCE.md                        # Full tool parameter docs and examples (31 read + 25 write tools)
 ├── AGENTS.md                           # LLM navigation guide (this file)
 ├── CHANGELOG.md                        # Version history
+├── SETUP.md                            # Interactive setup procedure (kept byte-identical to plugin-setup's copy)
 │
 ├── .claude-plugin/plugin.json          # Claude Code plugin manifest
 ├── .codex-plugin/plugin.json           # Codex plugin manifest + inline MCP registrations
@@ -20,7 +21,11 @@ plugins/github-mcp/
 ├── hooks/                              # HOOKS (MCP tool enforcement)
 │   ├── hooks.json                      # Hook configuration (SessionStart + PreToolUse x3)
 │   ├── prompts/
-│   │   └── mcp-tool-directives.md      # SessionStart prompt template: MCP tool listing and usage rules
+│   │   ├── mcp-tool-directives.md      # SessionStart prompt template: MCP tool listing and usage rules
+│   │   ├── write-operations-enabled.md # {{WRITE_SECTION}} filler when enable_write_server is true
+│   │   ├── write-operations-disabled.md # {{WRITE_SECTION}} filler when enable_write_server is false/absent
+│   │   ├── label-definitions-header.md # {{LABEL_SECTION}} header, followed by one generated line per label
+│   │   └── host-pi.md                  # Appended after the assembled template when the host is pi
 │   └── scripts/
 │       ├── session-start.sh            # SessionStart hook: assembles prompt from template + conditional sections
 │       ├── check-gh-tools.sh           # Blocks common gh CLI bash commands (read + write)
@@ -39,6 +44,7 @@ plugins/github-mcp/
     ├── config-write.json              # Write server metadata (name="gh-tooling-write")
     ├── tools-read.json                # 31 read tools (PR, issue, CI, commit, search, repo, release, label, project, api_read)
     ├── tools-write.json               # 25 write tools (PR lifecycle, reviews, issues, issue types/fields, labels, assignees, sub-issues, projects, api)
+    ├── tools-empty.json               # Tools list the write server reports while enable_write_server is false
     ├── mcp-gh-tooling.schema.json     # JSON Schema for .mcp-gh-tooling.json
     └── lib/
         ├── common.sh                  # _load_gh_config(), _gh_validate_number/repo/sha(), _gh_resolve_repo(), _gh_validate_jq_filter(), _gh_post_process(), _gh_parse_github_url(), _gh_validate_path(), _gh_download_file(), _gh_resolve_owner_repo()
@@ -209,26 +215,46 @@ tools: mcp__gh_tooling_write__pr_create, mcp__gh_tooling_write__pr_comment, mcp_
 
 ## Testing
 
-BATS tests for hook scripts and MCP tool functions are in `plugin-tests/github-mcp/`:
+BATS tests for hook scripts and MCP tool functions are in `plugin-tests/github-mcp/`; the pi gate's
+own unit tests are Node tests under `plugin-tests/github-mcp/pi/`:
 
 | Test File | Coverage |
 |-----------|----------|
-| `gh_tools.bats` | GitHub CLI tool blocking (gh pr, gh issue, gh run, gh search, gh label, gh project, gh api) |
-| `check_api_tools.bats` | Dedicated API-tool enforcement for Claude Code and Codex tool namespaces |
-| `session_start.bats` | Shared SessionStart context and host-specific config discovery |
-| `write_server_gating.bats` | Write-server gating and active-host config priority |
+| `api_read_restriction.bats` | `api_read`'s GET-only method allow-list versus `api`'s full method access |
+| `check_api_tools.bats` | Dedicated API-tool enforcement for the Claude Code, Codex, and pi tool namespaces |
+| `download_cancel_cleanup.bats` | Partial-file cleanup when a `repo_file` or `search_code` download is cancelled mid-write |
+| `gh_tools.bats` | GitHub CLI read-command blocking (gh pr, gh issue, gh run, gh search, gh api) and host and config resolution across Claude Code, Codex, and pi |
+| `gh_tools_write.bats` | GitHub CLI blocking for the write-server commands (gh pr/issue create/edit/close/reopen/review/comment, gh project item-add/item-edit) and for `gh label list` and `gh project list`/`view` |
+| `mcp_tool_gh.bats` | MCP tool shared parameters (`_gh_validate_jq_filter`, `_gh_post_process`, `suppress_errors`, `fallback`) and core read tool behavior (`pr_view`/`diff`/`list`/`checks`/`comments`/`reviews`/`files`/`commits`, `issue_view`/`list`, `run_view`/`list`/`logs`, `workflow_jobs`, `commit_pulls`, `search`/`search_code`/`search_repos`/`search_commits`/`search_discussions`, `repo_tree`/`repo_file`, `job_view`/`logs`/`annotations`) |
+| `package_contents.bats` | npm tarball contents: every runtime file packed, tests/CI/host manifests excluded, executable permissions preserved |
+| `package_manifest.bats` | `package.json` version alignment with both plugin manifests, pi extension entry points, and `@earendil-works` dependency pinning |
+| `pi_e2e.bats` | End-to-end `pi` binary runs against a scripted model and stubbed `gh`, in both git-clone and npm-install layouts, plus codemode and config-override cases |
+| `read_tools_escape_sequences.bats` | ANSI escape-sequence stripping and byte-for-byte downloads across `job_logs`, `api`, `repo_file` |
 | `read_tools_issue_schema.bats` | `issue_schema` org resolution, name filters, and merge output |
-| `write_tools_issue_schema.bats` | `issue_type_set` and `issue_field_set` name resolution and value checks |
-| `mcp_tool_gh.bats` | MCP tool shared parameters (_gh_validate_jq_filter, _gh_post_process, suppress_errors, fallback) |
+| `read_tools_issue_view_fields.bats` | `issue_view`'s `with_field_values` REST merge, single-select option-name resolution, and validation |
+| `read_tools_jq_filter_fields.bats` | `jq_filter`/`fields` interaction across the pr, run, issue, and search read tools |
+| `read_tools_new.bats` | `label_list`, `project_list`, `project_view`, including their `jq_filter` handling |
+| `release_tools.bats` | `release_list` semver ranking, prereleases, major/minor constraints, batch mode, `fields`, and `resolve_sha` |
+| `server_startup_tools_list.bats` | `server-read.sh` startup validation of `tools-read.json` |
+| `session_start.bats` | Shared SessionStart context and host-specific config discovery |
+| `session_start_write.bats` | SessionStart write-section and label-section rendering |
+| `tool_dispatch_declaration.bats` | Read and write server dispatch limited to the tools each declares |
 | `tool_schemas.bats` | Shipped tool schemas against the vendored validator: identifier unions, required fields, defaults, and validation round-trips |
+| `write_server_gating.bats` | Write-server gating and active-host config priority |
+| `write_tools_edit_params.bats` | `label_add`/`label_remove` and `assignee_add`/`assignee_remove` routing through `gh pr edit`/`gh issue edit` |
+| `write_tools_graphql.bats` | `sub_issue_add`/`sub_issue_remove` GraphQL mutations and node-ID resolution |
+| `write_tools_issue.bats` | `issue_create`/`edit`/`close`/`reopen`/`comment` parameter handling |
+| `write_tools_issue_schema.bats` | `issue_type_set` and `issue_field_set` name resolution and value checks |
+| `write_tools_pr.bats` | `pr_create`/`edit`/`ready`/`merge`/`close`/`reopen` parameter handling |
+| `write_tools_project.bats` | `project_item_add` and `project_status_set` name-to-ID resolution |
+| `write_tools_review.bats` | `pr_review_submit`/`pr_comment`/`pr_review_reply` parameter handling and REST payloads |
+| `pi/gate.test.ts` | `runGate()`/`runScript()`: exit codes, stderr capture, stdin handling, and the timeout that kills a gate's background children |
 
 The vendored SDK's own surface — argument validation and logging — is tested upstream in
 `shopwareLabs/bash-mcp-sdk`, not here.
 
-Run tests:
-```bash
-.bats/bats-core/bin/bats plugin-tests/github-mcp/*.bats
-```
+Run tests: see root `AGENTS.md` §BATS and §Node and pi for the exact commands, the one-time BATS
+setup, and the `pi_e2e.bats` prerequisites (`npm ci`, GNU `timeout`/`gtimeout`).
 
 ## External References
 
