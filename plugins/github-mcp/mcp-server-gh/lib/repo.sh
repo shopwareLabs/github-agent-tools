@@ -114,6 +114,7 @@ tool_repo_file() {
     fi
 
     _gh_validate_path "${path}" || return 1
+    _gh_validate_grep_pattern "${grep_pattern}" || return 1
 
     local endpoint="repos/${owner}/${repo}/contents/${path}"
     [[ -n "${ref}" ]] && endpoint="${endpoint}?ref=${ref}"

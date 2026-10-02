@@ -29,7 +29,7 @@ Tools with large text output (`run_logs`, `job_logs`, `pr_diff`) additionally ac
 | `grep_ignore_case`    | boolean | Case-insensitive matching (-i)                              |
 | `grep_invert`         | boolean | Return non-matching lines (-v)                              |
 
-A `grep_pattern` that grep rejects, such as an unbalanced `(`, fails the call with `Error: grep_pattern failed on output`. Unlike `jq_filter`, the pattern is checked only after `gh` returns, so the call still fetches its output first. A pattern that matches nothing is not an error. The result is empty.
+A `grep_pattern` that `grep -E` rejects, such as an unbalanced `(`, fails the call with `Error: Invalid grep_pattern` before `gh` runs, the same as an invalid `jq_filter`. A pattern that matches nothing is not an error. The result is empty.
 
 `max_lines` and `tail_lines` are also available on `pr_view`, `pr_checks`, `pr_comments`, `pr_reviews`, `issue_view`, `api_read`, `label_list`, `project_list`, and `project_view` for output size control.
 

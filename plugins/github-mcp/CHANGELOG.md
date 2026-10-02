@@ -9,9 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- An invalid `grep_pattern` now fails the tool call with `Error: grep_pattern failed on output`.
-  Before, grep's exit status was discarded and the call succeeded, returning grep's error message
-  as the tool's output.
+- An invalid `grep_pattern` now fails the tool call with `Error: Invalid grep_pattern` before `gh`
+  runs, so `run_logs` and `job_logs` no longer download a log and `search_code` no longer spends a
+  search request first. Before, grep's exit status was discarded and the call succeeded, returning
+  grep's error message as the tool's output.
 - Checking a `jq_filter` no longer runs it. A filter such as `until(.done; .next)` hung the call, and
   a valid filter that halts with exit status 3 and the text `compile error` was rejected.
 - `issue_schema` called without `org`, `owner`, or a repository now reports why

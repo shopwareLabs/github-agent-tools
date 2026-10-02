@@ -331,6 +331,29 @@ ${filter}
 }
 
 #######################################
+# Reject a grep_pattern that grep -E does not accept, before any gh call is
+# made, so a bad pattern does not cost a log download or a search request.
+# Arguments:
+#   $1 pattern.
+# Outputs:
+#   An error message carrying grep's diagnostic on stdout when the pattern is
+#   rejected.
+# Returns:
+#   0 when the pattern is empty or valid, 1 otherwise.
+#######################################
+_gh_validate_grep_pattern() {
+    local pattern="$1"
+    [[ -z "${pattern}" ]] && return 0
+    # Against empty input a valid pattern exits 1 (no match); 2 is an error.
+    local err grep_exit=0
+    err=$(grep -E -- "${pattern}" </dev/null 2>&1) || grep_exit=$?
+    if [[ ${grep_exit} -gt 1 ]]; then
+        echo "Error: Invalid grep_pattern: ${err}"
+        return 1
+    fi
+}
+
+#######################################
 # Determine whether the installed gh accepts `gh api --allow-escape-sequences`
 # and record the answer in a global.
 #

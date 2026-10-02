@@ -107,6 +107,7 @@ tool_search_code() {
     fi
 
     _gh_validate_jq_filter "${jq_filter}" || return 1
+    _gh_validate_grep_pattern "${grep_pattern}" || return 1
     _gh_validate_number "${limit}" "limit" || return 1
 
     local -a cmd=("gh" "search" "code" "${search}")

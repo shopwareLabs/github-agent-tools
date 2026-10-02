@@ -68,6 +68,7 @@ tool_job_logs() {
         return 1
     fi
     _gh_validate_number "${job_id}" "job_id" || return 1
+    _gh_validate_grep_pattern "${grep_pattern}" || return 1
 
     local effective_repo
     effective_repo=$(_gh_resolve_repo "${repo}")

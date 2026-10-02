@@ -353,6 +353,37 @@ bats_test_function --description "pr_checks: fails without repo outside git"  --
     assert_equal "${rc}" "3"
 }
 
+@test "_gh_validate_grep_pattern: accepts a valid extended regex" {
+    run _gh_validate_grep_pattern 'FAILED|Error [0-9]+'
+    assert_success
+    assert_output ""
+}
+
+@test "_gh_validate_grep_pattern: rejects a pattern grep -E refuses" {
+    run _gh_validate_grep_pattern '('
+    assert_failure
+    assert_output --partial "Invalid grep_pattern"
+}
+
+@test "an invalid grep_pattern is rejected before gh is called, on every tool that takes one" {
+    gh() { touch "${BATS_TEST_TMPDIR}/gh_called"; gh_stub_respond; }
+    local -a calls=(
+        'tool_pr_diff {"number": 1, "grep_pattern": "("}'
+        'tool_run_logs {"run_id": 1, "grep_pattern": "("}'
+        'tool_job_logs {"job_id": 1, "grep_pattern": "("}'
+        'tool_search_code {"search": "needle", "grep_pattern": "("}'
+        'tool_repo_file {"path": "README.md", "grep_pattern": "("}'
+    )
+    local call
+    for call in "${calls[@]}"; do
+        rm -f "${BATS_TEST_TMPDIR}/gh_called"
+        run "${call%% *}" "${call#* }"
+        assert_failure
+        assert_output --partial "Invalid grep_pattern"
+        [[ ! -f "${BATS_TEST_TMPDIR}/gh_called" ]] || fail "${call%% *} called gh before rejecting the pattern"
+    done
+}
+
 @test "_gh_validate_jq_filter: uses custom field name in error message" {
     run _gh_validate_jq_filter '{{bad' "my_filter"
     assert_failure

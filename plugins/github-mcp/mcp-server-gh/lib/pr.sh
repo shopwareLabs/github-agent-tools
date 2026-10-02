@@ -84,6 +84,7 @@ tool_pr_diff() {
         return 1
     fi
     _gh_validate_number "${number}" "number" || return 1
+    _gh_validate_grep_pattern "${grep_pattern}" || return 1
 
     _gh_resolve_owner_repo_optional "${args}" || return 1
     local effective_repo=""

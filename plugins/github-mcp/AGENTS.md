@@ -127,6 +127,7 @@ Tools in `tools-read.json` and `tools-write.json` map to bash functions with `to
 - `_gh_resolve_repo()` falls back to `GH_DEFAULT_REPO` from config
 - All tools support `suppress_errors` and `fallback` shared parameters
 - Tools with JSON output support `jq_filter` with pre-execution syntax validation
+- Tools that accept `grep_pattern` validate it with `_gh_validate_grep_pattern()` before calling `gh`
 - Log/text tools support `max_lines`, `tail_lines`, and grep parameters
 
 ### Standard execution block
