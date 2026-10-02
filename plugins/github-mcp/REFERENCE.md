@@ -2,7 +2,7 @@
 
 ## Read Server (gh-tooling)
 
-31 tools available via the `gh-tooling` MCP server. Requires `gh` CLI installed and authenticated.
+Tools available via the `gh-tooling` MCP server. Requires `gh` CLI installed and authenticated.
 
 ### Shared Tool Parameters
 
@@ -549,7 +549,7 @@ Use gh-tooling api_read with endpoint "search/issues" and jq_filter ".items[] | 
 
 ## Write Server (gh-tooling-write)
 
-25 tools available via the `gh-tooling-write` MCP server. Requires `enable_write_server: true` in `.mcp-gh-tooling.json`.
+Tools available via the `gh-tooling-write` MCP server. Requires `enable_write_server: true` in `.mcp-gh-tooling.json`.
 
 ### Shared Tool Parameters
 
