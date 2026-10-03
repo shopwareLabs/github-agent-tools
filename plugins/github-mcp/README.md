@@ -1,5 +1,7 @@
 # github-mcp
 
+> **Experimental Community Project**: Maintained by Shopware Labs, not an official Shopware product. Not affiliated with, endorsed by, or sponsored by GitHub, Anthropic, OpenAI, or any other platform or AI provider. Provider and product names are used only to describe compatibility. Provided as-is without warranty.
+
 GitHub CLI tools via MCP (Model Context Protocol). Wraps the `gh` CLI for pull requests, issues, CI runs, jobs, commits, search, labels, projects, and repository file browsing. Two MCP servers: a read server (always active) and a write server (opt-in). Configuration-optional: works without a config file when `gh` is authenticated.
 
 ## Features

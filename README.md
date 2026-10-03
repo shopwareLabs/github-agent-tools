@@ -1,12 +1,22 @@
+![GitHub Agent Tools](./.github/assets/social-preview.png)
+
 # GitHub Agent Tools
 
-> **Experimental Community Project**: Maintained by Shopware Labs, not an official Shopware product. Not affiliated with, endorsed by, or sponsored by Anthropic, OpenAI, or any other AI provider. Provider and product names are used only to describe compatibility. Provided as-is without warranty.
+[![CI](https://img.shields.io/github/actions/workflow/status/shopwareLabs/github-agent-tools/ci.yml?branch=main&logo=github&label=CI)](https://github.com/shopwareLabs/github-agent-tools/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@shopwarelabs/github-agent-tools?logo=npm&logoColor=white)](https://www.npmjs.com/package/@shopwarelabs/github-agent-tools)
+[![bash 4.1+](https://img.shields.io/badge/bash-4.1%2B-4EAA25?logo=gnubash&logoColor=white)](./plugins/github-mcp/README.md#dependencies)
+[![jq 1.7+](https://img.shields.io/badge/jq-1.7%2B-0E5E8E)](./plugins/github-mcp/README.md#dependencies)
+[![License: MIT](https://img.shields.io/github/license/shopwareLabs/github-agent-tools)](./LICENSE)
+
+[![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-D97757)](#claude-code)
+[![Codex plugin](https://img.shields.io/badge/Codex-plugin-000000)](#codex)
+[![Pi Package](https://img.shields.io/badge/Pi-Package-6366F1)](#pi)
+
+> **Experimental Community Project**: Maintained by Shopware Labs, not an official Shopware product. Not affiliated with, endorsed by, or sponsored by GitHub, Anthropic, OpenAI, or any other platform or AI provider. Provider and product names are used only to describe compatibility. Provided as-is without warranty.
 
 GitHub CLI tools for AI coding agents. Wraps the GitHub CLI (`gh`) behind MCP servers — pull requests, issues, CI runs, jobs, commits, search, labels, projects, releases, and repository file browsing — as first-class MCP tools, with hook-based enforcement that keeps the agent on the tools instead of raw `gh` bash calls.
 
 The MCP servers use the assistant-neutral [Model Context Protocol](https://modelcontextprotocol.io/) and can be integrated with MCP-capable coding agents. This repository provides tested `github-mcp` plugin packaging for [Claude Code](https://docs.claude.com/en/docs/claude-code/plugins), [Codex](https://learn.chatgpt.com/docs/build-plugins), and [pi](https://pi.dev).
-
-> **Origin**: Extracted from its sibling project [shopwareLabs/ai-coding-tools](https://github.com/shopwareLabs/ai-coding-tools) — a broader AI-coding-tools marketplace — into this standalone repository. The GitHub tooling was split out so it can evolve and be installed independently.
 
 ## ⚡ Quick Start
 
