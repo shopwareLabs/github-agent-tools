@@ -327,7 +327,10 @@ Search for issues or pull requests.
 Use gh-tooling search with search "NEXT-3412" and type "prs"
 Use gh-tooling search with search "custom field translation" and type "issues" and limit 20
 Use gh-tooling search with search "attribute entity" and state "closed"
+Use gh-tooling search with search "\"custom field\" label:\"good first issue\"" and type "issues"
 ```
+
+**Search expressions** (`search`, `search_repos`, `search_commits`): each word is its own keyword, so a result has to match all of them, in any order. Double quotes keep a phrase together (`"custom field"`), also as a qualifier value (`label:"good first issue"`). A `search` with an unmatched `"` fails before `gh` runs. `gh` cannot pass three forms through: a negated phrase (`-"exact phrase"` becomes a phrase that starts with `-`; use `NOT "exact phrase"`), a quoted single word (`"OR"` becomes the operator), and a phrase containing `:`.
 
 ### `search_code`
 
@@ -341,7 +344,7 @@ Use gh-tooling search_code with search "addClass" and repo "shopware/shopware" a
 ```
 
 **Parameters:**
-- `search` (string, required): Code search expression (exact text match, no regex).
+- `search` (string, required): Code search expression, matched as exact text (no regex). Unlike the other search tools, the whole value is one phrase.
 - `owner` (string, optional): Limit to repositories owned by this user/org.
 - `repo` (string, optional): Limit to this repository in `owner/repo` format.
 - `language` (string, optional): Filter by language (e.g. `php`, `typescript`).
@@ -363,7 +366,7 @@ Use gh-tooling search_repos with topic "shopware" and limit 10
 ```
 
 **Parameters:**
-- `search` (string, optional): Search text.
+- `search` (string, optional): Search expression; see [Search expressions](#search). A value with no words searches by the filters alone.
 - `owner` (string, optional): Filter by owner.
 - `topic` (string, optional): Filter by topic tag.
 - `language` (string, optional): Filter by language.
@@ -382,7 +385,7 @@ Use gh-tooling search_commits with search "fix cart" and author "mitelg" and aut
 ```
 
 **Parameters:**
-- `search` (string, required): Commit message search text.
+- `search` (string, required): Commit message search expression; see [Search expressions](#search).
 - `repo` (string, optional): Limit to this repository in `owner/repo` format.
 - `owner` (string, optional): Limit to repositories owned by this user/org.
 - `author` (string, optional): Filter by commit author username.

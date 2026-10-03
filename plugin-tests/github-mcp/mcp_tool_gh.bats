@@ -923,6 +923,119 @@ bats_test_function --description "pr_checks: fails without repo outside git"  --
 }
 
 # =============================================================================
+# search terms: search, search_repos, search_commits
+# =============================================================================
+
+# Print the terms _gh_split_search_terms produced, one per line.
+split_search_terms() {
+    _gh_split_search_terms "$1" "search" required || return 1
+    printf '%s\n' "${_GH_SEARCH_TERMS[@]}"
+}
+
+@test "search terms: words split on any whitespace, a qualifier stays one term" {
+    run split_search_terms $'is:open  timeout\thang\n'
+    assert_success
+    assert_output $'is:open\ntimeout\nhang'
+}
+
+@test "search terms: a quoted phrase becomes one term without its quotes" {
+    run split_search_terms '"exact phrase" crash'
+    assert_success
+    assert_output $'exact phrase\ncrash'
+}
+
+@test "search terms: a quoted qualifier value stays attached to its qualifier" {
+    run split_search_terms 'label:"good first issue" crash'
+    assert_success
+    assert_output $'label:good first issue\ncrash'
+}
+
+@test "search terms: whitespace inside a quoted phrase collapses to single spaces" {
+    run split_search_terms $'"out\tof   memory" crash'
+    assert_success
+    assert_output $'out of memory\ncrash'
+}
+
+@test "search terms: an expression containing a unit separator is rejected" {
+    run split_search_terms $'out\x1fof memory'
+    assert_failure
+    assert_output --partial "unit separator"
+}
+
+@test "search terms: an expression with no terms is rejected" {
+    run split_search_terms ' "" '
+    assert_failure
+    assert_output --partial "no search terms"
+}
+
+# Assert the exact argv a search tool hands gh, one argument per line.
+# Usage: assert_search_argv <tool_fn> <args_json> <expected_argv>
+assert_search_argv() {
+    local fn="$1" args="$2" expected="$3"
+    gh() {
+        printf '%s\n' "$@" > "${BATS_TEST_TMPDIR}/gh_args"
+        echo '[]'
+    }
+    run "${fn}" "${args}"
+    assert_success
+    run cat "${BATS_TEST_TMPDIR}/gh_args"
+    assert_output "${expected}"
+}
+
+_test_argv_search() {
+    assert_search_argv tool_search '{"search":"is:open timeout -label:bug"}' \
+        $'search\nprs\n--repo\nshopware/shopware\n--limit\n20\n--\nis:open\ntimeout\n-label:bug'
+}
+_test_argv_search_repos() {
+    assert_search_argv tool_search_repos '{"search":"stars:>10 plugin -topic:php","owner":"shopware"}' \
+        $'search\nrepos\n--owner\nshopware\n--limit\n20\n--json\nfullName,description,stargazersCount,language,updatedAt,url\n--\nstars:>10\nplugin\n-topic:php'
+}
+_test_argv_search_commits() {
+    assert_search_argv tool_search_commits '{"search":"author:mitelg fix cart -committer:bot"}' \
+        $'search\ncommits\n--repo\nshopware/shopware\n--limit\n20\n--json\nsha,commit\n--\nauthor:mitelg\nfix\ncart\n-committer:bot'
+}
+
+bats_test_function --description "search: each word is its own argument after --, a negated qualifier included" \
+    -- _test_argv_search
+bats_test_function --description "search_repos: each word is its own argument after --, a negated qualifier included" \
+    -- _test_argv_search_repos
+bats_test_function --description "search_commits: each word is its own argument after --, a negated qualifier included" \
+    -- _test_argv_search_commits
+
+@test "search: type=issues passes each word to gh search issues" {
+    assert_search_argv tool_search '{"search":"timeout hang","type":"issues"}' \
+        $'search\nissues\n--repo\nshopware/shopware\n--limit\n20\n--\ntimeout\nhang'
+}
+
+@test "search_repos: a whitespace-only search runs the filter-only search" {
+    assert_search_argv tool_search_repos '{"search":"  ","owner":"shopware"}' \
+        $'search\nrepos\n--owner\nshopware\n--limit\n20\n--json\nfullName,description,stargazersCount,language,updatedAt,url'
+}
+
+@test "search_code: the whole search is one argument after --" {
+    assert_search_argv tool_search_code '{"search":"->getId( foo","repo":"shopware/shopware"}' \
+        $'search\ncode\n--repo\nshopware/shopware\n--limit\n30\n--json\nrepository,path,textMatches\n--\n->getId( foo'
+}
+
+# Assert a search tool rejects an unbalanced double quote before calling gh.
+# Usage: assert_unbalanced_quote_rejected <tool_fn>
+assert_unbalanced_quote_rejected() {
+    local fn="$1"
+    gh() { touch "${BATS_TEST_TMPDIR}/gh_called"; echo '[]'; }
+    run "${fn}" '{"search":"label:\"good first issue"}'
+    assert_failure
+    assert_output --partial "unbalanced double quote"
+    assert [ ! -e "${BATS_TEST_TMPDIR}/gh_called" ]
+}
+
+bats_test_function --description "search: an unbalanced double quote is rejected before gh runs" \
+    -- assert_unbalanced_quote_rejected tool_search
+bats_test_function --description "search_repos: an unbalanced double quote is rejected before gh runs" \
+    -- assert_unbalanced_quote_rejected tool_search_repos
+bats_test_function --description "search_commits: an unbalanced double quote is rejected before gh runs" \
+    -- assert_unbalanced_quote_rejected tool_search_commits
+
+# =============================================================================
 # search_discussions
 # =============================================================================
 
@@ -2111,21 +2224,6 @@ diff --git a/src/Third.php b/src/Third.php
     run tool_search '{"search":"test","type":"invalid"}'
     assert_failure
     assert_output --partial "type must be"
-}
-
-@test "search: type=issues uses gh search issues" {
-    gh() {
-        echo "$*" > "${BATS_TEST_TMPDIR}/captured_cmd"
-        echo '[]'
-    }
-    run tool_search '{"search":"bug","type":"issues"}'
-    assert_success
-    local captured_cmd
-    captured_cmd=$(cat "${BATS_TEST_TMPDIR}/captured_cmd")
-    [[ "${captured_cmd}" == *"search issues bug"* ]] || {
-        echo "Expected 'search issues bug' in command: ${captured_cmd}"
-        return 1
-    }
 }
 
 @test "search: repo filter passed to gh" {

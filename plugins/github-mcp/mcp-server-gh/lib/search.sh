@@ -2,9 +2,85 @@
 # Search tools for gh-tooling MCP server
 # Tools: search, search_code, search_repos, search_commits, search_discussions
 
+#######################################
+# Split a search expression into the keyword arguments gh search expects.
+# gh quotes each argument that contains whitespace, so the whole expression
+# passed as one argument would become a single phrase. Splits on spaces, tabs,
+# and newlines; a double-quoted span stays in the term it belongs to, with its
+# quotes removed and its whitespace collapsed to single spaces, so gh quotes it
+# again: '"exact phrase"' -> 'exact phrase', 'label:"good first issue"' ->
+# 'label:good first issue'.
+# gh re-quotes only a term that contains whitespace, and reads the text before a
+# term's first ':' as a qualifier name. So '-"exact phrase"' becomes the phrase
+# '-exact phrase' rather than its negation, '"OR"' becomes the operator OR, and
+# '"error: timeout"' does not reach GitHub as that phrase; gh has no argument
+# form for any of them.
+# Callers pass the terms after "--", so a term starting with '-' (-label:bug)
+# is not read as a gh flag.
+# Built on read's field splitting rather than a per-character loop, which takes
+# quadratic time in bash.
+# Globals:
+#   _GH_SEARCH_TERMS (set)
+# Arguments:
+#   $1 search expression,
+#   $2 tool name, for error messages,
+#   $3 "required" to fail when no term remains, "optional" to allow none.
+# Outputs:
+#   An error message on stdout on failure.
+# Returns:
+#   0 on success, 1 on an unbalanced double quote, a unit separator (U+001F)
+#   in the expression, or no term in required mode.
+#######################################
+_gh_split_search_terms() {
+    local search="$1" tool_name="$2" mode="$3"
+    local ws=$' \t\n' us=$'\x1f'
+    _GH_SEARCH_TERMS=()
+
+    if [[ "${mode}" != "required" && "${mode}" != "optional" ]]; then
+        echo "Error: _gh_split_search_terms mode must be 'required' or 'optional', got: '${mode}'"
+        return 1
+    fi
+    if [[ "${search}" == *"${us}"* ]]; then
+        echo "Error: search for ${tool_name} contains a unit separator (U+001F): '${search}'"
+        return 1
+    fi
+
+    # Fields at odd indexes were inside quotes. The appended quote terminates the
+    # last field; the field after it holds only the here-string's newline.
+    local -a parts words
+    IFS='"' read -r -d '' -a parts <<< "${search}\"" || true
+    unset 'parts[${#parts[@]}-1]'
+    if (( ${#parts[@]} % 2 == 0 )); then
+        echo "Error: search for ${tool_name} has an unbalanced double quote: '${search}'"
+        return 1
+    fi
+
+    # A quoted span's words are joined with the unit separator, so the split
+    # below keeps the span in one term; the separator becomes a space after.
+    local flat="" phrase i
+    for (( i = 0; i < ${#parts[@]}; i++ )); do
+        if (( i % 2 == 0 )); then
+            flat+="${parts[i]}"
+            continue
+        fi
+        IFS="${ws}" read -r -d '' -a words <<< "${parts[i]}" || true
+        if (( ${#words[@]} > 0 )); then
+            printf -v phrase "%s${us}" "${words[@]}"
+            flat+="${phrase%"${us}"}"
+        fi
+    done
+
+    IFS="${ws}" read -r -d '' -a _GH_SEARCH_TERMS <<< "${flat}" || true
+    if (( ${#_GH_SEARCH_TERMS[@]} > 0 )); then
+        _GH_SEARCH_TERMS=("${_GH_SEARCH_TERMS[@]//"${us}"/ }")
+    elif [[ "${mode}" == "required" ]]; then
+        echo "Error: search for ${tool_name} has no search terms: '${search}'"
+        return 1
+    fi
+}
+
 # Search for GitHub issues or pull requests using a search expression.
-# Maps to: gh search issues|prs <search> [--repo] [--state] [--limit] [--json]
-# Also supports the low-level: gh api search/issues -X GET -f q="..." -f per_page=N
+# Maps to: gh search issues|prs [--repo] [--state] [--limit] [--json] -- <terms...>
 tool_search() {
     local args="$1"
 
@@ -39,8 +115,9 @@ tool_search() {
     effective_repo=$(_gh_resolve_repo "${repo}")
 
     _gh_validate_number "${limit}" "limit" || return 1
+    _gh_split_search_terms "${search}" "search" required || return 1
 
-    local -a cmd=("gh" "search" "${type}" "${search}")
+    local -a cmd=("gh" "search" "${type}")
 
     if [[ -n "${effective_repo}" ]]; then
         _gh_validate_repo "${effective_repo}" || return 1
@@ -50,6 +127,7 @@ tool_search() {
     [[ -n "${state}" ]] && cmd+=("--state" "${state}")
     cmd+=("--limit" "${limit}")
     [[ -n "${fields}" ]] && cmd+=("--json" "${fields}")
+    cmd+=("--" "${_GH_SEARCH_TERMS[@]}")
 
     log "INFO" "search: ${cmd[*]}"
     local __raw __exit=0
@@ -68,7 +146,7 @@ tool_search() {
 # Search for code across GitHub repositories.
 # Uses the legacy code search engine (no regex, no symbol search, no path globs).
 # Rate limit: 10 requests/minute (separate bucket from other search endpoints).
-# Maps to: gh search code <search> [--repo] [--language] [--extension] [--filename] [--match] [--limit] [--json]
+# Maps to: gh search code [--repo] [--owner] [--language] [--extension] [--filename] [--match] [--limit] [--json] -- <search>
 tool_search_code() {
     local args="$1"
 
@@ -110,7 +188,7 @@ tool_search_code() {
     _gh_validate_grep_pattern "${grep_pattern}" || return 1
     _gh_validate_number "${limit}" "limit" || return 1
 
-    local -a cmd=("gh" "search" "code" "${search}")
+    local -a cmd=("gh" "search" "code")
 
     # Resolve repo: explicit param > GH_DEFAULT_REPO (consistent with tool_search)
     local effective_repo
@@ -135,6 +213,9 @@ tool_search_code() {
 
     local default_fields="repository,path,textMatches"
     [[ -n "${fields}" ]] && cmd+=("--json" "${fields}") || cmd+=("--json" "${default_fields}")
+    # One argument, so gh quotes it as the exact text match the tool promises;
+    # "--" keeps a search such as "->getId(" from being read as a flag.
+    cmd+=("--" "${search}")
 
     log "INFO" "search_code: ${cmd[*]}"
     local __raw __exit=0
@@ -177,7 +258,7 @@ tool_search_code() {
 
 # Search for GitHub repositories.
 # Query is optional — filters alone (owner, topic, language, stars) suffice.
-# Maps to: gh search repos [search] [--owner] [--topic] [--language] [--license] [--stars] [--sort] [--limit] [--json]
+# Maps to: gh search repos [--owner] [--topic] [--language] [--license] [--stars] [--sort] [--limit] [--json] [-- <terms...>]
 tool_search_repos() {
     local args="$1"
 
@@ -209,9 +290,9 @@ tool_search_repos() {
 
     _gh_validate_jq_filter "${jq_filter}" || return 1
     _gh_validate_number "${limit}" "limit" || return 1
+    _gh_split_search_terms "${search}" "search_repos" optional || return 1
 
     local -a cmd=("gh" "search" "repos")
-    [[ -n "${search}" ]]   && cmd+=("${search}")
     [[ -n "${owner}" ]]    && cmd+=("--owner" "${owner}")
     [[ -n "${topic}" ]]    && cmd+=("--topic" "${topic}")
     [[ -n "${language}" ]] && cmd+=("--language" "${language}")
@@ -222,6 +303,7 @@ tool_search_repos() {
 
     local default_fields="fullName,description,stargazersCount,language,updatedAt,url"
     [[ -n "${fields}" ]] && cmd+=("--json" "${fields}") || cmd+=("--json" "${default_fields}")
+    [[ ${#_GH_SEARCH_TERMS[@]} -gt 0 ]] && cmd+=("--" "${_GH_SEARCH_TERMS[@]}")
 
     log "INFO" "search_repos: ${cmd[*]}"
     local __raw __exit=0
@@ -238,7 +320,7 @@ tool_search_repos() {
 }
 
 # Search for GitHub commits.
-# Maps to: gh search commits <search> [--repo] [--owner] [--author] [--committer] [--author-date] [--committer-date] [--hash] [--merge] [--sort] [--limit] [--json]
+# Maps to: gh search commits [--repo] [--owner] [--author] [--committer] [--author-date] [--committer-date] [--hash] [--merge] [--sort] [--limit] [--json] -- <terms...>
 tool_search_commits() {
     local args="$1"
 
@@ -277,8 +359,9 @@ tool_search_commits() {
 
     _gh_validate_jq_filter "${jq_filter}" || return 1
     _gh_validate_number "${limit}" "limit" || return 1
+    _gh_split_search_terms "${search}" "search_commits" required || return 1
 
-    local -a cmd=("gh" "search" "commits" "${search}")
+    local -a cmd=("gh" "search" "commits")
 
     # Resolve repo: explicit param > GH_DEFAULT_REPO (consistent with tool_search)
     local effective_repo
@@ -307,6 +390,7 @@ tool_search_commits() {
 
     local default_fields="sha,commit"
     [[ -n "${fields}" ]] && cmd+=("--json" "${fields}") || cmd+=("--json" "${default_fields}")
+    cmd+=("--" "${_GH_SEARCH_TERMS[@]}")
 
     log "INFO" "search_commits: ${cmd[*]}"
     local __raw __exit=0
