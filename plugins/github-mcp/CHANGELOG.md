@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `search`, `search_repos`, and `search_commits` now pass each word of `search` to `gh` as its own
+  keyword. Before, the whole expression went to `gh` as one argument, which `gh` quotes when it
+  contains a space: `timeout hang` searched for the phrase `"timeout hang"`, and
+  `is:open timeout hang` became `is:"open timeout hang"`. A double-quoted span such as
+  `"exact phrase"` or `label:"good first issue"` stays one term, and a negated qualifier such as
+  `-label:bug` is no longer read as a `gh` flag. A `search` with an unbalanced double quote, or with
+  no terms, now fails before `gh` runs.
 - In pi, `tool_search` now ranks the requested gh-tooling tool first for most exact-name queries,
   such as `issue_view` (before: 5th). Names that share terms with another tool can still rank 2nd to
   5th: `search`, `repo_file`, and with the write server `pr_comments`, `pr_reviews`, and

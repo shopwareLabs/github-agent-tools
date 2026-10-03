@@ -2,8 +2,48 @@
 # Search tools for gh-tooling MCP server
 # Tools: search, search_code, search_repos, search_commits, search_discussions
 
+# Split a search expression into the keyword arguments gh search expects.
+# gh quotes each argument that contains whitespace, so the whole expression
+# passed as one argument would become a single phrase. Splits on whitespace;
+# a double-quoted span stays in the term it belongs to, and its quotes are
+# removed so gh quotes it again: '"exact phrase"' -> 'exact phrase',
+# 'label:"good first issue"' -> 'label:good first issue'.
+# gh treats the text before a term's first ':' as a qualifier name, so a
+# quoted phrase containing ':' ('"error: timeout"') does not reach GitHub as
+# that phrase; gh offers no argument form that does.
+# Sets the global array _GH_SEARCH_TERMS. Prints an error and returns 1 on an
+# unbalanced quote or when no term remains.
+_gh_split_search_terms() {
+    local search="$1" tool_name="$2"
+    _GH_SEARCH_TERMS=()
+
+    local term="" in_quote=false ch i
+    for (( i = 0; i < ${#search}; i++ )); do
+        ch="${search:i:1}"
+        if [[ "${ch}" == '"' ]]; then
+            if [[ "${in_quote}" == true ]]; then in_quote=false; else in_quote=true; fi
+        elif [[ "${in_quote}" == false && "${ch}" == [[:space:]] ]]; then
+            [[ -n "${term}" ]] && _GH_SEARCH_TERMS+=("${term}")
+            term=""
+        else
+            term+="${ch}"
+        fi
+    done
+
+    if [[ "${in_quote}" == true ]]; then
+        echo "Error: search has an unbalanced double quote for ${tool_name}: ${search}"
+        return 1
+    fi
+    [[ -n "${term}" ]] && _GH_SEARCH_TERMS+=("${term}")
+
+    if [[ ${#_GH_SEARCH_TERMS[@]} -eq 0 ]]; then
+        echo "Error: search has no search terms for ${tool_name}: '${search}'"
+        return 1
+    fi
+}
+
 # Search for GitHub issues or pull requests using a search expression.
-# Maps to: gh search issues|prs <search> [--repo] [--state] [--limit] [--json]
+# Maps to: gh search issues|prs [--repo] [--state] [--limit] [--json] -- <terms...>
 # Also supports the low-level: gh api search/issues -X GET -f q="..." -f per_page=N
 tool_search() {
     local args="$1"
@@ -29,6 +69,8 @@ tool_search() {
         return 1
     fi
 
+    _gh_split_search_terms "${search}" "search" || return 1
+
     _gh_validate_jq_filter "${jq_filter}" || return 1
     if [[ -n "${jq_filter}" && -z "${fields}" ]]; then
         printf '%s\n' "Error: jq_filter requires fields on search. Without fields, gh search returns a human-readable table that jq cannot parse. Pass fields (for example \"number,title,state,repository\") alongside jq_filter."
@@ -40,7 +82,7 @@ tool_search() {
 
     _gh_validate_number "${limit}" "limit" || return 1
 
-    local -a cmd=("gh" "search" "${type}" "${search}")
+    local -a cmd=("gh" "search" "${type}")
 
     if [[ -n "${effective_repo}" ]]; then
         _gh_validate_repo "${effective_repo}" || return 1
@@ -50,6 +92,8 @@ tool_search() {
     [[ -n "${state}" ]] && cmd+=("--state" "${state}")
     cmd+=("--limit" "${limit}")
     [[ -n "${fields}" ]] && cmd+=("--json" "${fields}")
+    # Terms follow "--" so a negated qualifier such as -label:bug is not read as a flag.
+    cmd+=("--" "${_GH_SEARCH_TERMS[@]}")
 
     log "INFO" "search: ${cmd[*]}"
     local __raw __exit=0
@@ -177,7 +221,7 @@ tool_search_code() {
 
 # Search for GitHub repositories.
 # Query is optional — filters alone (owner, topic, language, stars) suffice.
-# Maps to: gh search repos [search] [--owner] [--topic] [--language] [--license] [--stars] [--sort] [--limit] [--json]
+# Maps to: gh search repos [--owner] [--topic] [--language] [--license] [--stars] [--sort] [--limit] [--json] [-- <terms...>]
 tool_search_repos() {
     local args="$1"
 
@@ -209,9 +253,13 @@ tool_search_repos() {
 
     _gh_validate_jq_filter "${jq_filter}" || return 1
     _gh_validate_number "${limit}" "limit" || return 1
+    if [[ -n "${search}" ]]; then
+        _gh_split_search_terms "${search}" "search_repos" || return 1
+    else
+        _GH_SEARCH_TERMS=()
+    fi
 
     local -a cmd=("gh" "search" "repos")
-    [[ -n "${search}" ]]   && cmd+=("${search}")
     [[ -n "${owner}" ]]    && cmd+=("--owner" "${owner}")
     [[ -n "${topic}" ]]    && cmd+=("--topic" "${topic}")
     [[ -n "${language}" ]] && cmd+=("--language" "${language}")
@@ -222,6 +270,8 @@ tool_search_repos() {
 
     local default_fields="fullName,description,stargazersCount,language,updatedAt,url"
     [[ -n "${fields}" ]] && cmd+=("--json" "${fields}") || cmd+=("--json" "${default_fields}")
+    # Terms follow "--" so a negated qualifier such as -topic:php is not read as a flag.
+    [[ ${#_GH_SEARCH_TERMS[@]} -gt 0 ]] && cmd+=("--" "${_GH_SEARCH_TERMS[@]}")
 
     log "INFO" "search_repos: ${cmd[*]}"
     local __raw __exit=0
@@ -238,7 +288,7 @@ tool_search_repos() {
 }
 
 # Search for GitHub commits.
-# Maps to: gh search commits <search> [--repo] [--owner] [--author] [--committer] [--author-date] [--committer-date] [--hash] [--merge] [--sort] [--limit] [--json]
+# Maps to: gh search commits [--repo] [--owner] [--author] [--committer] [--author-date] [--committer-date] [--hash] [--merge] [--sort] [--limit] [--json] -- <terms...>
 tool_search_commits() {
     local args="$1"
 
@@ -277,8 +327,9 @@ tool_search_commits() {
 
     _gh_validate_jq_filter "${jq_filter}" || return 1
     _gh_validate_number "${limit}" "limit" || return 1
+    _gh_split_search_terms "${search}" "search_commits" || return 1
 
-    local -a cmd=("gh" "search" "commits" "${search}")
+    local -a cmd=("gh" "search" "commits")
 
     # Resolve repo: explicit param > GH_DEFAULT_REPO (consistent with tool_search)
     local effective_repo
@@ -307,6 +358,8 @@ tool_search_commits() {
 
     local default_fields="sha,commit"
     [[ -n "${fields}" ]] && cmd+=("--json" "${fields}") || cmd+=("--json" "${default_fields}")
+    # Terms follow "--" so a negated qualifier such as -author:bot is not read as a flag.
+    cmd+=("--" "${_GH_SEARCH_TERMS[@]}")
 
     log "INFO" "search_commits: ${cmd[*]}"
     local __raw __exit=0
