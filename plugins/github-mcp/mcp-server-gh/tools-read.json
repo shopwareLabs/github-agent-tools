@@ -26,7 +26,7 @@
           },
           "comments": {
             "type": "boolean",
-            "description": "Append the PR's comments and reviews after the PR text, below a '--- comments and reviews ---' line. Only applies when 'fields' is not set. max_lines counts the PR and its comments together.",
+            "description": "Append the PR comments after the PR text, below a separator line. Only applies when 'fields' is not set. max_lines counts both together.",
             "default": false
           },
           "jq_filter": {
