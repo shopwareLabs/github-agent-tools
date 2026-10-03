@@ -64,7 +64,7 @@ Use gh-tooling pr_view with number 14642 and comments true
 - `number` (integer, required): PR number.
 - Repository selection: see [Repository selection](#repository-selection).
 - `fields` (string, optional): Comma-separated JSON fields (e.g. `title,body,state,reviews,files`)
-- `comments` (boolean, optional): Include PR comments in text output.
+- `comments` (boolean, optional): Append the PR's comments and reviews to the text output, after a `--- comments and reviews ---` line. Ignored when `fields` is set. `max_lines` counts the PR and its comments together. The limits listed under [`issue_view`](#issue_view) apply here too.
 
 ### `pr_diff`
 
@@ -150,6 +150,22 @@ Use gh-tooling issue_view with number 8498 and with_comments true
 Use gh-tooling issue_view with number 8498 and fields "title,body,state,labels,comments"
 Use gh-tooling issue_view with number 8498 and with_field_values true
 ```
+
+`with_comments: true` appends the issue's comments to the text output, after a
+`--- comments ---` line. It is ignored when `fields` is set, and rejected together
+with `with_field_values`. `max_lines` counts the issue and its comments together,
+so a long body can leave the comments out.
+
+The issue and its comments come from two `gh` calls. If the comments call fails,
+the whole call fails, or returns `fallback`; the tool never returns the issue
+without its comments. Known limits, which apply to `pr_view` with `comments` too:
+
+- A comment posted or deleted between the two calls makes the issue's
+  `comments:` count disagree with the list that follows.
+- `gh` leaves hidden (minimized) comments out of the list, so an issue whose only
+  comments are hidden shows a count but no separator.
+- The separator is plain text: a body that contains the same line reads as the
+  start of the comments.
 
 `with_field_values` returns the issue's type and its field values keyed by field
 name, which `gh issue view` exposes for neither:
