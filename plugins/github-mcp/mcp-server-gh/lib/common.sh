@@ -220,6 +220,49 @@ _gh_capture_split() {
 }
 
 #######################################
+# Run a gh issue/pr view command for the item's text preview, then again with
+# --comments for its comments. Without a TTY, gh prints only the comments when
+# given --comments, so the preview needs a call of its own.
+# Arguments:
+#   $1 separator line put between the preview and the comments,
+#   $2 suppress_errors; "true" leaves gh's stderr out of the output,
+#   $3... the view command and its arguments, without --comments.
+# Outputs:
+#   The preview, then a blank line, the separator, and the comments when gh
+#   printed any. On failure, the failed call's output.
+# Returns:
+#   0 when both calls succeed, otherwise the failed call's exit status.
+#######################################
+_gh_view_with_comments() {
+    local separator="$1" suppress_errors="$2"
+    shift 2
+    local preview comments exit_code=0
+
+    if [[ "${suppress_errors}" == "true" ]]; then
+        preview=$("$@" 2>/dev/null) || exit_code=$?
+    else
+        preview=$("$@" 2>&1) || exit_code=$?
+    fi
+    if [[ ${exit_code} -ne 0 ]]; then
+        printf '%s\n' "${preview}"
+        return "${exit_code}"
+    fi
+
+    if [[ "${suppress_errors}" == "true" ]]; then
+        comments=$("$@" --comments 2>/dev/null) || exit_code=$?
+    else
+        comments=$("$@" --comments 2>&1) || exit_code=$?
+    fi
+    if [[ ${exit_code} -ne 0 ]]; then
+        printf '%s\n' "${comments}"
+        return "${exit_code}"
+    fi
+
+    printf '%s\n' "${preview}"
+    [[ -z "${comments}" ]] || printf '\n%s\n%s\n' "${separator}" "${comments}"
+}
+
+#######################################
 # Resolve the organization owning org-level resources (issue types, issue fields).
 # Priority: org > owner > repo-shaped args > GH_DEFAULT_REPO > git remote.
 # Globals:

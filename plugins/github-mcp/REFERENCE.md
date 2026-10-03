@@ -64,7 +64,7 @@ Use gh-tooling pr_view with number 14642 and comments true
 - `number` (integer, required): PR number.
 - Repository selection: see [Repository selection](#repository-selection).
 - `fields` (string, optional): Comma-separated JSON fields (e.g. `title,body,state,reviews,files`)
-- `comments` (boolean, optional): Include PR comments in text output.
+- `comments` (boolean, optional): Append the PR's comments and reviews to the text output, after a `--- comments and reviews ---` line. Ignored when `fields` is set.
 
 ### `pr_diff`
 
@@ -150,6 +150,9 @@ Use gh-tooling issue_view with number 8498 and with_comments true
 Use gh-tooling issue_view with number 8498 and fields "title,body,state,labels,comments"
 Use gh-tooling issue_view with number 8498 and with_field_values true
 ```
+
+`with_comments: true` appends the issue's comments to the text output, after a
+`--- comments ---` line. It is ignored when `fields` is set.
 
 `with_field_values` returns the issue's type and its field values keyed by field
 name, which `gh issue view` exposes for neither:

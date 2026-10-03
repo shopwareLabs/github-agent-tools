@@ -3,7 +3,8 @@
 # Tools: pr_view, pr_diff, pr_list, pr_checks, pr_comments, pr_reviews, pr_files, pr_commits
 
 # View pull request details.
-# Maps to: gh pr view [<number>] [--repo owner/repo] [--json <fields>] [--comments]
+# Maps to: gh pr view <number> [--repo owner/repo] [--json <fields>],
+#          then gh pr view <number> [--repo owner/repo] --comments for comments
 tool_pr_view() {
     local args="$1"
 
@@ -40,13 +41,13 @@ tool_pr_view() {
 
     if [[ -n "${fields}" ]]; then
         cmd+=("--json" "${fields}")
-    elif [[ "${comments}" == "true" ]]; then
-        cmd+=("--comments")
     fi
 
     log "INFO" "pr_view: ${cmd[*]}"
     local __raw __exit=0
-    if [[ "${suppress_errors}" == "true" ]]; then
+    if [[ -z "${fields}" && "${comments}" == "true" ]]; then
+        __raw=$(_gh_view_with_comments "--- comments and reviews ---" "${suppress_errors}" "${cmd[@]}") || __exit=$?
+    elif [[ "${suppress_errors}" == "true" ]]; then
         __raw=$("${cmd[@]}" 2>/dev/null) || __exit=$?
     else
         __raw=$("${cmd[@]}" 2>&1) || __exit=$?

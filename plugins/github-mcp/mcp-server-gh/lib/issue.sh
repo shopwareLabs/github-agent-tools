@@ -3,7 +3,8 @@
 # Tools: issue_view, issue_list
 
 # View a GitHub issue with optional comments, type, and field values.
-# Maps to: gh issue view <number> [--repo owner/repo] [--json <fields>] [--comments]
+# Maps to: gh issue view <number> [--repo owner/repo] [--json <fields>],
+#          then gh issue view <number> [--repo owner/repo] --comments for comments,
 #          and gh api repos/<repo>/issues/<number> for the type and field values
 tool_issue_view() {
     local args="$1"
@@ -61,13 +62,13 @@ tool_issue_view() {
 
         if [[ -n "${fields}" ]]; then
             cmd+=("--json" "${fields}")
-        elif [[ "${with_comments}" == "true" ]]; then
-            cmd+=("--comments")
         fi
 
         log "INFO" "issue_view: ${cmd[*]}"
         local __raw __exit=0
-        if [[ "${suppress_errors}" == "true" ]]; then
+        if [[ -z "${fields}" && "${with_comments}" == "true" ]]; then
+            __raw=$(_gh_view_with_comments "--- comments ---" "${suppress_errors}" "${cmd[@]}") || __exit=$?
+        elif [[ "${suppress_errors}" == "true" ]]; then
             __raw=$("${cmd[@]}" 2>/dev/null) || __exit=$?
         else
             __raw=$("${cmd[@]}" 2>&1) || __exit=$?

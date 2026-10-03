@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `search`, `search_repos`, `search_commits`, and `search_code` now put the search after `--`, so a
   search that starts with `-`, such as `-label:bug crash` or the code `->getId(`, is no longer read
   as a `gh` flag. `search_code` still sends the whole search as one exact-text phrase.
+- `issue_view` with `with_comments: true` and `pr_view` with `comments: true` now return the
+  issue or PR (title, state, labels, body, and the other fields gh prints), followed by a
+  `--- comments ---` (issue) or `--- comments and reviews ---` (PR) line and the comments, or only
+  the issue or PR when it has none. Before, they returned only the comments, and nothing for an item
+  without comments: run without a terminal, `gh issue view --comments` and `gh pr view --comments`
+  print the comments alone. The tools now make one call for the item and a second with `--comments`;
+  a failed second call fails the tool call, or returns `fallback` when set.
 - In pi, `tool_search` now ranks the requested gh-tooling tool first for most exact-name queries,
   such as `issue_view` (before: 5th). Names that share terms with another tool can still rank 2nd to
   5th: `search`, `repo_file`, and with the write server `pr_comments`, `pr_reviews`, and
