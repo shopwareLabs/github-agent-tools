@@ -1108,11 +1108,11 @@
         "properties": {
           "owner": {
             "type": "string",
-            "description": "Limit search to repositories owned by this user/organization. Used instead of the configured default repo; ignored when repo is set."
+            "description": "Limit search to repositories owned by this user/organization, instead of the configured default repo. With a bare repo name in repo, the two form owner/repo."
           },
           "repo": {
             "type": "string",
-            "description": "Limit search to this repository in 'owner/repo' format."
+            "description": "Limit search to this repository, as 'owner/repo' or as a bare name together with owner."
           },
           "language": {
             "type": "string",
@@ -1286,11 +1286,11 @@
         "properties": {
           "repo": {
             "type": "string",
-            "description": "Limit search to this repository in 'owner/repo' format."
+            "description": "Limit search to this repository, as 'owner/repo' or as a bare name together with owner."
           },
           "owner": {
             "type": "string",
-            "description": "Limit search to repositories owned by this user/organization. Used instead of the configured default repo; ignored when repo is set."
+            "description": "Limit search to repositories owned by this user/organization, instead of the configured default repo. With a bare repo name in repo, the two form owner/repo."
           },
           "author": {
             "type": "string",

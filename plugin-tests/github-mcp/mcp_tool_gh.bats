@@ -837,20 +837,50 @@ bats_test_function --description "pr_checks: fails without repo outside git"  --
     }
 }
 
-@test "search_code: explicit owner overrides GH_DEFAULT_REPO" {
-    GH_DEFAULT_REPO="default/repo"
-    gh() {
-        echo "$*" > "${BATS_TEST_TMPDIR}/captured_cmd"
-        echo '[]'
-    }
-    run tool_search_code '{"search":"test","owner":"myorg"}'
-    assert_success
-    local captured_cmd
-    captured_cmd=$(cat "${BATS_TEST_TMPDIR}/captured_cmd")
-    [[ "${captured_cmd}" == *"--owner myorg"* && "${captured_cmd}" != *"--repo"* ]] || {
-        echo "Expected --owner myorg and no --repo in command: ${captured_cmd}"
-        return 1
-    }
+# Scope: an owner/repo value in repo, then owner + bare repo, then owner alone,
+# then GH_DEFAULT_REPO. GH_DEFAULT_REPO is shopware/shopware in each test.
+_scope_argv_code()    { printf 'search\ncode\n%s\n--limit\n30\n--json\nrepository,path,textMatches\n--\ntest' "$1"; }
+_scope_argv_commits() { printf 'search\ncommits\n%s\n--limit\n20\n--json\nsha,commit\n--\ntest' "$1"; }
+
+_test_scope_owner_beats_default() {
+    GH_DEFAULT_REPO="shopware/shopware"
+    assert_search_argv "tool_$1" '{"search":"test","owner":"acme"}' "$("_scope_argv_${1#search_}" $'--owner\nacme')"
+}
+_test_scope_repo_beats_owner() {
+    GH_DEFAULT_REPO="shopware/shopware"
+    assert_search_argv "tool_$1" '{"search":"test","repo":"acme/app","owner":"other"}' "$("_scope_argv_${1#search_}" $'--repo\nacme/app')"
+}
+_test_scope_split_form() {
+    GH_DEFAULT_REPO="shopware/shopware"
+    assert_search_argv "tool_$1" '{"search":"test","owner":"acme","repo":"app"}' "$("_scope_argv_${1#search_}" $'--repo\nacme/app')"
+}
+_test_scope_repo_beats_default() {
+    GH_DEFAULT_REPO="shopware/shopware"
+    assert_search_argv "tool_$1" '{"search":"test","repo":"acme/app"}' "$("_scope_argv_${1#search_}" $'--repo\nacme/app')"
+}
+
+bats_test_function --description "search_code: an explicit owner beats GH_DEFAULT_REPO"           -- _test_scope_owner_beats_default search_code
+bats_test_function --description "search_commits: an explicit owner beats GH_DEFAULT_REPO"        -- _test_scope_owner_beats_default search_commits
+bats_test_function --description "search_code: an owner/repo value in repo beats owner"           -- _test_scope_repo_beats_owner search_code
+bats_test_function --description "search_commits: an owner/repo value in repo beats owner"        -- _test_scope_repo_beats_owner search_commits
+bats_test_function --description "search_code: owner with a bare repo name searches owner/repo"   -- _test_scope_split_form search_code
+bats_test_function --description "search_commits: owner with a bare repo name searches owner/repo" -- _test_scope_split_form search_commits
+bats_test_function --description "search_commits: an explicit repo beats GH_DEFAULT_REPO"         -- _test_scope_repo_beats_default search_commits
+
+@test "search_code: a bare repo name without owner is rejected before gh runs" {
+    gh() { touch "${BATS_TEST_TMPDIR}/gh_called"; echo '[]'; }
+    run tool_search_code '{"search":"test","repo":"app"}'
+    assert_failure
+    assert_output --partial "needs owner"
+    assert [ ! -e "${BATS_TEST_TMPDIR}/gh_called" ]
+}
+
+@test "search_code: an owner that is not a single login is rejected before gh runs" {
+    gh() { touch "${BATS_TEST_TMPDIR}/gh_called"; echo '[]'; }
+    run tool_search_code '{"search":"test","owner":"acme,other"}'
+    assert_failure
+    assert_output --partial "acme,other"
+    assert [ ! -e "${BATS_TEST_TMPDIR}/gh_called" ]
 }
 
 @test "search_code: fails when search is missing" {
@@ -922,22 +952,6 @@ bats_test_function --description "pr_checks: fails without repo outside git"  --
     captured_cmd=$(cat "${BATS_TEST_TMPDIR}/captured_cmd")
     [[ "${captured_cmd}" == *"--repo default/repo"* ]] || {
         echo "Expected --repo default/repo in command: ${captured_cmd}"
-        return 1
-    }
-}
-
-@test "search_commits: explicit owner overrides GH_DEFAULT_REPO" {
-    GH_DEFAULT_REPO="default/repo"
-    gh() {
-        echo "$*" > "${BATS_TEST_TMPDIR}/captured_cmd"
-        echo '[]'
-    }
-    run tool_search_commits '{"search":"test","owner":"myorg"}'
-    assert_success
-    local captured_cmd
-    captured_cmd=$(cat "${BATS_TEST_TMPDIR}/captured_cmd")
-    [[ "${captured_cmd}" == *"--owner myorg"* && "${captured_cmd}" != *"--repo"* ]] || {
-        echo "Expected --owner myorg and no --repo in command: ${captured_cmd}"
         return 1
     }
 }
