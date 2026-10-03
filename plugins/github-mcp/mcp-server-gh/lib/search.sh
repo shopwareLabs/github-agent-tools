@@ -146,7 +146,7 @@ tool_search() {
 # Search for code across GitHub repositories.
 # Uses the legacy code search engine (no regex, no symbol search, no path globs).
 # Rate limit: 10 requests/minute (separate bucket from other search endpoints).
-# Maps to: gh search code <search> [--repo] [--language] [--extension] [--filename] [--match] [--limit] [--json]
+# Maps to: gh search code [--repo] [--owner] [--language] [--extension] [--filename] [--match] [--limit] [--json] -- <search>
 tool_search_code() {
     local args="$1"
 
@@ -188,7 +188,7 @@ tool_search_code() {
     _gh_validate_grep_pattern "${grep_pattern}" || return 1
     _gh_validate_number "${limit}" "limit" || return 1
 
-    local -a cmd=("gh" "search" "code" "${search}")
+    local -a cmd=("gh" "search" "code")
 
     # Resolve repo: explicit param > GH_DEFAULT_REPO (consistent with tool_search)
     local effective_repo
@@ -213,6 +213,9 @@ tool_search_code() {
 
     local default_fields="repository,path,textMatches"
     [[ -n "${fields}" ]] && cmd+=("--json" "${fields}") || cmd+=("--json" "${default_fields}")
+    # One argument, so gh quotes it as the exact text match the tool promises;
+    # "--" keeps a search such as "->getId(" from being read as a flag.
+    cmd+=("--" "${search}")
 
     log "INFO" "search_code: ${cmd[*]}"
     local __raw __exit=0

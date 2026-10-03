@@ -1012,6 +1012,11 @@ bats_test_function --description "search_commits: each word is its own argument 
         $'search\nrepos\n--owner\nshopware\n--limit\n20\n--json\nfullName,description,stargazersCount,language,updatedAt,url'
 }
 
+@test "search_code: the whole search is one argument after --" {
+    assert_search_argv tool_search_code '{"search":"->getId( foo","repo":"shopware/shopware"}' \
+        $'search\ncode\n--repo\nshopware/shopware\n--limit\n30\n--json\nrepository,path,textMatches\n--\n->getId( foo'
+}
+
 # Assert a search tool rejects an unbalanced double quote before calling gh.
 # Usage: assert_unbalanced_quote_rejected <tool_fn>
 assert_unbalanced_quote_rejected() {

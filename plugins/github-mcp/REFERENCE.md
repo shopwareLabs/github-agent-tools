@@ -344,7 +344,7 @@ Use gh-tooling search_code with search "addClass" and repo "shopware/shopware" a
 ```
 
 **Parameters:**
-- `search` (string, required): Code search expression (exact text match, no regex).
+- `search` (string, required): Code search expression, matched as exact text (no regex). Unlike the other search tools, the whole value is one phrase.
 - `owner` (string, optional): Limit to repositories owned by this user/org.
 - `repo` (string, optional): Limit to this repository in `owner/repo` format.
 - `language` (string, optional): Filter by language (e.g. `php`, `typescript`).

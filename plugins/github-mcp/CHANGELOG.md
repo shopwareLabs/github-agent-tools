@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `search` with an unbalanced double quote fails before `gh` runs, and so does a `search` without
   words for `search` and `search_commits`; `search_repos` then searches by its filters alone.
   `REFERENCE.md` lists the forms `gh` cannot pass through, such as a negated phrase.
+- `search`, `search_repos`, `search_commits`, and `search_code` now put the search after `--`, so a
+  search that starts with `-`, such as `-label:bug crash` or the code `->getId(`, is no longer read
+  as a `gh` flag. `search_code` still sends the whole search as one exact-text phrase.
 - In pi, `tool_search` now ranks the requested gh-tooling tool first for most exact-name queries,
   such as `issue_view` (before: 5th). Names that share terms with another tool can still rank 2nd to
   5th: `search`, `repo_file`, and with the write server `pr_comments`, `pr_reviews`, and

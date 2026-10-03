@@ -1198,7 +1198,7 @@
           },
           "search": {
             "type": "string",
-            "description": "Code search expression (exact text match, no regex). Example: 'addClass', 'extends AbstractController'."
+            "description": "Code search expression, matched as exact text including spaces (no regex). Example: 'addClass', 'extends AbstractController'."
           }
         },
         "additionalProperties": false
