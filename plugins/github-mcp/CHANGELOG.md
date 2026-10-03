@@ -49,10 +49,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `issue_schema` called without `org`, `owner`, or a repository now reports why
   `gh repo view` could not supply the organization (for example an authentication failure),
   instead of only saying that `org` is required. `suppress_errors: true` leaves gh's message out.
-- With `block_api_tool_read: true`, a GET of `repos/OWNER/REPO/issues/N` is now blocked with a
-  pointer to `issue_view`, and a GET of `search/code` with a pointer to `search_code`. Before, both
-  went through. Sub-resources of an issue without their own tool, such as `issues/N/timeline`, are
-  still allowed, and so are `search/issues`, `search/repositories`, and `search/commits`.
+- With `block_api_tool_read: true`, a GET of `repos/OWNER/REPO/issues/N` through `api_read` is
+  now blocked with a pointer to `issue_view`, or to `pr_view` for a pull request number; the same
+  applies to the write server's `api` tool under `block_api_tool_write: true`. Before, it went
+  through. The rule matches the path only, so a query string or a fragment does not get past it and
+  an issue path inside another endpoint's query does not trigger it. Sub-resources of an issue
+  without their own tool, such as `issues/N/timeline`, stay allowed. `issue_view` does not return
+  `closed_by`, `author_association`, or the lock state, so those are not available while the block
+  is on. `search/code` stays allowed, because `search_code` sends its search as one exact phrase and
+  has no form for separate keywords, `OR`/`NOT`, or `path:`.
 - `search_code` and `search_commits` now search the repositories of an explicit `owner` when a
   default repo is configured. Before, the default repo replaced `owner`, so these tools could not
   search outside it. An explicit `repo` still takes precedence over `owner`.
