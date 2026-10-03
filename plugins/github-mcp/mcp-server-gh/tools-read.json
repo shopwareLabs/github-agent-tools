@@ -1091,7 +1091,7 @@
           },
           "search": {
             "type": "string",
-            "description": "Search expression (e.g. 'NEXT-3412', 'attribute entity', 'custom field translated')."
+            "description": "Search expression. Each word is its own keyword; double quotes keep a phrase together (e.g. 'NEXT-3412', 'attribute entity', '\"custom field\" translated', 'label:\"good first issue\"'). An unmatched double quote fails the call."
           }
         },
         "additionalProperties": false
@@ -1269,7 +1269,7 @@
           },
           "search": {
             "type": "string",
-            "description": "Search expression (optional when using filters). Example: 'shopware plugin', 'ecommerce'."
+            "description": "Search expression (optional when using filters). Each word is its own keyword; double quotes keep a phrase together. Example: 'shopware plugin', '\"headless commerce\"'. An unmatched double quote fails the call."
           }
         },
         "additionalProperties": false
@@ -1348,7 +1348,7 @@
           },
           "search": {
             "type": "string",
-            "description": "Commit message search text (e.g. 'NEXT-1234', 'fix cart calculation')."
+            "description": "Commit message search expression. Each word is its own keyword; double quotes keep a phrase together (e.g. 'NEXT-1234', 'fix cart', '\"fix cart calculation\"'). An unmatched double quote fails the call."
           }
         },
         "additionalProperties": false

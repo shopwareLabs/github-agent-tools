@@ -2,49 +2,85 @@
 # Search tools for gh-tooling MCP server
 # Tools: search, search_code, search_repos, search_commits, search_discussions
 
+#######################################
 # Split a search expression into the keyword arguments gh search expects.
 # gh quotes each argument that contains whitespace, so the whole expression
-# passed as one argument would become a single phrase. Splits on whitespace;
-# a double-quoted span stays in the term it belongs to, and its quotes are
-# removed so gh quotes it again: '"exact phrase"' -> 'exact phrase',
-# 'label:"good first issue"' -> 'label:good first issue'.
-# gh treats the text before a term's first ':' as a qualifier name, so a
-# quoted phrase containing ':' ('"error: timeout"') does not reach GitHub as
-# that phrase; gh offers no argument form that does.
-# Sets the global array _GH_SEARCH_TERMS. Prints an error and returns 1 on an
-# unbalanced quote or when no term remains.
+# passed as one argument would become a single phrase. Splits on spaces, tabs,
+# and newlines; a double-quoted span stays in the term it belongs to, with its
+# quotes removed and its whitespace collapsed to single spaces, so gh quotes it
+# again: '"exact phrase"' -> 'exact phrase', 'label:"good first issue"' ->
+# 'label:good first issue'.
+# gh re-quotes only a term that contains whitespace, and reads the text before a
+# term's first ':' as a qualifier name. So '-"exact phrase"' becomes the phrase
+# '-exact phrase' rather than its negation, '"OR"' becomes the operator OR, and
+# '"error: timeout"' does not reach GitHub as that phrase; gh has no argument
+# form for any of them.
+# Callers pass the terms after "--", so a term starting with '-' (-label:bug)
+# is not read as a gh flag.
+# Built on read's field splitting rather than a per-character loop, which takes
+# quadratic time in bash.
+# Globals:
+#   _GH_SEARCH_TERMS (set)
+# Arguments:
+#   $1 search expression,
+#   $2 tool name, for error messages,
+#   $3 "required" to fail when no term remains, "optional" to allow none.
+# Outputs:
+#   An error message on stdout on failure.
+# Returns:
+#   0 on success, 1 on an unbalanced double quote, a unit separator (U+001F)
+#   in the expression, or no term in required mode.
+#######################################
 _gh_split_search_terms() {
-    local search="$1" tool_name="$2"
+    local search="$1" tool_name="$2" mode="$3"
+    local ws=$' \t\n' us=$'\x1f'
     _GH_SEARCH_TERMS=()
 
-    local term="" in_quote=false ch i
-    for (( i = 0; i < ${#search}; i++ )); do
-        ch="${search:i:1}"
-        if [[ "${ch}" == '"' ]]; then
-            if [[ "${in_quote}" == true ]]; then in_quote=false; else in_quote=true; fi
-        elif [[ "${in_quote}" == false && "${ch}" == [[:space:]] ]]; then
-            [[ -n "${term}" ]] && _GH_SEARCH_TERMS+=("${term}")
-            term=""
-        else
-            term+="${ch}"
+    if [[ "${mode}" != "required" && "${mode}" != "optional" ]]; then
+        echo "Error: _gh_split_search_terms mode must be 'required' or 'optional', got: '${mode}'"
+        return 1
+    fi
+    if [[ "${search}" == *"${us}"* ]]; then
+        echo "Error: search for ${tool_name} contains a unit separator (U+001F): '${search}'"
+        return 1
+    fi
+
+    # Fields at odd indexes were inside quotes. The appended quote terminates the
+    # last field; the field after it holds only the here-string's newline.
+    local -a parts words
+    IFS='"' read -r -d '' -a parts <<< "${search}\"" || true
+    unset 'parts[${#parts[@]}-1]'
+    if (( ${#parts[@]} % 2 == 0 )); then
+        echo "Error: search for ${tool_name} has an unbalanced double quote: '${search}'"
+        return 1
+    fi
+
+    # A quoted span's words are joined with the unit separator, so the split
+    # below keeps the span in one term; the separator becomes a space after.
+    local flat="" phrase i
+    for (( i = 0; i < ${#parts[@]}; i++ )); do
+        if (( i % 2 == 0 )); then
+            flat+="${parts[i]}"
+            continue
+        fi
+        IFS="${ws}" read -r -d '' -a words <<< "${parts[i]}" || true
+        if (( ${#words[@]} > 0 )); then
+            printf -v phrase "%s${us}" "${words[@]}"
+            flat+="${phrase%"${us}"}"
         fi
     done
 
-    if [[ "${in_quote}" == true ]]; then
-        echo "Error: search has an unbalanced double quote for ${tool_name}: ${search}"
-        return 1
-    fi
-    [[ -n "${term}" ]] && _GH_SEARCH_TERMS+=("${term}")
-
-    if [[ ${#_GH_SEARCH_TERMS[@]} -eq 0 ]]; then
-        echo "Error: search has no search terms for ${tool_name}: '${search}'"
+    IFS="${ws}" read -r -d '' -a _GH_SEARCH_TERMS <<< "${flat}" || true
+    if (( ${#_GH_SEARCH_TERMS[@]} > 0 )); then
+        _GH_SEARCH_TERMS=("${_GH_SEARCH_TERMS[@]//"${us}"/ }")
+    elif [[ "${mode}" == "required" ]]; then
+        echo "Error: search for ${tool_name} has no search terms: '${search}'"
         return 1
     fi
 }
 
 # Search for GitHub issues or pull requests using a search expression.
 # Maps to: gh search issues|prs [--repo] [--state] [--limit] [--json] -- <terms...>
-# Also supports the low-level: gh api search/issues -X GET -f q="..." -f per_page=N
 tool_search() {
     local args="$1"
 
@@ -69,8 +105,6 @@ tool_search() {
         return 1
     fi
 
-    _gh_split_search_terms "${search}" "search" || return 1
-
     _gh_validate_jq_filter "${jq_filter}" || return 1
     if [[ -n "${jq_filter}" && -z "${fields}" ]]; then
         printf '%s\n' "Error: jq_filter requires fields on search. Without fields, gh search returns a human-readable table that jq cannot parse. Pass fields (for example \"number,title,state,repository\") alongside jq_filter."
@@ -81,6 +115,7 @@ tool_search() {
     effective_repo=$(_gh_resolve_repo "${repo}")
 
     _gh_validate_number "${limit}" "limit" || return 1
+    _gh_split_search_terms "${search}" "search" required || return 1
 
     local -a cmd=("gh" "search" "${type}")
 
@@ -92,7 +127,6 @@ tool_search() {
     [[ -n "${state}" ]] && cmd+=("--state" "${state}")
     cmd+=("--limit" "${limit}")
     [[ -n "${fields}" ]] && cmd+=("--json" "${fields}")
-    # Terms follow "--" so a negated qualifier such as -label:bug is not read as a flag.
     cmd+=("--" "${_GH_SEARCH_TERMS[@]}")
 
     log "INFO" "search: ${cmd[*]}"
@@ -253,11 +287,7 @@ tool_search_repos() {
 
     _gh_validate_jq_filter "${jq_filter}" || return 1
     _gh_validate_number "${limit}" "limit" || return 1
-    if [[ -n "${search}" ]]; then
-        _gh_split_search_terms "${search}" "search_repos" || return 1
-    else
-        _GH_SEARCH_TERMS=()
-    fi
+    _gh_split_search_terms "${search}" "search_repos" optional || return 1
 
     local -a cmd=("gh" "search" "repos")
     [[ -n "${owner}" ]]    && cmd+=("--owner" "${owner}")
@@ -270,7 +300,6 @@ tool_search_repos() {
 
     local default_fields="fullName,description,stargazersCount,language,updatedAt,url"
     [[ -n "${fields}" ]] && cmd+=("--json" "${fields}") || cmd+=("--json" "${default_fields}")
-    # Terms follow "--" so a negated qualifier such as -topic:php is not read as a flag.
     [[ ${#_GH_SEARCH_TERMS[@]} -gt 0 ]] && cmd+=("--" "${_GH_SEARCH_TERMS[@]}")
 
     log "INFO" "search_repos: ${cmd[*]}"
@@ -327,7 +356,7 @@ tool_search_commits() {
 
     _gh_validate_jq_filter "${jq_filter}" || return 1
     _gh_validate_number "${limit}" "limit" || return 1
-    _gh_split_search_terms "${search}" "search_commits" || return 1
+    _gh_split_search_terms "${search}" "search_commits" required || return 1
 
     local -a cmd=("gh" "search" "commits")
 
@@ -358,7 +387,6 @@ tool_search_commits() {
 
     local default_fields="sha,commit"
     [[ -n "${fields}" ]] && cmd+=("--json" "${fields}") || cmd+=("--json" "${default_fields}")
-    # Terms follow "--" so a negated qualifier such as -author:bot is not read as a flag.
     cmd+=("--" "${_GH_SEARCH_TERMS[@]}")
 
     log "INFO" "search_commits: ${cmd[*]}"

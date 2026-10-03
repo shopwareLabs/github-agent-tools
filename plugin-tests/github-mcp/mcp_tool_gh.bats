@@ -928,7 +928,7 @@ bats_test_function --description "pr_checks: fails without repo outside git"  --
 
 # Print the terms _gh_split_search_terms produced, one per line.
 split_search_terms() {
-    _gh_split_search_terms "$1" "search" || return 1
+    _gh_split_search_terms "$1" "search" required || return 1
     printf '%s\n' "${_GH_SEARCH_TERMS[@]}"
 }
 
@@ -948,6 +948,18 @@ split_search_terms() {
     run split_search_terms 'label:"good first issue" crash'
     assert_success
     assert_output $'label:good first issue\ncrash'
+}
+
+@test "search terms: whitespace inside a quoted phrase collapses to single spaces" {
+    run split_search_terms $'"out\tof   memory" crash'
+    assert_success
+    assert_output $'out of memory\ncrash'
+}
+
+@test "search terms: an expression containing a unit separator is rejected" {
+    run split_search_terms $'out\x1fof memory'
+    assert_failure
+    assert_output --partial "unit separator"
 }
 
 @test "search terms: an expression with no terms is rejected" {
@@ -989,6 +1001,16 @@ bats_test_function --description "search_repos: each word is its own argument af
     -- _test_argv_search_repos
 bats_test_function --description "search_commits: each word is its own argument after --, a negated qualifier included" \
     -- _test_argv_search_commits
+
+@test "search: type=issues passes each word to gh search issues" {
+    assert_search_argv tool_search '{"search":"timeout hang","type":"issues"}' \
+        $'search\nissues\n--repo\nshopware/shopware\n--limit\n20\n--\ntimeout\nhang'
+}
+
+@test "search_repos: a whitespace-only search runs the filter-only search" {
+    assert_search_argv tool_search_repos '{"search":"  ","owner":"shopware"}' \
+        $'search\nrepos\n--owner\nshopware\n--limit\n20\n--json\nfullName,description,stargazersCount,language,updatedAt,url'
+}
 
 # Assert a search tool rejects an unbalanced double quote before calling gh.
 # Usage: assert_unbalanced_quote_rejected <tool_fn>
@@ -2197,21 +2219,6 @@ diff --git a/src/Third.php b/src/Third.php
     run tool_search '{"search":"test","type":"invalid"}'
     assert_failure
     assert_output --partial "type must be"
-}
-
-@test "search: type=issues uses gh search issues" {
-    gh() {
-        echo "$*" > "${BATS_TEST_TMPDIR}/captured_cmd"
-        echo '[]'
-    }
-    run tool_search '{"search":"bug","type":"issues"}'
-    assert_success
-    local captured_cmd
-    captured_cmd=$(cat "${BATS_TEST_TMPDIR}/captured_cmd")
-    [[ "${captured_cmd}" == "search issues "* ]] || {
-        echo "Expected 'search issues' in command: ${captured_cmd}"
-        return 1
-    }
 }
 
 @test "search: repo filter passed to gh" {
