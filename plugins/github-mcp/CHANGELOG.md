@@ -53,6 +53,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pointer to `issue_view`, and a GET of `search/code` with a pointer to `search_code`. Before, both
   went through. Sub-resources of an issue without their own tool, such as `issues/N/timeline`, are
   still allowed, and so are `search/issues`, `search/repositories`, and `search/commits`.
+- `search_code` and `search_commits` now search the repositories of an explicit `owner` when a
+  default repo is configured. Before, the default repo replaced `owner`, so these tools could not
+  search outside it. An explicit `repo` still takes precedence over `owner`.
 - `sub_issue_add`, `sub_issue_remove`, `project_item_add`, and `project_status_set` now reject a
   `repo` that is not in `owner/repo` form before any GitHub call. Before, `acme/app/extra` was read
   as owner `acme` and repository `extra`, or built a wrong item URL.

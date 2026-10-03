@@ -1108,7 +1108,7 @@
         "properties": {
           "owner": {
             "type": "string",
-            "description": "Limit search to repositories owned by this user/organization."
+            "description": "Limit search to repositories owned by this user/organization. Used instead of the configured default repo; ignored when repo is set."
           },
           "repo": {
             "type": "string",
@@ -1290,7 +1290,7 @@
           },
           "owner": {
             "type": "string",
-            "description": "Limit search to repositories owned by this user/organization."
+            "description": "Limit search to repositories owned by this user/organization. Used instead of the configured default repo; ignored when repo is set."
           },
           "author": {
             "type": "string",

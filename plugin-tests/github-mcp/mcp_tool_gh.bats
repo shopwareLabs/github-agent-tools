@@ -837,6 +837,22 @@ bats_test_function --description "pr_checks: fails without repo outside git"  --
     }
 }
 
+@test "search_code: explicit owner overrides GH_DEFAULT_REPO" {
+    GH_DEFAULT_REPO="default/repo"
+    gh() {
+        echo "$*" > "${BATS_TEST_TMPDIR}/captured_cmd"
+        echo '[]'
+    }
+    run tool_search_code '{"search":"test","owner":"myorg"}'
+    assert_success
+    local captured_cmd
+    captured_cmd=$(cat "${BATS_TEST_TMPDIR}/captured_cmd")
+    [[ "${captured_cmd}" == *"--owner myorg"* && "${captured_cmd}" != *"--repo"* ]] || {
+        echo "Expected --owner myorg and no --repo in command: ${captured_cmd}"
+        return 1
+    }
+}
+
 @test "search_code: fails when search is missing" {
     run tool_search_code '{}'
     assert_failure
@@ -906,6 +922,22 @@ bats_test_function --description "pr_checks: fails without repo outside git"  --
     captured_cmd=$(cat "${BATS_TEST_TMPDIR}/captured_cmd")
     [[ "${captured_cmd}" == *"--repo default/repo"* ]] || {
         echo "Expected --repo default/repo in command: ${captured_cmd}"
+        return 1
+    }
+}
+
+@test "search_commits: explicit owner overrides GH_DEFAULT_REPO" {
+    GH_DEFAULT_REPO="default/repo"
+    gh() {
+        echo "$*" > "${BATS_TEST_TMPDIR}/captured_cmd"
+        echo '[]'
+    }
+    run tool_search_commits '{"search":"test","owner":"myorg"}'
+    assert_success
+    local captured_cmd
+    captured_cmd=$(cat "${BATS_TEST_TMPDIR}/captured_cmd")
+    [[ "${captured_cmd}" == *"--owner myorg"* && "${captured_cmd}" != *"--repo"* ]] || {
+        echo "Expected --owner myorg and no --repo in command: ${captured_cmd}"
         return 1
     }
 }

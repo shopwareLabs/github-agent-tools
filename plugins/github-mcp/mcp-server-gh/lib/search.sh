@@ -190,11 +190,11 @@ tool_search_code() {
 
     local -a cmd=("gh" "search" "code")
 
-    # Resolve repo: explicit param > GH_DEFAULT_REPO (consistent with tool_search)
-    local effective_repo
+    # Resolve scope: explicit repo > explicit owner > GH_DEFAULT_REPO
+    local effective_repo=""
     if [[ -n "${repo}" ]]; then
         effective_repo="${repo}"
-    else
+    elif [[ -z "${owner}" ]]; then
         effective_repo="${GH_DEFAULT_REPO:-}"
     fi
 
@@ -363,11 +363,11 @@ tool_search_commits() {
 
     local -a cmd=("gh" "search" "commits")
 
-    # Resolve repo: explicit param > GH_DEFAULT_REPO (consistent with tool_search)
-    local effective_repo
+    # Resolve scope: explicit repo > explicit owner > GH_DEFAULT_REPO
+    local effective_repo=""
     if [[ -n "${repo}" ]]; then
         effective_repo="${repo}"
-    else
+    elif [[ -z "${owner}" ]]; then
         effective_repo="${GH_DEFAULT_REPO:-}"
     fi
 
