@@ -48,6 +48,10 @@ fi
 [[ "$BLOCK" != "true" ]] && exit 0
 
 COMMAND="api ${METHOD} ${ENDPOINT}"
+# The endpoint without its query string or fragment, for rules that match the
+# end of the path: text inside a query must not match one, and gh drops a
+# fragment before sending, so a fragment must not escape one.
+ENDPOINT_PATH="${ENDPOINT%%[?#]*}"
 
 # ============================================================================
 # Read endpoint mapping (GET requests with dedicated read tools)
@@ -105,6 +109,12 @@ fi
 # Labels
 if echo "$ENDPOINT" | grep -qE 'labels(\?|$)'; then
     block_tool "label_list" "Use label_list with optional repo and filter parameters."
+fi
+
+# One issue. search/code stays allowed: search_code sends its search as one
+# exact phrase, so separate keywords, OR/NOT, and path: have no other route.
+if echo "$ENDPOINT_PATH" | grep -qE '(^|/)repos/[^/]+/[^/]+/issues/[0-9]+/?$'; then
+    block_tool "issue_view" "Use issue_view with number and optional repo, fields, and jq_filter. For a pull request number, use pr_view. issue_view does not return closed_by, author_association, or the lock state; those are not available while this block is on."
 fi
 
 # Issue field values on one issue

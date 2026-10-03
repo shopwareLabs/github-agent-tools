@@ -79,6 +79,59 @@ _gh_split_search_terms() {
     fi
 }
 
+#######################################
+# Resolve the scope of a search_code or search_commits call. An owner/repo value
+# in repo comes first, and an owner passed with it must name the same owner; a
+# bare repo name joins owner (the split form); an owner alone searches that
+# user's or organization's repositories; GH_DEFAULT_REPO applies only when
+# neither is passed. owner takes the characters _gh_validate_repo allows in an
+# owner, since a user login, unlike an organization's, can contain '_'.
+# Globals:
+#   GH_DEFAULT_REPO (read); _GH_SEARCH_SCOPE (set)
+# Arguments:
+#   $1 owner from the tool arguments, may be empty,
+#   $2 repo from the tool arguments, may be empty,
+#   $3 tool name, for error messages.
+# Outputs:
+#   An error message on stdout on failure.
+# Returns:
+#   0 on success, 1 on a bare repo without owner, an owner that differs from
+#   the owner in repo, or an invalid owner or repo.
+#######################################
+_gh_resolve_search_scope() {
+    local owner="$1" repo="$2" tool_name="$3"
+    _GH_SEARCH_SCOPE=()
+
+    if [[ -n "${owner}" && ! "${owner}" =~ ^[a-zA-Z0-9_.-]+$ ]]; then
+        echo "Error: owner for ${tool_name} must be a single GitHub user or organization login, got: '${owner}'"
+        return 1
+    fi
+    # GitHub logins are case-insensitive.
+    local repo_owner="${repo%%/*}"
+    if [[ -n "${owner}" && "${repo}" == */* && "${owner,,}" != "${repo_owner,,}" ]]; then
+        echo "Error: owner '${owner}' for ${tool_name} does not match the owner in repo '${repo}'"
+        return 1
+    fi
+
+    if [[ -n "${repo}" && "${repo}" != */* ]]; then
+        if [[ -z "${owner}" ]]; then
+            echo "Error: repo '${repo}' for ${tool_name} needs owner, or pass repo as 'owner/repo'"
+            return 1
+        fi
+        repo="${owner}/${repo}"
+    fi
+
+    if [[ -n "${repo}" ]]; then
+        _gh_validate_repo "${repo}" || return 1
+        _GH_SEARCH_SCOPE=("--repo" "${repo}")
+    elif [[ -n "${owner}" ]]; then
+        _GH_SEARCH_SCOPE=("--owner" "${owner}")
+    elif [[ -n "${GH_DEFAULT_REPO:-}" ]]; then
+        _gh_validate_repo "${GH_DEFAULT_REPO}" || return 1
+        _GH_SEARCH_SCOPE=("--repo" "${GH_DEFAULT_REPO}")
+    fi
+}
+
 # Search for GitHub issues or pull requests using a search expression.
 # Maps to: gh search issues|prs [--repo] [--state] [--limit] [--json] -- <terms...>
 tool_search() {
@@ -190,20 +243,8 @@ tool_search_code() {
 
     local -a cmd=("gh" "search" "code")
 
-    # Resolve repo: explicit param > GH_DEFAULT_REPO (consistent with tool_search)
-    local effective_repo
-    if [[ -n "${repo}" ]]; then
-        effective_repo="${repo}"
-    else
-        effective_repo="${GH_DEFAULT_REPO:-}"
-    fi
-
-    if [[ -n "${effective_repo}" ]]; then
-        _gh_validate_repo "${effective_repo}" || return 1
-        cmd+=("--repo" "${effective_repo}")
-    elif [[ -n "${owner}" ]]; then
-        cmd+=("--owner" "${owner}")
-    fi
+    _gh_resolve_search_scope "${owner}" "${repo}" "search_code" || return 1
+    cmd+=(${_GH_SEARCH_SCOPE[@]+"${_GH_SEARCH_SCOPE[@]}"})
 
     [[ -n "${language}" ]]  && cmd+=("--language" "${language}")
     [[ -n "${extension}" ]] && cmd+=("--extension" "${extension}")
@@ -363,20 +404,8 @@ tool_search_commits() {
 
     local -a cmd=("gh" "search" "commits")
 
-    # Resolve repo: explicit param > GH_DEFAULT_REPO (consistent with tool_search)
-    local effective_repo
-    if [[ -n "${repo}" ]]; then
-        effective_repo="${repo}"
-    else
-        effective_repo="${GH_DEFAULT_REPO:-}"
-    fi
-
-    if [[ -n "${effective_repo}" ]]; then
-        _gh_validate_repo "${effective_repo}" || return 1
-        cmd+=("--repo" "${effective_repo}")
-    elif [[ -n "${owner}" ]]; then
-        cmd+=("--owner" "${owner}")
-    fi
+    _gh_resolve_search_scope "${owner}" "${repo}" "search_commits" || return 1
+    cmd+=(${_GH_SEARCH_SCOPE[@]+"${_GH_SEARCH_SCOPE[@]}"})
 
     [[ -n "${author}" ]]         && cmd+=("--author" "${author}")
     [[ -n "${committer}" ]]      && cmd+=("--committer" "${committer}")

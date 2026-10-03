@@ -73,6 +73,45 @@ setup_read_blocking() {
     assert_output --partial "issue_view"
 }
 
+@test "read api: blocks GET issues/N → suggests issue_view" {
+    setup_read_blocking
+    run_api_hook "$READ_TOOL" "repos/shopware/shopware/issues/123"
+    assert_failure 2
+    assert_output --partial "issue_view"
+}
+
+# Spellings that fetch the same issue: a leading slash, a query string, a
+# fragment gh drops before sending, a trailing slash, and gh's placeholders.
+_test_issue_spelling_blocked() {
+    setup_read_blocking
+    run_api_hook "$READ_TOOL" "$1"
+    assert_failure 2
+    assert_output --partial "issue_view"
+}
+bats_test_function --description "read api: blocks /repos/O/R/issues/N"          -- _test_issue_spelling_blocked "/repos/shopware/shopware/issues/123"
+bats_test_function --description "read api: blocks issues/N with a query string" -- _test_issue_spelling_blocked "repos/shopware/shopware/issues/123?per_page=1"
+bats_test_function --description "read api: blocks issues/N with a fragment"     -- _test_issue_spelling_blocked "repos/shopware/shopware/issues/123#top"
+bats_test_function --description "read api: blocks issues/N/ with a trailing slash" -- _test_issue_spelling_blocked "repos/shopware/shopware/issues/123/"
+bats_test_function --description "read api: blocks issues/N with gh's placeholders" -- _test_issue_spelling_blocked "repos/{owner}/{repo}/issues/123"
+
+@test "read api: allows issues/N/timeline, which has no dedicated tool" {
+    setup_read_blocking
+    run_api_hook "$READ_TOOL" "repos/shopware/shopware/issues/123/timeline"
+    assert_success
+}
+
+@test "read api: allows search/issues whose query names an issue path" {
+    setup_read_blocking
+    run_api_hook "$READ_TOOL" "search/issues?q=https://api.github.com/repos/shopware/shopware/issues/1"
+    assert_success
+}
+
+@test "read api: allows search/code, which search_code cannot fully replace" {
+    setup_read_blocking
+    run_api_hook "$READ_TOOL" "search/code?q=addClass+removeClass+repo:shopware/shopware"
+    assert_success
+}
+
 @test "read api: blocks orgs/N/issue-types → suggests issue_schema" {
     setup_read_blocking
     run_api_hook "$READ_TOOL" "orgs/shopware/issue-types"
@@ -130,6 +169,13 @@ setup_read_blocking() {
 
 setup_write_blocking() {
     setup_config "gh-tooling" '{"block_api_tool_write": true}'
+}
+
+@test "write api: blocks GET issues/N → suggests issue_view" {
+    setup_write_blocking
+    run_api_hook "$WRITE_TOOL" "repos/shopware/shopware/issues/123"
+    assert_failure 2
+    assert_output --partial "issue_view"
 }
 
 @test "write api: blocks POST pulls → suggests pr_create" {
