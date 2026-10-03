@@ -1,6 +1,6 @@
 {
   "name": "@shopwarelabs/github-agent-tools",
-  "version": "5.0.0",
+  "version": "5.0.1",
   "description": "GitHub CLI MCP servers for pull requests, issues, CI, and repositories, with enforcement that keeps the agent on the MCP tools.",
   "type": "module",
   "license": "MIT",
