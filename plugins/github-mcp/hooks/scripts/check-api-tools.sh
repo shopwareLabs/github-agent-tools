@@ -107,6 +107,16 @@ if echo "$ENDPOINT" | grep -qE 'labels(\?|$)'; then
     block_tool "label_list" "Use label_list with optional repo and filter parameters."
 fi
 
+# One issue
+if echo "$ENDPOINT" | grep -qE 'repos/[^/]+/[^/]+/issues/[0-9]+(\?|$)'; then
+    block_tool "issue_view" "Use issue_view with number and optional repo, fields, and jq_filter. For a pull request number, use pr_view."
+fi
+
+# Code search
+if echo "$ENDPOINT" | grep -qE 'search/code(\?|$)'; then
+    block_tool "search_code" "Use search_code with search and optional repo, owner, language, extension, and filename."
+fi
+
 # Issue field values on one issue
 if echo "$ENDPOINT" | grep -qE 'issues/[0-9]+/issue-field-values'; then
     block_tool "issue_view" "Use issue_view with number and with_field_values true. It returns the issue's type and field values keyed by field name."

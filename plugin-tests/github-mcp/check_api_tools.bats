@@ -73,6 +73,32 @@ setup_read_blocking() {
     assert_output --partial "issue_view"
 }
 
+@test "read api: blocks GET issues/N → suggests issue_view" {
+    setup_read_blocking
+    run_api_hook "$READ_TOOL" "repos/shopware/shopware/issues/123"
+    assert_failure 2
+    assert_output --partial "issue_view"
+}
+
+@test "read api: allows issues/N/timeline, which has no dedicated tool" {
+    setup_read_blocking
+    run_api_hook "$READ_TOOL" "repos/shopware/shopware/issues/123/timeline"
+    assert_success
+}
+
+@test "read api: blocks search/code with a query string → suggests search_code" {
+    setup_read_blocking
+    run_api_hook "$READ_TOOL" "search/code?q=typebox+repo:shopware/shopware"
+    assert_failure 2
+    assert_output --partial "search_code"
+}
+
+@test "read api: allows search/issues, a documented api_read use" {
+    setup_read_blocking
+    run_api_hook "$READ_TOOL" "search/issues?q=repo:shopware/shopware+is:open"
+    assert_success
+}
+
 @test "read api: blocks orgs/N/issue-types → suggests issue_schema" {
     setup_read_blocking
     run_api_hook "$READ_TOOL" "orgs/shopware/issue-types"
