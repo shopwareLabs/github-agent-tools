@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- In pi, `tool_search` now ranks the requested gh-tooling tool first for most exact-name queries,
+  such as `issue_view` (before: 5th). Names that share terms with another tool can still rank 2nd to
+  5th: `search`, `repo_file`, and with the write server `pr_comments`, `pr_reviews`, and
+  `pr_comment`. pi adds each server's description and instructions to every one of its tools' search
+  text, and the old texts repeated the words the tools are named after. The descriptions and the
+  server instructions now use none of those words (the instructions are not sent by the current SDK
+  yet). The pi directive now tells the model to search with `limit: 1` and to search again when a
+  different tool loads; most lookups now load one tool instead of up to eight, and each of the names
+  listed above takes one more search per place it ranks below first.
+- The shared tool directive now lists `release_list`, which was missing (affects every host).
 - An invalid `grep_pattern` now fails the tool call with `Error: Invalid grep_pattern` before `gh`
   runs, so `run_logs` and `job_logs` no longer download a log and `search_code` no longer spends a
   search request first. Before, grep's exit status was discarded and the call succeeded, returning

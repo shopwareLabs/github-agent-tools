@@ -63,7 +63,8 @@ return JSON.stringify({ results, caught });
     "done",
   ],
   deferred: [
-    fauxToolCall("tool_search", { query: "pr_view" }, { id: "search-pr-view" }),
+    fauxToolCall("tool_search", { limit: 1, query: "pr_view" }, { id: "search-pr-view" }),
+    fauxToolCall("tool_search", { limit: 1, query: "issue_view" }, { id: "search-issue-view" }),
     prView(8),
     ghPrViewInBash,
     fauxToolCall("tool_search", { query: "api_read" }, { id: "search-api-read" }),

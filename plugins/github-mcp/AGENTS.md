@@ -167,6 +167,10 @@ Where gh's stdout is a value the tool parses (an ID, a SHA, a JSON listing) rath
 6. Add tool definition to `mcp-server-gh/tools-read.json`
 7. If new file: source it in `mcp-server-gh/server-read.sh`
 8. Update README.md and REFERENCE.md
+9. Check that the tool name shares no word with the server descriptions in `pi/index.ts` or the
+   `instructions` in `config-read.json`/`config-write.json` — pi's `tool_search` adds those texts to
+   every tool's search text. `pi/tool-search-ranking.test.ts` checks this and that the new tool ranks
+   first for its own name.
 
 **Adding a new write tool:**
 1. Choose or create appropriate `mcp-server-gh/lib/<group>_write.sh`
@@ -175,6 +179,10 @@ Where gh's stdout is a value the tool parses (an ID, a SHA, a JSON listing) rath
 4. If new file: source it in `mcp-server-gh/server-write.sh`
 5. Add bash command blocking in `hooks/scripts/check-gh-tools.sh`
 6. Update README.md and REFERENCE.md
+7. Check that the tool name shares no word with the server descriptions in `pi/index.ts` or the
+   `instructions` in `config-read.json`/`config-write.json` — pi's `tool_search` adds those texts to
+   every tool's search text. `pi/tool-search-ranking.test.ts` checks this and that the new tool ranks
+   first for its own name.
 
 **Modifying the pi extension:**
 1. `pi/index.ts` registers the servers, runs the SessionStart directive, and wires the two gates —
@@ -249,6 +257,7 @@ own unit tests are Node tests under `plugin-tests/github-mcp/pi/`:
 | `write_tools_review.bats` | `pr_review_submit`/`pr_comment`/`pr_review_reply` parameter handling and REST payloads |
 | `pi/gate.test.ts` | `runGate()`/`runScript()`: exit codes, stderr capture, stdin handling, and the timeout that kills a gate's background children |
 | `pi/index.test.ts` | The extension's event handlers on a fake pi: the `github_mcp` section from session-start output (malformed output and non-zero exits add none), and which `bash` and `api_read` calls the gates block or let through |
+| `pi/tool-search-ranking.test.ts` | Exact-name ranking with pi's own ranker over the real tool catalogs, server descriptions, and server instructions; and that no server description or instructions term matches a tool-name term |
 
 The vendored SDK's own surface — argument validation and logging — is tested upstream in
 `shopwareLabs/bash-mcp-sdk`, not here.
