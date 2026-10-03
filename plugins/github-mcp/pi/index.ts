@@ -28,15 +28,14 @@ function readAdditionalContext(stdout: string): string {
 export default function githubMcp(pi: ExtensionAPI): void {
   pi.registerMcpServer("gh-tooling", {
     command: path.join(PLUGIN_ROOT, "mcp-server-gh", "server-read.sh"),
-    description:
-      "GitHub via the gh CLI: pull requests, issues, CI runs and logs, commits, search, labels, projects, repository files.",
+    description: "Remote GitHub data through the gh CLI, not local git.",
     env: { GITHUB_MCP_HOST: "pi" },
     exposure: "deferred",
   });
   pi.registerMcpServer("gh-tooling-write", {
     command: path.join(PLUGIN_ROOT, "mcp-server-gh", "server-write.sh"),
     description:
-      "GitHub writes via the gh CLI: create and edit pull requests, issues, reviews, comments, labels, projects. Empty unless enable_write_server is set.",
+      "Changes to remote GitHub data through the gh CLI, not local git. Empty unless enable_write_server is true.",
     env: { GITHUB_MCP_HOST: "pi" },
     exposure: "deferred",
   });

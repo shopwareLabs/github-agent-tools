@@ -13,6 +13,7 @@ CI: run_view, run_list, run_logs, workflow_jobs, job_view, job_logs, job_annotat
 Commits: commit_pulls
 Search: search, search_code, search_repos, search_commits, search_discussions
 Repo: repo_tree, repo_file
+Releases: release_list
 Labels: label_list
 Projects: project_list, project_view
 Escape hatch (last resort): api_read (GET only). Use only when no dedicated tool covers your endpoint — not as a fallback when a dedicated tool returns an error.

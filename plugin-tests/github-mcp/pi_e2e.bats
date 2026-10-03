@@ -183,13 +183,24 @@ assert_tools_deferred_until_searched() {
     assert_output "{\"all\":${expected_count},\"exposures\":[\"deferred\"]}"
 }
 
-assert_tool_search_loads_pr_view() {
-    local result
-    result=$(tool_result "$1" search-pr-view)
+assert_tool_search_loads_one_tool() {
+    local run_name="$1" tool_call_id="$2" tool_name="$3" result text
+    result=$(tool_result "${run_name}" "${tool_call_id}")
     run jq -r '.isError' <<<"${result}"
     assert_output "false"
-    run jq -r '.text' <<<"${result}"
-    assert_output --partial "mcp__gh_tooling__pr_view"
+    text=$(jq -r '.text' <<<"${result}")
+    run grep -c -E '^- [^[:space:]]+: ' <<<"${text}"
+    assert_output "1"
+    run grep -c -- "^- ${tool_name}: " <<<"${text}"
+    assert_output "1"
+}
+
+assert_tool_search_loads_pr_view() {
+    assert_tool_search_loads_one_tool "$1" search-pr-view mcp__gh_tooling__pr_view
+}
+
+assert_tool_search_loads_issue_view() {
+    assert_tool_search_loads_one_tool "$1" search-issue-view mcp__gh_tooling__issue_view
 }
 
 assert_pr_view_returns_stub() {
@@ -245,6 +256,10 @@ assert_pi_exits_cleanly() {
 
 @test "git layout: tool_search for pr_view loads mcp__gh_tooling__pr_view" {
     assert_tool_search_loads_pr_view git-deferred
+}
+
+@test "git layout: tool_search for issue_view loads mcp__gh_tooling__issue_view" {
+    assert_tool_search_loads_issue_view git-deferred
 }
 
 @test "git layout: pr_view returns the stub's JSON" {

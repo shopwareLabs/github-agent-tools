@@ -2,7 +2,7 @@
 
 > **Experimental Community Project**: Maintained by Shopware Labs, not an official Shopware product. Not affiliated with, endorsed by, or sponsored by Anthropic, OpenAI, or any other AI provider. Provider and product names are used only to describe compatibility. Provided as-is without warranty.
 
-GitHub CLI tools for AI coding agents. Wraps the GitHub CLI (`gh`) behind MCP servers — pull requests, issues, CI runs, jobs, commits, search, labels, projects, and repository file browsing — as first-class MCP tools, with hook-based enforcement that keeps the agent on the tools instead of raw `gh` bash calls.
+GitHub CLI tools for AI coding agents. Wraps the GitHub CLI (`gh`) behind MCP servers — pull requests, issues, CI runs, jobs, commits, search, labels, projects, releases, and repository file browsing — as first-class MCP tools, with hook-based enforcement that keeps the agent on the tools instead of raw `gh` bash calls.
 
 The MCP servers use the assistant-neutral [Model Context Protocol](https://modelcontextprotocol.io/) and can be integrated with MCP-capable coding agents. This repository provides tested `github-mcp` plugin packaging for [Claude Code](https://docs.claude.com/en/docs/claude-code/plugins), [Codex](https://learn.chatgpt.com/docs/build-plugins), and [pi](https://pi.dev).
 

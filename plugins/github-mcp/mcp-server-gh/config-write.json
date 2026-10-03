@@ -9,5 +9,5 @@
       "listChanged": false
     }
   },
-  "instructions": "GitHub write operations: create and edit PRs, issues, reviews, comments, labels, assignees, sub-issues, and projects. Requires enable_write_server: true in .mcp-gh-tooling.json. All tools require network connectivity and the gh CLI to be authenticated."
+  "instructions": "Changes to remote GitHub data through the gh CLI. Needs enable_write_server: true in .mcp-gh-tooling.json, network access, and an authenticated gh CLI."
 }

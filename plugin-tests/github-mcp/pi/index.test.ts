@@ -4,10 +4,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test, { type TestContext } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { type Handler, registerOnFakePi } from "./fake-pi.ts";
 import type githubMcp from "../../../plugins/github-mcp/pi/index.ts";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-
-type Handler = (event: unknown, ctx: unknown) => unknown;
 
 const PLUGIN_DIR = fileURLToPath(new URL("../../../plugins/github-mcp", import.meta.url));
 
@@ -17,26 +15,6 @@ function makeTemporaryDirectory(t: TestContext): string {
     rmSync(dir, { force: true, recursive: true });
   });
   return dir;
-}
-
-function noop(): void {
-  // The fake pi has nothing to unsubscribe and no server to start.
-}
-
-/**
- * Registers the extension on a fake pi that only records the event handlers.
- */
-function register(extension: typeof githubMcp): Map<string, Handler> {
-  const handlers = new Map<string, Handler>();
-  const pi = {
-    on: (name: string, handler: Handler) => {
-      handlers.set(name, handler);
-      return noop;
-    },
-    registerMcpServer: noop,
-  };
-  extension(pi as unknown as ExtensionAPI);
-  return handlers;
 }
 
 function handler(handlers: Map<string, Handler>, name: string): Handler {
@@ -59,7 +37,7 @@ async function sectionsAfterSessionStart(t: TestContext, scriptBody: string): Pr
   writeFileSync(path.join(dir, "plugin", "hooks", "scripts", "session-start.sh"), scriptBody);
   const indexUrl = pathToFileURL(path.join(dir, "plugin", "pi", "index.ts")).href;
   const { default: extension } = (await import(indexUrl)) as { default: typeof githubMcp };
-  const handlers = register(extension);
+  const handlers = registerOnFakePi(extension).handlers;
 
   await handler(handlers, "session_start")({}, { cwd: dir });
   const sections: Record<string, string> = {};
@@ -69,7 +47,7 @@ async function sectionsAfterSessionStart(t: TestContext, scriptBody: string): Pr
 
 async function loadRealExtension(): Promise<Map<string, Handler>> {
   const { default: extension } = await import("../../../plugins/github-mcp/pi/index.ts");
-  return register(extension);
+  return registerOnFakePi(extension).handlers;
 }
 
 test("the session-start directive becomes the github_mcp system prompt section", async (t) => {
