@@ -62,8 +62,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   default repo is configured. Before, the default repo replaced `owner`, so these tools could not
   search outside it. `owner` together with a bare repo name in `repo` now searches `owner/repo`,
   the split form the other tools accept; before, the bare name failed as not `owner/repo`. An
-  `owner/repo` value in `repo` still takes precedence over `owner`, and an `owner` that is not a
-  single user or organization login is rejected before `gh` runs.
+  `owner` passed with an `owner/repo` value in `repo` must name the same owner, and an `owner` that
+  is not a single user or organization login is rejected before `gh` runs.
 - `sub_issue_add`, `sub_issue_remove`, `project_item_add`, and `project_status_set` now reject a
   `repo` that is not in `owner/repo` form before any GitHub call. Before, `acme/app/extra` was read
   as owner `acme` and repository `extra`, or built a wrong item URL.

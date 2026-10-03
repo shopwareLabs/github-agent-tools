@@ -846,9 +846,20 @@ _test_scope_owner_beats_default() {
     GH_DEFAULT_REPO="shopware/shopware"
     assert_search_argv "tool_$1" '{"search":"test","owner":"acme"}' "$("_scope_argv_${1#search_}" $'--owner\nacme')"
 }
-_test_scope_repo_beats_owner() {
+_test_scope_matching_owner() {
     GH_DEFAULT_REPO="shopware/shopware"
-    assert_search_argv "tool_$1" '{"search":"test","repo":"acme/app","owner":"other"}' "$("_scope_argv_${1#search_}" $'--repo\nacme/app')"
+    assert_search_argv "tool_$1" '{"search":"test","repo":"acme/app","owner":"ACME"}' "$("_scope_argv_${1#search_}" $'--repo\nacme/app')"
+}
+_test_scope_user_login_owner() {
+    GH_DEFAULT_REPO="shopware/shopware"
+    assert_search_argv "tool_$1" '{"search":"test","owner":"octocat_acme"}' "$("_scope_argv_${1#search_}" $'--owner\noctocat_acme')"
+}
+_test_scope_conflicting_owner() {
+    gh() { touch "${BATS_TEST_TMPDIR}/gh_called"; echo '[]'; }
+    run "tool_$1" '{"search":"test","repo":"acme/app","owner":"other"}'
+    assert_failure
+    assert_output --partial "does not match the owner in repo"
+    assert [ ! -e "${BATS_TEST_TMPDIR}/gh_called" ]
 }
 _test_scope_split_form() {
     GH_DEFAULT_REPO="shopware/shopware"
@@ -861,8 +872,11 @@ _test_scope_repo_beats_default() {
 
 bats_test_function --description "search_code: an explicit owner beats GH_DEFAULT_REPO"           -- _test_scope_owner_beats_default search_code
 bats_test_function --description "search_commits: an explicit owner beats GH_DEFAULT_REPO"        -- _test_scope_owner_beats_default search_commits
-bats_test_function --description "search_code: an owner/repo value in repo beats owner"           -- _test_scope_repo_beats_owner search_code
-bats_test_function --description "search_commits: an owner/repo value in repo beats owner"        -- _test_scope_repo_beats_owner search_commits
+bats_test_function --description "search_code: an owner matching the owner in repo is accepted, in any case"    -- _test_scope_matching_owner search_code
+bats_test_function --description "search_commits: an owner matching the owner in repo is accepted, in any case" -- _test_scope_matching_owner search_commits
+bats_test_function --description "search_code: an owner differing from the owner in repo is rejected before gh runs"    -- _test_scope_conflicting_owner search_code
+bats_test_function --description "search_commits: an owner differing from the owner in repo is rejected before gh runs" -- _test_scope_conflicting_owner search_commits
+bats_test_function --description "search_code: a user login with an underscore is a valid owner"           -- _test_scope_user_login_owner search_code
 bats_test_function --description "search_code: owner with a bare repo name searches owner/repo"   -- _test_scope_split_form search_code
 bats_test_function --description "search_commits: owner with a bare repo name searches owner/repo" -- _test_scope_split_form search_commits
 bats_test_function --description "search_commits: an explicit repo beats GH_DEFAULT_REPO"         -- _test_scope_repo_beats_default search_commits

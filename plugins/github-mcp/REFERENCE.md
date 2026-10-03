@@ -362,7 +362,7 @@ Use gh-tooling search_code with search "addClass" and repo "shopware/shopware" a
 **Parameters:**
 - `search` (string, required): Code search expression, matched as exact text (no regex). Unlike the other search tools, the whole value is one phrase.
 - `owner` (string, optional): Limit to repositories owned by this user/org, instead of the configured default repo. With a bare repo name in `repo`, the two form `owner/repo`.
-- `repo` (string, optional): Limit to this repository, as `owner/repo` or as a bare name together with `owner`. An `owner/repo` value makes `owner` unused.
+- `repo` (string, optional): Limit to this repository, as `owner/repo` or as a bare name together with `owner`. An `owner` passed with an `owner/repo` value must name the same owner.
 - `language` (string, optional): Filter by language (e.g. `php`, `typescript`).
 - `extension` (string, optional): Filter by file extension (e.g. `php`, `ts`).
 - `filename` (string, optional): Filter by filename (e.g. `composer.json`).
@@ -402,7 +402,7 @@ Use gh-tooling search_commits with search "fix cart" and author "mitelg" and aut
 
 **Parameters:**
 - `search` (string, required): Commit message search expression; see [Search expressions](#search).
-- `repo` (string, optional): Limit to this repository, as `owner/repo` or as a bare name together with `owner`. An `owner/repo` value makes `owner` unused.
+- `repo` (string, optional): Limit to this repository, as `owner/repo` or as a bare name together with `owner`. An `owner` passed with an `owner/repo` value must name the same owner.
 - `owner` (string, optional): Limit to repositories owned by this user/org, instead of the configured default repo. With a bare repo name in `repo`, the two form `owner/repo`.
 - `author` (string, optional): Filter by commit author username.
 - `committer` (string, optional): Filter by committer username.
