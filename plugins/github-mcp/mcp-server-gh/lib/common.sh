@@ -222,39 +222,37 @@ _gh_capture_split() {
 #######################################
 # Run a gh issue/pr view command for the item's text preview, then again with
 # --comments for its comments. Without a TTY, gh prints only the comments when
-# given --comments, so the preview needs a call of its own.
+# given --comments, so the preview needs a call of its own. Each call's stderr
+# is kept out of its output, so a gh warning can never pass for a comment.
+# Known limits: the two calls are separate requests, so a comment posted
+# between them can make the preview's comment count disagree with the list;
+# gh leaves hidden (minimized) comments out of the list.
 # Arguments:
-#   $1 separator line put between the preview and the comments,
-#   $2 suppress_errors; "true" leaves gh's stderr out of the output,
+#   $1 tool name, for the log,
+#   $2 separator line put between the preview and the comments,
 #   $3... the view command and its arguments, without --comments.
 # Outputs:
 #   The preview, then a blank line, the separator, and the comments when gh
-#   printed any. On failure, the failed call's output.
+#   printed any. On failure, the failed call's stderr, or its stdout when
+#   stderr is empty.
 # Returns:
 #   0 when both calls succeed, otherwise the failed call's exit status.
 #######################################
 _gh_view_with_comments() {
-    local separator="$1" suppress_errors="$2"
+    local tool_name="$1" separator="$2"
     shift 2
-    local preview comments exit_code=0
+    local preview comments err exit_code=0
 
-    if [[ "${suppress_errors}" == "true" ]]; then
-        preview=$("$@" 2>/dev/null) || exit_code=$?
-    else
-        preview=$("$@" 2>&1) || exit_code=$?
-    fi
+    _gh_capture_split preview err "$@" || exit_code=$?
     if [[ ${exit_code} -ne 0 ]]; then
-        printf '%s\n' "${preview}"
+        printf '%s\n' "${err:-${preview}}"
         return "${exit_code}"
     fi
 
-    if [[ "${suppress_errors}" == "true" ]]; then
-        comments=$("$@" --comments 2>/dev/null) || exit_code=$?
-    else
-        comments=$("$@" --comments 2>&1) || exit_code=$?
-    fi
+    log "INFO" "${tool_name}: $* --comments"
+    _gh_capture_split comments err "$@" --comments || exit_code=$?
     if [[ ${exit_code} -ne 0 ]]; then
-        printf '%s\n' "${comments}"
+        printf '%s\n' "${err:-${comments}}"
         return "${exit_code}"
     fi
 

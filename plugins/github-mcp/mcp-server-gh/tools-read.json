@@ -26,7 +26,7 @@
           },
           "comments": {
             "type": "boolean",
-            "description": "Include PR comments in output. Only applies when 'fields' is not set.",
+            "description": "Append the PR's comments and reviews after the PR text, below a '--- comments and reviews ---' line. Only applies when 'fields' is not set. max_lines counts the PR and its comments together.",
             "default": false
           },
           "jq_filter": {
@@ -478,7 +478,7 @@
           },
           "with_comments": {
             "type": "boolean",
-            "description": "Include issue comments in text output. Only applies when 'fields' is not set.",
+            "description": "Append the issue's comments after the issue text, below a '--- comments ---' line. Only applies when 'fields' is not set; cannot be combined with 'with_field_values'. max_lines counts the issue and its comments together.",
             "default": false
           },
           "with_field_values": {

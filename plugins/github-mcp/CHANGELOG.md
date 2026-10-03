@@ -27,7 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the issue or PR when it has none. Before, they returned only the comments, and nothing for an item
   without comments: run without a terminal, `gh issue view --comments` and `gh pr view --comments`
   print the comments alone. The tools now make one call for the item and a second with `--comments`;
-  a failed second call fails the tool call, or returns `fallback` when set.
+  a failed second call fails the tool call, or returns `fallback` when set. A warning gh prints on
+  stderr stays out of the result. `max_lines` now counts the item and its comments together, where
+  before it applied to the comments alone. `REFERENCE.md` lists the known limits of the two calls.
 - In pi, `tool_search` now ranks the requested gh-tooling tool first for most exact-name queries,
   such as `issue_view` (before: 5th). Names that share terms with another tool can still rank 2nd to
   5th: `search`, `repo_file`, and with the write server `pr_comments`, `pr_reviews`, and

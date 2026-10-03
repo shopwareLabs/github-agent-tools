@@ -67,7 +67,7 @@ tool_issue_view() {
         log "INFO" "issue_view: ${cmd[*]}"
         local __raw __exit=0
         if [[ -z "${fields}" && "${with_comments}" == "true" ]]; then
-            __raw=$(_gh_view_with_comments "--- comments ---" "${suppress_errors}" "${cmd[@]}") || __exit=$?
+            __raw=$(_gh_view_with_comments "issue_view" "--- comments ---" "${cmd[@]}") || __exit=$?
         elif [[ "${suppress_errors}" == "true" ]]; then
             __raw=$("${cmd[@]}" 2>/dev/null) || __exit=$?
         else

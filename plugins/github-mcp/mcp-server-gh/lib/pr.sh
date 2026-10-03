@@ -46,7 +46,7 @@ tool_pr_view() {
     log "INFO" "pr_view: ${cmd[*]}"
     local __raw __exit=0
     if [[ -z "${fields}" && "${comments}" == "true" ]]; then
-        __raw=$(_gh_view_with_comments "--- comments and reviews ---" "${suppress_errors}" "${cmd[@]}") || __exit=$?
+        __raw=$(_gh_view_with_comments "pr_view" "--- comments and reviews ---" "${cmd[@]}") || __exit=$?
     elif [[ "${suppress_errors}" == "true" ]]; then
         __raw=$("${cmd[@]}" 2>/dev/null) || __exit=$?
     else

@@ -2012,10 +2012,12 @@ diff --git a/src/Third.php b/src/Third.php
 
 # Stub gh as a view command: the preview without --comments, and VIEW_COMMENTS
 # (exit VIEW_COMMENTS_EXIT) with it, the way gh prints them without a TTY.
+# Each call's arguments go to gh_calls, one call per line.
 _stub_gh_view() {
     VIEW_COMMENTS="$1"
     VIEW_COMMENTS_EXIT="${2:-0}"
     gh() {
+        echo "$*" >> "${BATS_TEST_TMPDIR}/gh_calls"
         if [[ " $* " == *" --comments "* ]]; then
             if [[ "${VIEW_COMMENTS_EXIT}" -ne 0 ]]; then
                 echo "comments request failed" >&2
@@ -2052,28 +2054,82 @@ assert_view_comments_failure() {
     assert_output "comments request failed"
 }
 
-# Under suppress_errors, a gh warning on stderr stays out of a successful
-# call's output, for the comments call as well as the preview call.
-# Usage: assert_view_comments_warning_suppressed <tool_fn> <args_json> <separator>
-assert_view_comments_warning_suppressed() {
+# A gh warning on stderr is not a comment: an item without comments still
+# comes back without a separator.
+# Usage: assert_view_warning_not_a_comment <tool_fn> <args_json>
+assert_view_warning_not_a_comment() {
     gh() {
         echo "warning: rate limit low" >&2
-        if [[ " $* " == *" --comments "* ]]; then
-            echo "First comment"
-        else
-            echo "Example body"
-        fi
+        [[ " $* " == *" --comments "* ]] || echo "Example body"
     }
     run "$1" "$2"
     assert_success
-    assert_output "$(printf 'Example body\n\n%s\nFirst comment' "$3")"
+    assert_output "Example body"
 }
 
-_test_issue_view_comments_suppressed() { assert_view_comments_warning_suppressed tool_issue_view '{"number":"42","with_comments":true,"suppress_errors":true}' "--- comments ---"; }
-_test_pr_view_comments_suppressed()    { assert_view_comments_warning_suppressed tool_pr_view '{"number":"123","comments":true,"suppress_errors":true}' "--- comments and reviews ---"; }
+# A failed preview call is reported as is, and the comments call never runs.
+# Usage: assert_view_preview_failure <tool_fn> <args_json>
+assert_view_preview_failure() {
+    gh() {
+        echo "$*" >> "${BATS_TEST_TMPDIR}/gh_calls"
+        echo "could not resolve to an issue" >&2
+        return 1
+    }
+    run "$1" "$2"
+    assert_failure
+    assert_output "could not resolve to an issue"
+    run grep -c -- "--comments" "${BATS_TEST_TMPDIR}/gh_calls"
+    assert_output "0"
+}
 
-bats_test_function --description "issue_view: with_comments under suppress_errors leaves gh's warnings out" -- _test_issue_view_comments_suppressed
-bats_test_function --description "pr_view: comments under suppress_errors leaves gh's warnings out"         -- _test_pr_view_comments_suppressed
+# Usage: assert_view_comments_failure_fallback <tool_fn> <args_json>
+assert_view_comments_failure_fallback() {
+    _stub_gh_view "" 1
+    run "$1" "$2"
+    assert_success
+    assert_output "no data"
+}
+
+# Usage: assert_view_comments_call_args <tool_fn> <args_json> <expected_call>
+assert_view_comments_call_args() {
+    _stub_gh_view "First comment"
+    run "$1" "$2"
+    assert_success
+    run tail -n 1 "${BATS_TEST_TMPDIR}/gh_calls"
+    assert_output "$3"
+}
+
+# With fields, gh returns JSON and the flag does not apply: one call, no --comments.
+# Usage: assert_view_fields_skip_comments <tool_fn> <args_json> <expected_call>
+assert_view_fields_skip_comments() {
+    _stub_gh_view "First comment"
+    run "$1" "$2"
+    assert_success
+    run cat "${BATS_TEST_TMPDIR}/gh_calls"
+    assert_output "$3"
+}
+
+_test_issue_view_warning()          { assert_view_warning_not_a_comment tool_issue_view '{"number":"42","with_comments":true}'; }
+_test_pr_view_warning()             { assert_view_warning_not_a_comment tool_pr_view '{"number":"123","comments":true}'; }
+_test_issue_view_preview_failed()   { assert_view_preview_failure tool_issue_view '{"number":"42","with_comments":true}'; }
+_test_pr_view_preview_failed()      { assert_view_preview_failure tool_pr_view '{"number":"123","comments":true}'; }
+_test_issue_view_comments_fallback() { assert_view_comments_failure_fallback tool_issue_view '{"number":"42","with_comments":true,"fallback":"no data"}'; }
+_test_pr_view_comments_fallback()   { assert_view_comments_failure_fallback tool_pr_view '{"number":"123","comments":true,"fallback":"no data"}'; }
+_test_issue_view_comments_args()    { assert_view_comments_call_args tool_issue_view '{"number":"42","repo":"acme/app","with_comments":true}' "issue view 42 --repo acme/app --comments"; }
+_test_pr_view_comments_args()       { assert_view_comments_call_args tool_pr_view '{"number":"123","repo":"acme/app","comments":true}' "pr view 123 --repo acme/app --comments"; }
+_test_issue_view_fields_comments()  { assert_view_fields_skip_comments tool_issue_view '{"number":"42","repo":"acme/app","fields":"title","with_comments":true}' "issue view 42 --repo acme/app --json title"; }
+_test_pr_view_fields_comments()     { assert_view_fields_skip_comments tool_pr_view '{"number":"123","repo":"acme/app","fields":"title","comments":true}' "pr view 123 --repo acme/app --json title"; }
+
+bats_test_function --description "issue_view: with_comments does not count a gh warning as a comment"        -- _test_issue_view_warning
+bats_test_function --description "pr_view: comments does not count a gh warning as a comment"                -- _test_pr_view_warning
+bats_test_function --description "issue_view: with_comments reports a failed issue call without fetching comments" -- _test_issue_view_preview_failed
+bats_test_function --description "pr_view: comments reports a failed PR call without fetching comments"      -- _test_pr_view_preview_failed
+bats_test_function --description "issue_view: with_comments returns fallback when the comments call fails"  -- _test_issue_view_comments_fallback
+bats_test_function --description "pr_view: comments returns fallback when the comments call fails"          -- _test_pr_view_comments_fallback
+bats_test_function --description "issue_view: the comments call targets the same issue and repo"           -- _test_issue_view_comments_args
+bats_test_function --description "pr_view: the comments call targets the same PR and repo"                 -- _test_pr_view_comments_args
+bats_test_function --description "issue_view: with_comments does not apply when fields is set"             -- _test_issue_view_fields_comments
+bats_test_function --description "pr_view: comments does not apply when fields is set"                     -- _test_pr_view_fields_comments
 
 _test_issue_view_no_comments()     { assert_view_without_comments tool_issue_view '{"number":"42","with_comments":true}'; }
 _test_issue_view_comments()        { assert_view_with_comments tool_issue_view '{"number":"42","with_comments":true}' "--- comments ---"; }
