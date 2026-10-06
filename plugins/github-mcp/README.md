@@ -22,7 +22,7 @@ GitHub CLI tools via MCP (Model Context Protocol). Wraps the `gh` CLI for pull r
 
 ### Write Server (gh-tooling-write)
 - **PR lifecycle** via `pr_create`, `pr_edit`, `pr_ready`, `pr_merge`, `pr_close`, `pr_reopen`
-- **Reviews** via `pr_review_submit`, `pr_comment`, `pr_review_reply`, `comment_edit` (edits any existing comment by its URL)
+- **Reviews** via `pr_review_submit`, `pr_comment`, `pr_review_reply`, `comment_edit` (edits an issue or PR conversation comment, an inline review comment, or a review summary by its URL)
 - **Issue lifecycle** via `issue_create`, `issue_edit`, `issue_close`, `issue_reopen`, `issue_comment`
 - **Labels** via `label_add`, `label_remove`
 - **Assignees** via `assignee_add`, `assignee_remove`

@@ -419,17 +419,62 @@ _comment_edit_find_pending() {
 }
 
 #######################################
-# Replace the body of one existing comment, whatever its kind. The kind comes
-# from the anchor of the URL; REFERENCE.md lists the accepted URL forms. A URL
-# that matches none fails before any gh call. A conversation or inline comment
-# is read first and edited only when it belongs to the issue or PR number in
-# the URL. An inline comment the REST API reports as 404 may sit in the
-# caller's own pending review, so it is looked up there, page by page, and
-# edited through GraphQL; when that lookup fails or finds nothing, the error
-# states the 404 and the lookup's result. Every other failure ends the call
-# without a write.
+# Refuse to edit a comment somebody else wrote. The author comes from the
+# response of the read that precedes the write; the caller's login comes from
+# one GraphQL viewer query. Logins compare case-insensitively.
 # Arguments:
-#   $1 JSON arguments: url (required) and body (required).
+#   $1 response of the GET of the comment or review summary,
+#   $2 the GET's endpoint, for the message.
+# Outputs:
+#   An "Error: ..." message on stdout when the author cannot be read, the
+#   login lookup fails, or the logins differ.
+# Returns:
+#   0 when the caller wrote it; otherwise gh's exit status from the login
+#   lookup, or 1.
+#######################################
+_comment_edit_check_author() {
+    local response="$1" endpoint="$2"
+    local author viewer_out viewer viewer_exit=0
+
+    if ! author=$(printf '%s' "${response}" | jq -r '.user.login // empty' 2>/dev/null) || [[ -z "${author}" ]]; then
+        echo "Error: comment_edit: GET ${endpoint} returned no author login, so it cannot be compared with yours; nothing was edited. Pass allow_other_author: true to edit it anyway: ${response}"
+        return 1
+    fi
+
+    log "INFO" "comment_edit: reading the authenticated login"
+    _comment_edit_graphql viewer_out gh api graphql -f 'query=query { viewer { login } }' || viewer_exit=$?
+    if [[ ${viewer_exit} -ne 0 ]]; then
+        echo "Error: comment_edit: reading your login failed: ${viewer_out}; nothing was edited"
+        return "${viewer_exit}"
+    fi
+    if ! viewer=$(printf '%s' "${viewer_out}" | jq -r '.data.viewer.login // empty' 2>/dev/null) || [[ -z "${viewer}" ]]; then
+        echo "Error: comment_edit: the response to the login query holds no login; nothing was edited: ${viewer_out}"
+        return 1
+    fi
+
+    if [[ "${author,,}" != "${viewer,,}" ]]; then
+        echo "Error: comment_edit: the comment was written by ${author}, not by you (${viewer}); nothing was edited. Pass allow_other_author: true to edit it"
+        return 1
+    fi
+}
+
+#######################################
+# Replace the body of one existing comment: an issue or PR conversation
+# comment, an inline review comment (including one in the caller's own pending
+# review), or a review summary. Commit comments and Discussions comments are
+# not supported. The kind comes from the anchor of the URL; REFERENCE.md lists
+# the accepted URL forms. A URL that matches none fails before any gh call. The
+# comment is read first. A conversation or inline comment is edited only when
+# it belongs to the issue or PR number in the URL. Unless allow_other_author is
+# true, the edit also needs the comment's author to be the caller. An inline
+# comment the REST API reports as 404 may sit in the caller's own pending
+# review, so it is looked up there, page by page, and edited through GraphQL;
+# that review is the caller's by the lookup, so no author check runs. When that
+# lookup fails or finds nothing, the error states the 404 and the lookup's
+# result. Every other failure ends the call without a write.
+# Arguments:
+#   $1 JSON arguments: url (required), body (required), allow_other_author
+#      (optional boolean, default false).
 # Outputs:
 #   The edited comment's URL on success, otherwise an "Error: ..." message.
 # Returns:
@@ -439,9 +484,10 @@ _comment_edit_find_pending() {
 tool_comment_edit() {
     local args="$1"
 
-    local url body
+    local url body allow_other_author
     url=$(echo "${args}" | jq -r '.url // empty')
     body=$(echo "${args}" | jq -r '.body // empty')
+    allow_other_author=$(echo "${args}" | jq -r '.allow_other_author // false')
 
     if [[ -z "${url}" ]]; then
         echo "Error: url is required for comment_edit"
@@ -467,34 +513,33 @@ tool_comment_edit() {
 
     # Owners may contain "_" (Enterprise Managed User accounts). GitHub never
     # generates a number or ID with a leading zero, so none is accepted.
-    local form_error="Error: url must be OWNER/REPO/issues/N#issuecomment-ID, OWNER/REPO/pull/N#issuecomment-ID, OWNER/REPO/pull/N#discussion_rID, OWNER/REPO/pull/N/files#rID, OWNER/REPO/pull/N/changes#rID, or OWNER/REPO/pull/N#pullrequestreview-ID (optionally with a leading https://github.com/), got: '${url}'"
-    local url_re='^([A-Za-z0-9_-]+/[A-Za-z0-9_.-]+)/(issues|pull)/([1-9][0-9]*)(/files|/changes)?#([A-Za-z0-9_-]+)$'
+    # _gh_validate_repo and _gh_validate_number accept an owner with "." and a
+    # leading zero or 0, which this tool rejects, so the patterns below stay.
+    # A "?query" before the "#" is dropped.
+    local sha='[0-9a-fA-F]{7,40}'
+    local form_error="Error: url must be OWNER/REPO/issues/N#issuecomment-ID, OWNER/REPO/pull/N#issuecomment-ID, OWNER/REPO/pull/N#discussion_rID, OWNER/REPO/pull/N/files#rID, OWNER/REPO/pull/N/changes#rID, OWNER/REPO/pull/N/files/SHA..SHA#rID, OWNER/REPO/pull/N/commits/SHA#rID, or OWNER/REPO/pull/N#pullrequestreview-ID (SHA is 7 to 40 hex characters; optionally with a leading https://github.com/ and a ?query before the #), got: '${url}'"
+    local url_re="^([A-Za-z0-9_-]+/[A-Za-z0-9_.-]+)/(issues|pull)/([1-9][0-9]*)(/files|/changes|/files/${sha}\\.\\.${sha}|/commits/${sha})?(\\?[^#]*)?#([A-Za-z0-9_-]+)\$"
     if [[ ! "${rest}" =~ ${url_re} ]]; then
         echo "${form_error}"
         return 1
     fi
     local repo="${BASH_REMATCH[1]}" kind="${BASH_REMATCH[2]}" number="${BASH_REMATCH[3]}"
-    local suffix="${BASH_REMATCH[4]}" anchor="${BASH_REMATCH[5]}"
+    local suffix="${BASH_REMATCH[4]}" anchor="${BASH_REMATCH[6]}"
     if [[ "${repo##*/}" == "." || "${repo##*/}" == ".." || "${repo##*/}" == *.git ]]; then
         echo "${form_error}"
         return 1
     fi
 
     # owner_field names the field of the GET response that holds the issue or
-    # PR the comment belongs to; owner_path is how that URL must end.
+    # PR the comment belongs to; owner_path is how that URL must end. A review
+    # summary has neither: its endpoint already carries the PR number.
     local endpoint method owner_field="" owner_path="" review_comment_id=""
     if [[ "${anchor}" =~ ^issuecomment-([1-9][0-9]*)$ && -z "${suffix}" ]]; then
         endpoint="repos/${repo}/issues/comments/${BASH_REMATCH[1]}"
         method="PATCH"
         owner_field="issue_url"
         owner_path="issues/${number}"
-    elif [[ "${kind}" == "pull" && -z "${suffix}" && "${anchor}" =~ ^discussion_r([1-9][0-9]*)$ ]]; then
-        endpoint="repos/${repo}/pulls/comments/${BASH_REMATCH[1]}"
-        method="PATCH"
-        owner_field="pull_request_url"
-        owner_path="pulls/${number}"
-        review_comment_id="${BASH_REMATCH[1]}"
-    elif [[ "${kind}" == "pull" && -n "${suffix}" && "${anchor}" =~ ^r([1-9][0-9]*)$ ]]; then
+    elif [[ "${kind}" == "pull" ]] && { [[ -z "${suffix}" && "${anchor}" =~ ^discussion_r([1-9][0-9]*)$ ]] || [[ -n "${suffix}" && "${anchor}" =~ ^r([1-9][0-9]*)$ ]]; }; then
         endpoint="repos/${repo}/pulls/comments/${BASH_REMATCH[1]}"
         method="PATCH"
         owner_field="pull_request_url"
@@ -511,20 +556,20 @@ tool_comment_edit() {
     local __out __err __exit=0
     local not_found_note=""
 
-    if [[ -n "${owner_field}" ]]; then
-        log "INFO" "comment_edit: GET ${endpoint}"
-        _comment_edit_gh __out __err gh api "${endpoint}" || __exit=$?
-        if [[ ${__exit} -ne 0 ]]; then
-            # Only an inline comment can still be edited: REST answers 404 for
-            # a comment inside the caller's unsubmitted review.
-            if [[ -n "${review_comment_id}" && "${__err}" == *"(HTTP 404)"* ]]; then
-                not_found_note="GET ${endpoint} returned 404 (not found, or no access to the repository)"
-                __exit=0
-            else
-                echo "Error: comment_edit: GET ${endpoint} failed: ${__out}"
-                return "${__exit}"
-            fi
+    log "INFO" "comment_edit: GET ${endpoint}"
+    _comment_edit_gh __out __err gh api "${endpoint}" || __exit=$?
+    if [[ ${__exit} -ne 0 ]]; then
+        # Only an inline comment can still be edited: REST answers 404 for a
+        # comment inside the caller's unsubmitted review.
+        if [[ -n "${review_comment_id}" && "${__err}" == *"(HTTP 404)"* ]]; then
+            not_found_note="GET ${endpoint} returned 404 (not found, or no access to the repository)"
+            __exit=0
         else
+            echo "Error: comment_edit: GET ${endpoint} failed: ${__out}"
+            return "${__exit}"
+        fi
+    else
+        if [[ -n "${owner_field}" ]]; then
             local owner_url
             if ! owner_url=$(printf '%s' "${__out}" | jq -r --arg field "${owner_field}" '.[$field] // empty' 2>/dev/null) || [[ -z "${owner_url}" ]]; then
                 echo "Error: comment_edit: GET ${endpoint} returned no ${owner_field}: ${__out}"
@@ -534,6 +579,9 @@ tool_comment_edit() {
                 echo "Error: comment_edit: the comment belongs to #${owner_url##*/}, not to #${number} named in the URL; nothing was edited"
                 return 1
             fi
+        fi
+        if [[ "${allow_other_author}" != "true" ]]; then
+            _comment_edit_check_author "${__out}" "${endpoint}" || return $?
         fi
     fi
 
@@ -559,7 +607,7 @@ tool_comment_edit() {
             return 1
         fi
         if [[ -z "${mutation_url}" ]]; then
-            echo "Error: comment_edit: ${not_found_note}; pending-review comment edit failed: GitHub returned no URL for the edited comment: ${mutation}"
+            echo "Error: comment_edit: ${not_found_note}; the pending-review edit was sent and GitHub reported success but returned no URL, so the comment may already hold the new body: ${mutation}"
             return 1
         fi
         echo "${mutation_url}"
@@ -573,7 +621,7 @@ tool_comment_edit() {
         return "${__exit}"
     fi
     if [[ -z "${__out}" ]]; then
-        echo "Error: comment_edit: GitHub returned no URL for the edited comment"
+        echo "Error: comment_edit: ${method} ${endpoint} was sent and GitHub reported success but returned no URL, so the comment may already hold the new body"
         return 1
     fi
     echo "${__out}"

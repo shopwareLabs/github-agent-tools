@@ -1,6 +1,6 @@
 ## Write (gh-tooling-write)
 PRs: pr_create, pr_edit, pr_ready, pr_merge, pr_close, pr_reopen
-Reviews: pr_review_submit, pr_comment, pr_review_reply, comment_edit (replaces the body of one existing issue, PR, review, or inline review comment, found by its url)
+Reviews: pr_review_submit, pr_comment, pr_review_reply, comment_edit (replaces the body of one existing issue or PR conversation comment, inline review comment, or review summary, found by its url; another author's comment needs allow_other_author: true)
 Issues: issue_create, issue_edit, issue_close, issue_reopen, issue_comment
 Issue type and fields: issue_type_set, issue_field_set (issue_field_set replaces the issue's whole set of field values; read them first with issue_view and with_field_values true)
 Labels: label_add, label_remove

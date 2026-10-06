@@ -41,8 +41,10 @@ setup() {
         # its own stdout, stderr, and exit code: GH_STUB_<KIND>_OUTPUT/_STDERR/_EXIT.
         # A page fetch of a pending review's comments is keyed by the cursor it
         # sends, so each page has its own canned answer: GH_STUB_PAGE_<cursor>_*.
-        local kind="" get_re='^api repos/[^ ]+/comments/[0-9]+$'
-        if [[ "$*" == *"reviews(states: [PENDING]"* ]]; then
+        local kind="" get_re='^api repos/[^ ]+/(comments|reviews)/[0-9]+$'
+        if [[ "$*" == *"viewer { login }"* ]]; then
+            kind=VIEWER
+        elif [[ "$*" == *"reviews(states: [PENDING]"* ]]; then
             kind=LOOKUP
         elif [[ "$*" == *'node(id: $reviewId)'* ]]; then
             local arg cursor=""
@@ -77,11 +79,12 @@ setup() {
     }
     reset_gh_stub
     local kind
-    for kind in GET WRITE LOOKUP MUTATION; do
+    for kind in GET WRITE LOOKUP MUTATION VIEWER; do
         printf -v "GH_STUB_${kind}_OUTPUT" '%s' ""
         printf -v "GH_STUB_${kind}_STDERR" '%s' ""
         printf -v "GH_STUB_${kind}_EXIT" '%s' 0
     done
+    GH_STUB_VIEWER_OUTPUT="${VIEWER_ME}"
     GH_STUB_HEAD_SHA="0123456789abcdef0123456789abcdef01234567"
 }
 
@@ -318,15 +321,23 @@ PENDING_PAGED='{"data":{"repository":{"pullRequest":{"reviews":{"pageInfo":{"has
 PAGE_MORE='{"data":{"node":{"comments":{"nodes":[{"id":"PRRC_b","fullDatabaseId":"2"}],"pageInfo":{"hasNextPage":true,"endCursor":"CUR2"}}}}}'
 PAGE_LAST_MATCH='{"data":{"node":{"comments":{"nodes":[{"id":"PRRC_node5551","fullDatabaseId":"5551"}],"pageInfo":{"hasNextPage":false,"endCursor":"CURLAST"}}}}}'
 PAGE_LAST_NO_MATCH='{"data":{"node":{"comments":{"nodes":[{"id":"PRRC_c","fullDatabaseId":"3"}],"pageInfo":{"hasNextPage":false,"endCursor":"CURLAST"}}}}}'
+VIEWER_ME='{"data":{"viewer":{"login":"me"}}}'
+VIEWER_CALL="api graphql -f query=query { viewer { login } }"
 MUTATION_OK='{"data":{"updatePullRequestReviewComment":{"pullRequestReviewComment":{"url":"https://github.com/shopware/shopware/pull/100#discussion_r5551"}}}}'
 
-# The GET answer for a comment that belongs to issue or PR N.
+# The GET answer for a comment that belongs to issue or PR N, written by $2
+# (default: the caller, "me").
 stub_get_issue() {
-    GH_STUB_GET_OUTPUT=$(jq -cn --arg u "https://api.github.com/repos/shopware/shopware/issues/$1" '{id: 1, issue_url: $u}')
+    GH_STUB_GET_OUTPUT=$(jq -cn --arg u "https://api.github.com/repos/shopware/shopware/issues/$1" --arg l "${2:-me}" '{id: 1, issue_url: $u, user: {login: $l}}')
 }
 
 stub_get_pull() {
-    GH_STUB_GET_OUTPUT=$(jq -cn --arg u "https://api.github.com/repos/shopware/shopware/pulls/$1" '{id: 1, pull_request_url: $u}')
+    GH_STUB_GET_OUTPUT=$(jq -cn --arg u "https://api.github.com/repos/shopware/shopware/pulls/$1" --arg l "${2:-me}" '{id: 1, pull_request_url: $u, user: {login: $l}}')
+}
+
+# The viewer query was not sent.
+assert_no_viewer_query() {
+    ! grep -qF -- "viewer { login }" "${GH_ARGS_FILE}" || fail "Expected no viewer query, got: $(cat "${GH_ARGS_FILE}")"
 }
 
 # gh must not have run: the rejection happens before any API call.
@@ -390,8 +401,9 @@ assert_no_mutation() {
     ! grep -q -- "updatePullRequestReviewComment" "${GH_ARGS_FILE}" || fail "Expected no mutation, got: $(cat "${GH_ARGS_FILE}")"
 }
 
+# No GraphQL call other than the viewer login query: no pending-review lookup or mutation.
 assert_no_graphql_call() {
-    ! grep -q -- "graphql" "${GH_ARGS_FILE}" || fail "Expected no GraphQL call, got: $(cat "${GH_ARGS_FILE}")"
+    ! grep -- "graphql" "${GH_ARGS_FILE}" | grep -qvF -- "viewer { login }" || fail "Expected no GraphQL call, got: $(cat "${GH_ARGS_FILE}")"
 }
 
 # A failed call reports through an error message that starts with "Error:".
@@ -407,9 +419,10 @@ assert_error_output() {
     run tool_comment_edit '{"url": "shopware/shopware/issues/7#issuecomment-9001", "body": "New text"}'
     assert_success
     assert_output "https://github.com/shopware/shopware/issues/7#issuecomment-9001"
-    assert_gh_call_count 2
+    assert_gh_call_count 3
     assert_gh_call_equal 1 "api repos/shopware/shopware/issues/comments/9001"
-    assert_gh_call_equal 2 "api repos/shopware/shopware/issues/comments/9001 -X PATCH -f body=New text --jq .html_url // empty"
+    assert_gh_call_equal 2 "${VIEWER_CALL}"
+    assert_gh_call_equal 3 "api repos/shopware/shopware/issues/comments/9001 -X PATCH -f body=New text --jq .html_url // empty"
 }
 
 @test "comment_edit patches a PR conversation comment through the issues comments endpoint" {
@@ -418,7 +431,7 @@ assert_error_output() {
     run tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#issuecomment-9002", "body": "New text"}'
     assert_success
     assert_gh_call_equal 1 "api repos/shopware/shopware/issues/comments/9002"
-    assert_gh_call_equal 2 "api repos/shopware/shopware/issues/comments/9002 -X PATCH -f body=New text --jq .html_url // empty"
+    assert_gh_call_equal 3 "api repos/shopware/shopware/issues/comments/9002 -X PATCH -f body=New text --jq .html_url // empty"
 }
 
 @test "comment_edit refuses to edit a conversation comment that belongs to another issue or PR" {
@@ -500,9 +513,9 @@ assert_error_output() {
     run tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#discussion_r5551", "body": "New text"}'
     assert_success
     assert_output "https://example/c"
-    assert_gh_call_count 2
+    assert_gh_call_count 3
     assert_gh_call_equal 1 "api repos/shopware/shopware/pulls/comments/5551"
-    assert_gh_call_equal 2 "api repos/shopware/shopware/pulls/comments/5551 -X PATCH -f body=New text --jq .html_url // empty"
+    assert_gh_call_equal 3 "api repos/shopware/shopware/pulls/comments/5551 -X PATCH -f body=New text --jq .html_url // empty"
     assert_no_graphql_call
 }
 
@@ -545,7 +558,7 @@ assert_error_output() {
     assert_failure
     assert_error_output
     assert_output --partial "PATCH repos/shopware/shopware/pulls/comments/5551 failed"
-    assert_gh_call_count 2
+    assert_gh_call_count 3
     assert_no_graphql_call
 }
 
@@ -896,8 +909,7 @@ assert_error_output() {
     run tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#discussion_r5551", "body": "x"}'
     assert_failure
     assert_error_output
-    assert_output --partial "no URL for the edited comment"
-    assert_output --partial "GET repos/shopware/shopware/pulls/comments/5551 returned 404 (not found, or no access to the repository); pending-review comment edit failed"
+    assert_output --partial "GET repos/shopware/shopware/pulls/comments/5551 returned 404 (not found, or no access to the repository); the pending-review edit was sent and GitHub reported success but returned no URL, so the comment may already hold the new body"
 }
 
 @test "comment_edit fails when the mutation response has a wrongly typed data path, with no jq diagnostic" {
@@ -954,11 +966,14 @@ assert_error_output() {
 
 # ---- review summary body ------------------------------------------------------
 
-@test "comment_edit puts a review body with PUT on the PR's reviews endpoint without reading it first" {
+@test "comment_edit reads a review summary, then puts the body on the PR's reviews endpoint" {
+    GH_STUB_GET_OUTPUT='{"id":777,"user":{"login":"me"}}'
     GH_STUB_WRITE_OUTPUT="https://example/c"
     run tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#pullrequestreview-777", "body": "New summary"}'
     assert_success
-    assert_gh_args_equal "api repos/shopware/shopware/pulls/100/reviews/777 -X PUT -f body=New summary --jq .html_url // empty"
+    assert_gh_call_count 3
+    assert_gh_call_equal 1 "api repos/shopware/shopware/pulls/100/reviews/777"
+    assert_gh_call_equal 3 "api repos/shopware/shopware/pulls/100/reviews/777 -X PUT -f body=New summary --jq .html_url // empty"
 }
 
 # ---- stderr warnings on successful calls -------------------------------------
@@ -974,6 +989,7 @@ assert_error_output() {
 }
 
 @test "comment_edit returns the clean URL when a successful review PUT prints a warning on stderr" {
+    GH_STUB_GET_OUTPUT='{"id":777,"user":{"login":"me"}}'
     GH_STUB_WRITE_STDERR="${WARNING_STDERR}"
     GH_STUB_WRITE_OUTPUT="https://example/review"
     run --separate-stderr tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#pullrequestreview-777", "body": "x"}'
@@ -993,15 +1009,154 @@ assert_error_output() {
     assert_output "https://github.com/shopware/shopware/pull/100#discussion_r5551"
 }
 
+# ---- author guard -------------------------------------------------------------
+
+@test "comment_edit edits a comment written by the caller, comparing logins without regard to case" {
+    stub_get_issue 7 "ME"
+    GH_STUB_WRITE_OUTPUT="https://example/c"
+    run tool_comment_edit '{"url": "shopware/shopware/issues/7#issuecomment-9001", "body": "x"}'
+    assert_success
+    assert_output "https://example/c"
+    assert_gh_call_equal 2 "${VIEWER_CALL}"
+}
+
+@test "comment_edit refuses another author's conversation comment by default, naming both logins, with no write" {
+    stub_get_issue 7 "octocat"
+    GH_STUB_WRITE_OUTPUT="https://example/c"
+    local json
+    for json in '{"url": "shopware/shopware/issues/7#issuecomment-9001", "body": "x"}' \
+                '{"url": "shopware/shopware/issues/7#issuecomment-9001", "body": "x", "allow_other_author": false}'; do
+        : > "${GH_ARGS_FILE}"
+        run tool_comment_edit "${json}"
+        assert_failure
+        assert_error_output
+        assert_output --partial "octocat"
+        assert_output --partial "(me)"
+        assert_output --partial "allow_other_author: true"
+        assert_gh_call_count 2
+        assert_no_rest_write
+    done
+}
+
+@test "comment_edit refuses another author's inline comment by default, with no write" {
+    stub_get_pull 100 "octocat"
+    GH_STUB_WRITE_OUTPUT="https://example/c"
+    run tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#discussion_r5551", "body": "x"}'
+    assert_failure
+    assert_error_output
+    assert_output --partial "octocat"
+    assert_no_rest_write
+}
+
+@test "comment_edit refuses another author's review summary by default, with no PUT" {
+    GH_STUB_GET_OUTPUT='{"id":777,"user":{"login":"octocat"}}'
+    GH_STUB_WRITE_OUTPUT="https://example/c"
+    run tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#pullrequestreview-777", "body": "x"}'
+    assert_failure
+    assert_error_output
+    assert_output --partial "octocat"
+    assert_output --partial "allow_other_author: true"
+    assert_gh_call_equal 1 "api repos/shopware/shopware/pulls/100/reviews/777"
+    assert_no_rest_write
+}
+
+@test "comment_edit edits another author's comment when allow_other_author is true, without asking who the caller is" {
+    stub_get_issue 7 "octocat"
+    GH_STUB_WRITE_OUTPUT="https://example/c"
+    run tool_comment_edit '{"url": "shopware/shopware/issues/7#issuecomment-9001", "body": "x", "allow_other_author": true}'
+    assert_success
+    assert_output "https://example/c"
+    assert_gh_call_count 2
+    assert_no_viewer_query
+}
+
+@test "comment_edit edits another author's review summary when allow_other_author is true" {
+    GH_STUB_GET_OUTPUT='{"id":777,"user":{"login":"octocat"}}'
+    GH_STUB_WRITE_OUTPUT="https://example/c"
+    run tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#pullrequestreview-777", "body": "x", "allow_other_author": true}'
+    assert_success
+    assert_gh_call_count 2
+    assert_gh_call_equal 2 "api repos/shopware/shopware/pulls/100/reviews/777 -X PUT -f body=x --jq .html_url // empty"
+    assert_no_viewer_query
+}
+
+@test "comment_edit fails when the review summary cannot be read, with no PUT" {
+    GH_STUB_GET_EXIT=1
+    GH_STUB_GET_STDERR="${NOT_FOUND_STDERR}"
+    run tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#pullrequestreview-777", "body": "x", "allow_other_author": true}'
+    assert_failure
+    assert_error_output
+    assert_output --partial "GET repos/shopware/shopware/pulls/100/reviews/777 failed"
+    assert_gh_call_count 1
+    assert_no_rest_write
+}
+
+@test "comment_edit fails with no write when the caller's login cannot be read" {
+    stub_get_issue 7
+    GH_STUB_VIEWER_EXIT=1
+    GH_STUB_VIEWER_STDERR="gh: Bad credentials (HTTP 401)"
+    GH_STUB_WRITE_OUTPUT="https://example/c"
+    run tool_comment_edit '{"url": "shopware/shopware/issues/7#issuecomment-9001", "body": "x"}'
+    assert_failure
+    assert_error_output
+    assert_output --partial "Bad credentials"
+    assert_no_rest_write
+}
+
+@test "comment_edit fails with no write when the login query answers with GraphQL errors" {
+    stub_get_issue 7
+    GH_STUB_VIEWER_OUTPUT='{"errors":[{"message":"Resource not accessible"}]}'
+    GH_STUB_WRITE_OUTPUT="https://example/c"
+    run tool_comment_edit '{"url": "shopware/shopware/issues/7#issuecomment-9001", "body": "x"}'
+    assert_failure
+    assert_error_output
+    assert_output --partial "Resource not accessible"
+    assert_no_rest_write
+}
+
+@test "comment_edit fails with no write when the login query returns no login" {
+    stub_get_issue 7
+    GH_STUB_VIEWER_OUTPUT='{"data":{"viewer":{"login":null}}}'
+    GH_STUB_WRITE_OUTPUT="https://example/c"
+    run tool_comment_edit '{"url": "shopware/shopware/issues/7#issuecomment-9001", "body": "x"}'
+    assert_failure
+    assert_error_output
+    assert_no_rest_write
+}
+
+@test "comment_edit fails with no write when the comment names no author, unless allow_other_author is true" {
+    GH_STUB_GET_OUTPUT='{"id":1,"issue_url":"https://api.github.com/repos/shopware/shopware/issues/7","user":null}'
+    GH_STUB_WRITE_OUTPUT="https://example/c"
+    run tool_comment_edit '{"url": "shopware/shopware/issues/7#issuecomment-9001", "body": "x"}'
+    assert_failure
+    assert_error_output
+    assert_output --partial "allow_other_author: true"
+    assert_no_rest_write
+
+    : > "${GH_ARGS_FILE}"
+    run tool_comment_edit '{"url": "shopware/shopware/issues/7#issuecomment-9001", "body": "x", "allow_other_author": true}'
+    assert_success
+}
+
+@test "comment_edit does not ask who the caller is for a comment in the caller's own pending review" {
+    GH_STUB_GET_EXIT=1
+    GH_STUB_GET_STDERR="${NOT_FOUND_STDERR}"
+    GH_STUB_LOOKUP_OUTPUT="${PENDING_MATCH}"
+    GH_STUB_MUTATION_OUTPUT="${MUTATION_OK}"
+    run tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#discussion_r5551", "body": "x"}'
+    assert_success
+    assert_no_viewer_query
+}
+
 # ---- URL handling -----------------------------------------------------------------
 
 @test "comment_edit takes the repository from the URL, not from the default repo" {
-    GH_STUB_GET_OUTPUT='{"id":1,"issue_url":"https://api.github.com/repos/other-org/other.repo/issues/7"}'
+    GH_STUB_GET_OUTPUT='{"id":1,"issue_url":"https://api.github.com/repos/other-org/other.repo/issues/7","user":{"login":"me"}}'
     GH_STUB_WRITE_OUTPUT="https://example/c"
     run tool_comment_edit '{"url": "other-org/other.repo/issues/7#issuecomment-1", "body": "x"}'
     assert_success
     assert_gh_call_equal 1 "api repos/other-org/other.repo/issues/comments/1"
-    assert_gh_call_equal 2 "api repos/other-org/other.repo/issues/comments/1 -X PATCH -f body=x --jq .html_url // empty"
+    assert_gh_call_equal 3 "api repos/other-org/other.repo/issues/comments/1 -X PATCH -f body=x --jq .html_url // empty"
 }
 
 @test "comment_edit strips the http and www.github.com prefixes" {
@@ -1016,14 +1171,65 @@ assert_error_output() {
     done
 }
 
+@test "comment_edit accepts a query string before the anchor and the commit and range forms of an inline anchor" {
+    local sha40="0123456789abcdef0123456789abcdef01234567"
+    GH_STUB_GET_OUTPUT='{"id":1,"issue_url":"https://api.github.com/repos/shopware/shopware/issues/100","pull_request_url":"https://api.github.com/repos/shopware/shopware/pulls/100","user":{"login":"me"}}'
+    GH_STUB_WRITE_OUTPUT="https://example/c"
+    local row u endpoint
+    for row in \
+        "shopware/shopware/issues/100?notification_referrer_id=NT_x#issuecomment-3|repos/shopware/shopware/issues/comments/3" \
+        "https://github.com/shopware/shopware/pull/100?notification_referrer_id=NT_x#issuecomment-3|repos/shopware/shopware/issues/comments/3" \
+        "shopware/shopware/pull/100?notification_referrer_id=NT_x#discussion_r5551|repos/shopware/shopware/pulls/comments/5551" \
+        "shopware/shopware/pull/100/files?w=1#r5552|repos/shopware/shopware/pulls/comments/5552" \
+        "shopware/shopware/pull/100/files/${sha40}..${sha40}#r5553|repos/shopware/shopware/pulls/comments/5553" \
+        "shopware/shopware/pull/100/files/abc1234..def5678#r5554|repos/shopware/shopware/pulls/comments/5554" \
+        "shopware/shopware/pull/100/commits/${sha40}#r5555|repos/shopware/shopware/pulls/comments/5555" \
+        "shopware/shopware/pull/100/commits/abc1234#r5556|repos/shopware/shopware/pulls/comments/5556" \
+        "shopware/shopware/pull/100/commits/${sha40}?notification_referrer_id=NT_x#r5557|repos/shopware/shopware/pulls/comments/5557" \
+        "shopware/shopware/pull/100?notification_referrer_id=NT_x#pullrequestreview-777|repos/shopware/shopware/pulls/100/reviews/777"; do
+        u="${row%%|*}"
+        endpoint="${row##*|}"
+        : > "${GH_ARGS_FILE}"
+        rm -f "${BATS_TEST_TMPDIR}"/gh_argv.*
+        run tool_comment_edit "{\"url\": \"${u}\", \"body\": \"x\"}"
+        [[ "${status}" -eq 0 ]] || fail "Expected '${u}' to be accepted, got: ${output}"
+        assert_gh_call_equal 1 "api ${endpoint}"
+        assert_gh_call_contains_all 3 "api ${endpoint} -X "
+    done
+}
+
+@test "comment_edit rejects a malformed sha segment, a misplaced query string, and a sha form on an issues URL before any gh call" {
+    local sha41="0123456789abcdef0123456789abcdef012345678"
+    local u
+    for u in "shopware/shopware/pull/100/commits/abc123#r5" \
+             "shopware/shopware/pull/100/commits/xyz1234#r5" \
+             "shopware/shopware/pull/100/commits/${sha41}#r5" \
+             "shopware/shopware/pull/100/commits/abc1234..def5678#r5" \
+             "shopware/shopware/pull/100/commits/abc1234/files#r5" \
+             "shopware/shopware/pull/100/files/abc1234#r5" \
+             "shopware/shopware/pull/100/files/abc1234..#r5" \
+             "shopware/shopware/pull/100/files/abc1234..def567#r5" \
+             "shopware/shopware/pull/100/files/abc1234...def5678#r5" \
+             "shopware/shopware/pull/100/files/${sha41}..abc1234#r5" \
+             "shopware/shopware/pull/100/commits/abc1234#issuecomment-5" \
+             "shopware/shopware/issues/100/commits/abc1234#r5" \
+             "shopware/shopware/pull/100/commits/abc1234#r5?x=1" \
+             "shopware/shopware/pull/100?x=1"; do
+        run tool_comment_edit "{\"url\": \"${u}\", \"body\": \"x\"}"
+        [[ "${status}" -ne 0 ]] || fail "Expected '${u}' to be rejected"
+        [[ "${output}" == "Error: url must be "* ]] || fail "Expected the form error for '${u}', got: ${output}"
+    done
+    assert_gh_not_called
+}
+
 @test "comment_edit accepts an owner with an underscore and reaches gh" {
-    GH_STUB_GET_OUTPUT='{"id":1,"issue_url":"https://api.github.com/repos/mona_octocorp/repo/issues/7"}'
+    GH_STUB_GET_OUTPUT='{"id":1,"issue_url":"https://api.github.com/repos/mona_octocorp/repo/issues/7","user":{"login":"me"}}'
     GH_STUB_WRITE_OUTPUT="https://example/c"
     run tool_comment_edit '{"url": "mona_octocorp/repo/issues/7#issuecomment-1", "body": "x"}'
     assert_success
     assert_output "https://example/c"
     assert_gh_call_equal 1 "api repos/mona_octocorp/repo/issues/comments/1"
-    assert_gh_call_equal 2 "api repos/mona_octocorp/repo/issues/comments/1 -X PATCH -f body=x --jq .html_url // empty"
+    assert_gh_call_equal 3 "api repos/mona_octocorp/repo/issues/comments/1 -X PATCH -f body=x --jq .html_url // empty"
 }
 
 @test "comment_edit rejects an issue or PR number with a leading zero before any gh call" {
@@ -1208,7 +1414,7 @@ assert_error_output() {
     run tool_comment_edit '{"url": "shopware/shopware/issues/7#issuecomment-3", "body": "x"}'
     assert_failure
     assert_error_output
-    assert_output --partial "no URL for the edited comment"
+    assert_output --partial "was sent and GitHub reported success but returned no URL, so the comment may already hold the new body"
 }
 
 @test "comment_edit fails when the PATCH response has no html_url field" {
@@ -1218,7 +1424,7 @@ assert_error_output() {
     run tool_comment_edit '{"url": "shopware/shopware/issues/7#issuecomment-3", "body": "x"}'
     assert_failure
     assert_error_output
-    assert_output --partial "no URL for the edited comment"
+    assert_output --partial "was sent and GitHub reported success but returned no URL, so the comment may already hold the new body"
     refute_output --partial "null"
 }
 
@@ -1254,16 +1460,6 @@ assert_one_argv_equal() {
 }
 
 TRICKY_BODY=$'-leading dash, two words a=b @file.txt "double" \'single\'\nsecond line'
-
-@test "comment_edit passes a body with special characters as one -f argument" {
-    stub_get_issue 7
-    GH_STUB_WRITE_OUTPUT="https://example/c"
-    # shellcheck disable=SC2016 # the body's $(x) must stay literal
-    run tool_comment_edit '{"url": "shopware/shopware/issues/7#issuecomment-3", "body": "a=b \"quoted\" $(x)"}'
-    assert_success
-    # shellcheck disable=SC2016
-    assert_gh_last_args_equal 'api repos/shopware/shopware/issues/comments/3 -X PATCH -f body=a=b "quoted" $(x) --jq .html_url // empty'
-}
 
 @test "comment_edit passes a body with a newline, spaces, =, @, quotes, and a leading dash as exactly one REST argument" {
     stub_get_issue 7
