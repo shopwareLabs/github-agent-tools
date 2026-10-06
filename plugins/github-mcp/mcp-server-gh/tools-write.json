@@ -757,7 +757,7 @@
     },
     {
       "name": "comment_edit",
-      "description": "Replace the body of an issue or pull request comment, an inline comment on a diff (including one in your own unsubmitted draft), or a summary of a submitted verdict. The new body replaces the whole text. Accepted url forms, with or without a leading https://github.com/: OWNER/REPO/issues/N#issuecomment-ID, OWNER/REPO/pull/N#issuecomment-ID, OWNER/REPO/pull/N#discussion_rID, OWNER/REPO/pull/N/files#rID (or /changes#rID), OWNER/REPO/pull/N#pullrequestreview-ID. Any other url is rejected before the request. Returns the html_url.",
+      "description": "Replace the body of an issue or pull request comment, an inline comment on a diff (including one in your own unsubmitted draft), or a summary of a submitted verdict. The new body replaces the whole text. Accepted url forms, with no prefix or with a leading https://github.com/, http://github.com/, or https://www.github.com/: OWNER/REPO/issues/N#issuecomment-ID, OWNER/REPO/pull/N#issuecomment-ID, OWNER/REPO/pull/N#discussion_rID, OWNER/REPO/pull/N/files#rID (or /changes#rID), OWNER/REPO/pull/N#pullrequestreview-ID. Any other url, including any other host, is rejected before the request. Returns the edited comment's URL.",
       "inputSchema": {
         "type": "object",
         "required": ["url", "body"],

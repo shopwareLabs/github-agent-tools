@@ -25,6 +25,11 @@ setup() {
         local call_n
         call_n=$(find "${BATS_TEST_TMPDIR}" -maxdepth 1 -name 'gh_argv.*' | wc -l | tr -d ' ')
         printf '%s\0' "$@" > "${BATS_TEST_TMPDIR}/gh_argv.$((call_n + 1))"
+        # Runaway guard: a looping lookup ends here instead of hanging the suite.
+        if [[ "${call_n}" -ge 20 ]]; then
+            echo "stub: more than 20 gh calls" >&2
+            return 99
+        fi
         if [[ "$*" == *"--input"* ]]; then
             cat > "${GH_STDIN_FILE}"
         fi
@@ -34,9 +39,17 @@ setup() {
         fi
         # comment_edit's calls, told apart by what the argv names. Each kind has
         # its own stdout, stderr, and exit code: GH_STUB_<KIND>_OUTPUT/_STDERR/_EXIT.
+        # A page fetch of a pending review's comments is keyed by the cursor it
+        # sends, so each page has its own canned answer: GH_STUB_PAGE_<cursor>_*.
         local kind="" get_re='^api repos/[^ ]+/comments/[0-9]+$'
         if [[ "$*" == *"reviews(states: [PENDING]"* ]]; then
             kind=LOOKUP
+        elif [[ "$*" == *'node(id: $reviewId)'* ]]; then
+            local arg cursor=""
+            for arg in "$@"; do
+                [[ "${arg}" == cursor=* ]] && cursor="${arg#cursor=}"
+            done
+            kind="PAGE_${cursor}"
         elif [[ "$*" == *"updatePullRequestReviewComment"* ]]; then
             kind=MUTATION
         elif [[ "$*" == *" -X PATCH "* || "$*" == *" -X PUT "* ]]; then
@@ -301,7 +314,10 @@ WARNING_STDERR="warning: a new gh release is available"
 PENDING_NONE='{"data":{"repository":{"pullRequest":{"reviews":{"pageInfo":{"hasNextPage":false},"nodes":[]}}}}}'
 PENDING_MATCH='{"data":{"repository":{"pullRequest":{"reviews":{"pageInfo":{"hasNextPage":false},"nodes":[{"viewerDidAuthor":true,"comments":{"nodes":[{"id":"PRRC_other","fullDatabaseId":"4000"},{"id":"PRRC_node5551","fullDatabaseId":"5551"}],"pageInfo":{"hasNextPage":false}}}]}}}}}'
 PENDING_BIG='{"data":{"repository":{"pullRequest":{"reviews":{"pageInfo":{"hasNextPage":false},"nodes":[{"viewerDidAuthor":true,"comments":{"nodes":[{"id":"PRRC_near","fullDatabaseId":"4195291200"},{"id":"PRRC_big","fullDatabaseId":"4195291201"}],"pageInfo":{"hasNextPage":false}}}]}}}}}'
-PENDING_FULL_PAGE='{"data":{"repository":{"pullRequest":{"reviews":{"pageInfo":{"hasNextPage":false},"nodes":[{"viewerDidAuthor":true,"comments":{"nodes":[{"id":"PRRC_a","fullDatabaseId":"1"}],"pageInfo":{"hasNextPage":true}}}]}}}}}'
+PENDING_PAGED='{"data":{"repository":{"pullRequest":{"reviews":{"pageInfo":{"hasNextPage":false},"nodes":[{"id":"PRR_mine","viewerDidAuthor":true,"comments":{"nodes":[{"id":"PRRC_a","fullDatabaseId":"1"}],"pageInfo":{"hasNextPage":true,"endCursor":"CUR1"}}}]}}}}}'
+PAGE_MORE='{"data":{"node":{"comments":{"nodes":[{"id":"PRRC_b","fullDatabaseId":"2"}],"pageInfo":{"hasNextPage":true,"endCursor":"CUR2"}}}}}'
+PAGE_LAST_MATCH='{"data":{"node":{"comments":{"nodes":[{"id":"PRRC_node5551","fullDatabaseId":"5551"}],"pageInfo":{"hasNextPage":false,"endCursor":"CURLAST"}}}}}'
+PAGE_LAST_NO_MATCH='{"data":{"node":{"comments":{"nodes":[{"id":"PRRC_c","fullDatabaseId":"3"}],"pageInfo":{"hasNextPage":false,"endCursor":"CURLAST"}}}}}'
 MUTATION_OK='{"data":{"updatePullRequestReviewComment":{"pullRequestReviewComment":{"url":"https://github.com/shopware/shopware/pull/100#discussion_r5551"}}}}'
 
 # The GET answer for a comment that belongs to issue or PR N.
@@ -367,6 +383,11 @@ assert_gh_call_count() {
 # No PATCH or PUT was sent.
 assert_no_rest_write() {
     ! grep -q -- " -X " "${GH_ARGS_FILE}" || fail "Expected no REST write, got: $(cat "${GH_ARGS_FILE}")"
+}
+
+# The edit mutation was not sent.
+assert_no_mutation() {
+    ! grep -q -- "updatePullRequestReviewComment" "${GH_ARGS_FILE}" || fail "Expected no mutation, got: $(cat "${GH_ARGS_FILE}")"
 }
 
 assert_no_graphql_call() {
@@ -450,6 +471,16 @@ assert_error_output() {
     assert_gh_call_count 1
     assert_no_rest_write
     assert_no_graphql_call
+}
+
+@test "comment_edit names the failed read and keeps gh's exit status when the read fails with no output" {
+    GH_STUB_GET_EXIT=3
+    run tool_comment_edit '{"url": "shopware/shopware/issues/7#issuecomment-9001", "body": "x"}'
+    assert_failure 3
+    assert_error_output
+    assert_output --partial "GET repos/shopware/shopware/issues/comments/9001 failed: gh failed with exit 3 and no output"
+    assert_gh_call_count 1
+    assert_no_rest_write
 }
 
 @test "comment_edit fails when the read of a conversation comment names no issue, and does not patch" {
@@ -559,15 +590,6 @@ assert_error_output() {
     assert_no_rest_write
 }
 
-@test "comment_edit asks GitHub for fullDatabaseId, the field that holds an id above 32 bits" {
-    GH_STUB_GET_EXIT=1
-    GH_STUB_GET_STDERR="${NOT_FOUND_STDERR}"
-    GH_STUB_LOOKUP_OUTPUT="${PENDING_NONE}"
-    run tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#discussion_r5551", "body": "x"}'
-    assert_failure
-    assert_gh_call_contains_all 2 "nodes { id fullDatabaseId }"
-}
-
 @test "comment_edit fails when the 404 comment is not in the pending review, with no mutation or write" {
     GH_STUB_GET_EXIT=1
     GH_STUB_GET_STDERR="${NOT_FOUND_STDERR}"
@@ -575,10 +597,11 @@ assert_error_output() {
     run tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#discussion_r9999", "body": "x"}'
     assert_failure
     assert_error_output
-    assert_output --partial "not a submitted review comment"
-    assert_output --partial "pending review on PR 100"
+    assert_output --partial "GET repos/shopware/shopware/pulls/comments/9999 returned 404"
+    assert_output --partial "pending-review lookup on PR 100: no matching comment"
     assert_gh_call_count 2
     assert_no_rest_write
+    assert_no_mutation
 }
 
 @test "comment_edit fails when the 404 comment is not found and the caller has no pending review" {
@@ -588,20 +611,98 @@ assert_error_output() {
     run tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#discussion_r5551", "body": "x"}'
     assert_failure
     assert_error_output
+    assert_output --partial "returned 404"
+    assert_output --partial "pending-review lookup on PR 100: no matching comment (you have no pending review on this PR)"
     assert_gh_call_count 2
+    assert_no_rest_write
+    assert_no_mutation
+}
+
+@test "comment_edit finds the comment on the second page of a large pending review and edits it with that node id" {
+    GH_STUB_GET_EXIT=1
+    GH_STUB_GET_STDERR="${NOT_FOUND_STDERR}"
+    GH_STUB_LOOKUP_OUTPUT="${PENDING_PAGED}"
+    GH_STUB_PAGE_CUR1_OUTPUT="${PAGE_LAST_MATCH}"
+    GH_STUB_MUTATION_OUTPUT="${MUTATION_OK}"
+    run tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#discussion_r5551", "body": "New text"}'
+    assert_success
+    assert_output "https://github.com/shopware/shopware/pull/100#discussion_r5551"
+    assert_gh_call_count 4
+    assert_gh_call_contains_all 3 "-f reviewId=PRR_mine" "-f cursor=CUR1"
+    assert_gh_last_args_contain_all "updatePullRequestReviewComment" "-f id=PRRC_node5551" "-f body=New text"
     assert_no_rest_write
 }
 
-@test "comment_edit fails when the 404 comment is not on the first page of a large pending review" {
+@test "comment_edit follows each page's cursor until the comment turns up on the third page" {
     GH_STUB_GET_EXIT=1
     GH_STUB_GET_STDERR="${NOT_FOUND_STDERR}"
-    GH_STUB_LOOKUP_OUTPUT="${PENDING_FULL_PAGE}"
+    GH_STUB_LOOKUP_OUTPUT="${PENDING_PAGED}"
+    GH_STUB_PAGE_CUR1_OUTPUT="${PAGE_MORE}"
+    GH_STUB_PAGE_CUR2_OUTPUT="${PAGE_LAST_MATCH}"
+    GH_STUB_MUTATION_OUTPUT="${MUTATION_OK}"
+    run tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#discussion_r5551", "body": "x"}'
+    assert_success
+    assert_gh_call_count 5
+    assert_gh_call_contains_all 3 "-f reviewId=PRR_mine" "-f cursor=CUR1"
+    assert_gh_call_contains_all 4 "-f reviewId=PRR_mine" "-f cursor=CUR2"
+    assert_gh_last_args_contain_all "-f id=PRRC_node5551"
+}
+
+@test "comment_edit fails with the 404 and no matching comment when no page of a large pending review holds it" {
+    GH_STUB_GET_EXIT=1
+    GH_STUB_GET_STDERR="${NOT_FOUND_STDERR}"
+    GH_STUB_LOOKUP_OUTPUT="${PENDING_PAGED}"
+    GH_STUB_PAGE_CUR1_OUTPUT="${PAGE_LAST_NO_MATCH}"
     run tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#discussion_r5551", "body": "x"}'
     assert_failure
     assert_error_output
-    assert_output --partial "more than 100 comments"
-    assert_gh_call_count 2
+    assert_output --partial "returned 404"
+    assert_output --partial "pending-review lookup on PR 100: no matching comment"
+    assert_gh_call_count 3
     assert_no_rest_write
+    assert_no_mutation
+}
+
+@test "comment_edit fails and sends no mutation when the second page of comments cannot be read" {
+    GH_STUB_GET_EXIT=1
+    GH_STUB_GET_STDERR="${NOT_FOUND_STDERR}"
+    GH_STUB_LOOKUP_OUTPUT="${PENDING_PAGED}"
+    GH_STUB_PAGE_CUR1_EXIT=7
+    GH_STUB_PAGE_CUR1_STDERR="gh: Bad Gateway (HTTP 502)"
+    run tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#discussion_r5551", "body": "x"}'
+    assert_failure 7
+    assert_error_output
+    assert_output --partial "returned 404"
+    assert_output --partial "Bad Gateway (HTTP 502)"
+    assert_gh_call_count 3
+    assert_no_rest_write
+    assert_no_mutation
+}
+
+@test "comment_edit fails and sends no mutation when the second page carries GraphQL errors" {
+    GH_STUB_GET_EXIT=1
+    GH_STUB_GET_STDERR="${NOT_FOUND_STDERR}"
+    GH_STUB_LOOKUP_OUTPUT="${PENDING_PAGED}"
+    GH_STUB_PAGE_CUR1_OUTPUT='{"errors":[{"message":"Rate limited"}],"data":null}'
+    run tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#discussion_r5551", "body": "x"}'
+    assert_failure
+    assert_error_output
+    assert_output --partial "Rate limited"
+    assert_gh_call_count 3
+    assert_no_mutation
+}
+
+@test "comment_edit fails and sends no mutation when the second page has no comments object" {
+    GH_STUB_GET_EXIT=1
+    GH_STUB_GET_STDERR="${NOT_FOUND_STDERR}"
+    GH_STUB_LOOKUP_OUTPUT="${PENDING_PAGED}"
+    GH_STUB_PAGE_CUR1_OUTPUT='{"data":{"node":null}}'
+    run tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#discussion_r5551", "body": "x"}'
+    assert_failure
+    assert_error_output
+    assert_output --partial "no comments for your pending review"
+    assert_gh_call_count 3
+    assert_no_mutation
 }
 
 @test "comment_edit edits a matching pending-review comment even when the review has further pages" {
@@ -621,9 +722,11 @@ assert_error_output() {
     run tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#discussion_r5551", "body": "x"}'
     assert_failure
     assert_error_output
-    assert_output --partial "not in your pending review"
+    assert_output --partial "returned 404"
+    assert_output --partial "pending-review lookup on PR 100: no matching comment (it is not in your pending review)"
     assert_gh_call_count 2
     assert_no_rest_write
+    assert_no_mutation
 }
 
 @test "comment_edit edits with the node id from the caller's review when it is not the first pending review" {
@@ -644,9 +747,10 @@ assert_error_output() {
     run tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#discussion_r5551", "body": "x"}'
     assert_failure
     assert_error_output
-    assert_output --partial "not in your pending review"
+    assert_output --partial "pending-review lookup on PR 100: no matching comment (you have no pending review on this PR)"
     assert_gh_call_count 2
     assert_no_rest_write
+    assert_no_mutation
 }
 
 @test "comment_edit fails when the caller's review is not among more than 100 pending reviews" {
@@ -656,18 +760,10 @@ assert_error_output() {
     run tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#discussion_r5551", "body": "x"}'
     assert_failure
     assert_error_output
-    assert_output --partial "more than 100 pending reviews"
+    assert_output --partial "returned 404"
+    assert_output --partial "pending-review lookup on PR 100: your pending review could not be located among more than 100 pending reviews"
     assert_gh_call_count 2
     assert_no_rest_write
-}
-
-@test "comment_edit asks GitHub for up to 100 pending reviews with their viewerDidAuthor flag" {
-    GH_STUB_GET_EXIT=1
-    GH_STUB_GET_STDERR="${NOT_FOUND_STDERR}"
-    GH_STUB_LOOKUP_OUTPUT="${PENDING_NONE}"
-    run tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#discussion_r5551", "body": "x"}'
-    assert_failure
-    assert_gh_call_contains_all 2 "reviews(states: [PENDING], first: 100) { pageInfo { hasNextPage } nodes { viewerDidAuthor comments"
 }
 
 @test "comment_edit fails when the pending-review lookup exits non-zero, with gh's message and no mutation" {
@@ -678,10 +774,23 @@ assert_error_output() {
     run tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#discussion_r5551", "body": "x"}'
     assert_failure
     assert_error_output
-    assert_output --partial "pending-review lookup failed"
-    assert_output --partial "Could not resolve to a Repository"
+    assert_output --partial "GET repos/shopware/shopware/pulls/comments/5551 returned 404 (not found, or no access to the repository)"
+    assert_output --partial "pending-review lookup on PR 100: gh: Could not resolve to a Repository"
     assert_gh_call_count 2
     assert_no_rest_write
+}
+
+@test "comment_edit states the 404 and the GraphQL message when the lookup answers a Could not resolve error" {
+    GH_STUB_GET_EXIT=1
+    GH_STUB_GET_STDERR="${NOT_FOUND_STDERR}"
+    GH_STUB_LOOKUP_OUTPUT='{"errors":[{"type":"NOT_FOUND","message":"Could not resolve to a Repository with the name shopware/shopware."}],"data":{"repository":null}}'
+    run tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#discussion_r5551", "body": "x"}'
+    assert_failure
+    assert_error_output
+    assert_output --partial "returned 404 (not found, or no access to the repository)"
+    assert_output --partial "Could not resolve to a Repository"
+    assert_gh_call_count 2
+    assert_no_mutation
 }
 
 @test "comment_edit fails when the lookup response carries GraphQL errors" {
@@ -691,6 +800,7 @@ assert_error_output() {
     run tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#discussion_r5551", "body": "x"}'
     assert_failure
     assert_error_output
+    assert_output --partial "returned 404"
     assert_output --partial "Something broke"
     assert_gh_call_count 2
 }
@@ -702,7 +812,7 @@ assert_error_output() {
     run tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#discussion_r5551", "body": "x"}'
     assert_failure
     assert_error_output
-    assert_output --partial "pending-review lookup failed: GitHub returned no output"
+    assert_output --partial "pending-review lookup on PR 100: GitHub returned no output"
     assert_gh_call_count 2
 }
 
@@ -713,7 +823,7 @@ assert_error_output() {
     run tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#discussion_r5551", "body": "x"}'
     assert_failure 5
     assert_error_output
-    assert_output --partial "gh api graphql failed with exit 5 and no output"
+    assert_output --partial "pending-review lookup on PR 100: gh failed with exit 5 and no output"
 }
 
 @test "comment_edit fails when the lookup output is not JSON" {
@@ -748,6 +858,7 @@ assert_error_output() {
     assert_failure
     assert_error_output
     assert_output --partial "Resource not accessible"
+    assert_output --partial "GET repos/shopware/shopware/pulls/comments/5551 returned 404 (not found, or no access to the repository); pending-review comment edit failed"
     assert_gh_call_count 3
     assert_no_rest_write
 }
@@ -761,6 +872,7 @@ assert_error_output() {
     assert_failure
     assert_error_output
     assert_output --partial "Body cannot be blank"
+    assert_output --partial "GET repos/shopware/shopware/pulls/comments/5551 returned 404 (not found, or no access to the repository); pending-review comment edit failed"
     assert_no_rest_write
 }
 
@@ -773,6 +885,7 @@ assert_error_output() {
     assert_failure
     assert_error_output
     assert_output --partial "pending-review comment edit failed"
+    assert_output --partial "GET repos/shopware/shopware/pulls/comments/5551 returned 404 (not found, or no access to the repository); pending-review comment edit failed"
 }
 
 @test "comment_edit fails when the mutation response has a null url" {
@@ -784,6 +897,47 @@ assert_error_output() {
     assert_failure
     assert_error_output
     assert_output --partial "no URL for the edited comment"
+    assert_output --partial "GET repos/shopware/shopware/pulls/comments/5551 returned 404 (not found, or no access to the repository); pending-review comment edit failed"
+}
+
+@test "comment_edit fails when the mutation response has a wrongly typed data path, with no jq diagnostic" {
+    GH_STUB_GET_EXIT=1
+    GH_STUB_GET_STDERR="${NOT_FOUND_STDERR}"
+    GH_STUB_LOOKUP_OUTPUT="${PENDING_MATCH}"
+    GH_STUB_MUTATION_OUTPUT='{"data":{"updatePullRequestReviewComment":"oops"}}'
+    run --separate-stderr tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#discussion_r5551", "body": "x"}'
+    assert_failure
+    [[ "${lines[0]}" == Error:* ]] || fail "Expected first line to start with Error:, got: ${lines[0]}"
+    [[ -z "${stderr}" ]] || fail "Expected no stderr, got: ${stderr}"
+}
+
+@test "comment_edit fails without a mutation when GitHub returns the cursor just used, after a bounded number of calls" {
+    GH_STUB_GET_EXIT=1
+    GH_STUB_GET_STDERR="${NOT_FOUND_STDERR}"
+    GH_STUB_LOOKUP_OUTPUT="${PENDING_PAGED}"
+    GH_STUB_PAGE_CUR1_OUTPUT='{"data":{"node":{"comments":{"nodes":[{"id":"PRRC_b","fullDatabaseId":"2"}],"pageInfo":{"hasNextPage":true,"endCursor":"CUR1"}}}}}'
+    run tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#discussion_r5551", "body": "x"}'
+    assert_failure
+    assert_error_output
+    assert_output --partial "did not advance"
+    assert_gh_call_count 3
+    assert_no_rest_write
+    assert_no_mutation
+}
+
+@test "comment_edit fails without a mutation when pages alternate between two cursors, after a bounded number of calls" {
+    GH_STUB_GET_EXIT=1
+    GH_STUB_GET_STDERR="${NOT_FOUND_STDERR}"
+    GH_STUB_LOOKUP_OUTPUT="${PENDING_PAGED}"
+    GH_STUB_PAGE_CUR1_OUTPUT="${PAGE_MORE}"
+    GH_STUB_PAGE_CUR2_OUTPUT='{"data":{"node":{"comments":{"nodes":[{"id":"PRRC_c","fullDatabaseId":"3"}],"pageInfo":{"hasNextPage":true,"endCursor":"CUR1"}}}}}'
+    run tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#discussion_r5551", "body": "x"}'
+    assert_failure
+    assert_error_output
+    assert_output --partial "did not advance (cursor CUR1 came back)"
+    assert_gh_call_count 4
+    assert_no_rest_write
+    assert_no_mutation
 }
 
 @test "comment_edit names the failed call and keeps gh's exit status when the mutation fails with no output" {
@@ -794,7 +948,8 @@ assert_error_output() {
     run tool_comment_edit '{"url": "https://github.com/shopware/shopware/pull/100#discussion_r5551", "body": "x"}'
     assert_failure 4
     assert_error_output
-    assert_output --partial "gh api graphql failed with exit 4 and no output"
+    assert_output --partial "pending-review comment edit failed: gh failed with exit 4 and no output"
+    assert_output --partial "GET repos/shopware/shopware/pulls/comments/5551 returned 404 (not found, or no access to the repository); pending-review comment edit failed"
 }
 
 # ---- review summary body ------------------------------------------------------
@@ -859,6 +1014,42 @@ assert_error_output() {
         assert_success
         assert_gh_last_args_equal "api repos/shopware/shopware/issues/comments/3 -X PATCH -f body=x --jq .html_url // empty"
     done
+}
+
+@test "comment_edit accepts an owner with an underscore and reaches gh" {
+    GH_STUB_GET_OUTPUT='{"id":1,"issue_url":"https://api.github.com/repos/mona_octocorp/repo/issues/7"}'
+    GH_STUB_WRITE_OUTPUT="https://example/c"
+    run tool_comment_edit '{"url": "mona_octocorp/repo/issues/7#issuecomment-1", "body": "x"}'
+    assert_success
+    assert_output "https://example/c"
+    assert_gh_call_equal 1 "api repos/mona_octocorp/repo/issues/comments/1"
+    assert_gh_call_equal 2 "api repos/mona_octocorp/repo/issues/comments/1 -X PATCH -f body=x --jq .html_url // empty"
+}
+
+@test "comment_edit rejects an issue or PR number with a leading zero before any gh call" {
+    local u
+    for u in "shopware/shopware/issues/07#issuecomment-5" \
+             "shopware/shopware/pull/0100#discussion_r5" \
+             "shopware/shopware/pull/0#issuecomment-5"; do
+        run tool_comment_edit "{\"url\": \"${u}\", \"body\": \"x\"}"
+        [[ "${status}" -ne 0 ]] || fail "Expected '${u}' to be rejected"
+        [[ "${output}" == "Error: url must be "* ]] || fail "Expected the form error for '${u}', got: ${output}"
+    done
+    assert_gh_not_called
+}
+
+@test "comment_edit rejects a comment or review ID with a leading zero before any gh call" {
+    local u
+    for u in "shopware/shopware/issues/7#issuecomment-05" \
+             "shopware/shopware/pull/100#discussion_r05" \
+             "shopware/shopware/pull/100/files#r05" \
+             "shopware/shopware/pull/100/changes#r0" \
+             "shopware/shopware/pull/100#pullrequestreview-05"; do
+        run tool_comment_edit "{\"url\": \"${u}\", \"body\": \"x\"}"
+        [[ "${status}" -ne 0 ]] || fail "Expected '${u}' to be rejected"
+        [[ "${output}" == "Error: url must be "* ]] || fail "Expected the form error for '${u}', got: ${output}"
+    done
+    assert_gh_not_called
 }
 
 @test "comment_edit requires url" {
@@ -1008,7 +1199,7 @@ assert_error_output() {
     run tool_comment_edit '{"url": "shopware/shopware/issues/7#issuecomment-3", "body": "x"}'
     assert_failure 3
     assert_error_output
-    assert_output --partial "PATCH repos/shopware/shopware/issues/comments/3 failed: gh exited with status 3 and no output"
+    assert_output --partial "PATCH repos/shopware/shopware/issues/comments/3 failed: gh failed with exit 3 and no output"
 }
 
 @test "comment_edit fails with a message when the PATCH succeeds with no output" {

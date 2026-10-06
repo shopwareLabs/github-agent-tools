@@ -13,16 +13,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   comment's URL: `issues/N#issuecomment-ID` and `pull/N#issuecomment-ID` (conversation comments),
   `pull/N#discussion_rID` and `pull/N/files#rID` or `pull/N/changes#rID` (inline review comments),
   and `pull/N#pullrequestreview-ID` (a review's summary body). The URL may carry a leading
-  `https://github.com/`; a URL on another host, without an anchor, with an unknown anchor, or with a
-  non-numeric ID or number is rejected before any `gh` call. A conversation or inline comment is read
-  first and edited only when it belongs to the issue or PR `N` in the URL; a comment of another
-  issue or PR is an error and nothing is edited. When the read of an inline comment answers 404, the
-  comment may sit in the caller's own unsubmitted (pending) review: the tool looks the review up
-  through GraphQL, matching `fullDatabaseId`, and edits a matching comment with the
-  `updatePullRequestReviewComment` mutation. No match is an error. Every failure is returned as an
-  error that starts with `Error:`, and a warning that `gh` writes to stderr on a successful call does
-  not fail the edit. It returns the updated comment's `html_url`, or the `url` for a comment in a
-  pending review.
+  `https://github.com/`; a URL on another host, without an anchor, with an unknown anchor, with a
+  non-numeric number or ID, or with a number or ID that starts with `0` is rejected before any `gh`
+  call. The owner may contain `_`, as an Enterprise Managed User account name does. A conversation or
+  inline comment is read first and edited only when it belongs to the issue or PR `N` in the URL; a
+  comment of another issue or PR is an error and nothing is edited. When the read of an inline
+  comment answers 404, the comment may sit in the caller's own unsubmitted (pending) review: the tool
+  looks the review up through GraphQL, matching `fullDatabaseId` and reading further pages of a
+  review with more than 100 comments, and edits a matching comment with the
+  `updatePullRequestReviewComment` mutation. When the lookup fails or finds no match, the error
+  states the 404 and the lookup's result. Every failure is returned as an error that starts with
+  `Error:`, and a warning that `gh` writes to stderr on a successful call does not fail the edit. It
+  returns the updated comment's `html_url`, or the `url` for a comment in a pending review.
 - `check-api-tools.sh` redirects `PATCH repos/O/R/issues/comments/ID`,
   `PATCH repos/O/R/pulls/comments/ID`, and `PUT repos/O/R/pulls/N/reviews/ID` on the `api` write tool
   to `comment_edit`, under `block_api_tool_write`. The message for a conversation comment points to
