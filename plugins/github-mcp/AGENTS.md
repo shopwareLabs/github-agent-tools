@@ -125,7 +125,7 @@ Claude Code / Codex ← stdout ← JSON-RPC response ← formatted output
 Tools in `tools-read.json` and `tools-write.json` map to bash functions with `tool_` prefix:
 - Uses bash arrays (`local -a cmd=("gh" "pr" "view" "${number}")`) for injection-safe argument passing
 - `_gh_resolve_repo()` falls back to `GH_DEFAULT_REPO` from config
-- All tools support `suppress_errors` and `fallback` shared parameters, except write tool `comment_edit`, which declares neither so a failed edit always returns an error
+- Shared parameters (`suppress_errors`, `fallback`): which tools take them is in `REFERENCE.md` §Shared Tool Parameters
 - Tools with JSON output support `jq_filter` with pre-execution syntax validation
 - Tools that accept `grep_pattern` validate it with `_gh_validate_grep_pattern()` before calling `gh`
 - Log/text tools support `max_lines`, `tail_lines`, and grep parameters

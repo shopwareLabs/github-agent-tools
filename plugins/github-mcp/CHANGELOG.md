@@ -9,38 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `comment_edit` write tool. Replaces the body of one existing comment from the comment's URL. It
-  edits four kinds: an issue or PR conversation comment (`issues/N#issuecomment-ID`,
-  `pull/N#issuecomment-ID`), an inline review comment (`pull/N#discussion_rID`, or an `#rID` anchor on
-  `pull/N/files`, `pull/N/changes`, `pull/N/files/SHA..SHA`, or `pull/N/commits/SHA`; it may sit in
-  your own pending review), and a review's summary body (`pull/N#pullrequestreview-ID`). Commit
-  comments and Discussions comments are not supported. The URL may carry a leading
-  `https://github.com/` and a `?query` before the `#`; a URL on another host, without an anchor, with
-  an unknown anchor, with a non-numeric number or ID, with a malformed SHA, or with a number or ID
-  that starts with `0` is rejected before any `gh` call. The owner may contain `_`, as an Enterprise
-  Managed User account name does.
-- `comment_edit` reads the comment before editing it. A conversation or inline comment is edited only
-  when it belongs to the issue or PR `N` in the URL; a comment of another issue or PR is an error and
-  nothing is edited. A comment or review summary written by someone else is refused as well, with an
-  error naming both logins, unless `allow_other_author` is `true` (for moderation). The tool reads the
-  authenticated login with one GraphQL query, and skips that query when `allow_other_author` is
-  `true`. A comment in your own pending review needs neither check.
-- `comment_edit` handles a comment in your own unsubmitted (pending) review: when the read of an
-  inline comment answers 404, the tool looks the review up through GraphQL, matching
-  `fullDatabaseId` and reading further pages of a review with more than 100 comments, and edits a
-  matching comment with the `updatePullRequestReviewComment` mutation. When the lookup fails or finds
-  no match, the error states the 404 and the lookup's result.
-- `comment_edit` returns every failure as an error that starts with `Error:`, and a warning that
-  `gh` writes to stderr on a successful call does not fail the edit. It returns the updated
-  comment's `html_url`, or the `url` for a comment in a pending review. When GitHub reports success
-  but returns no URL, the call is still an error, and its message says the edit was sent and the
-  comment may already hold the new body.
-- `check-api-tools.sh` redirects `PATCH repos/O/R/issues/comments/ID`,
-  `PATCH repos/O/R/pulls/comments/ID`, and `PUT repos/O/R/pulls/N/reviews/ID` on the `api` write tool
-  to `comment_edit`, under `block_api_tool_write`. The message for a conversation comment points to
-  `issue_view` or `pr_view` with `fields=comments` for the comment's URL. The block messages for
-  `gh pr comment` and `gh issue comment` now also name `comment_edit` for editing an existing
-  comment, which covers `--edit-last`.
+- `comment_edit` write tool. Edits the body of an existing comment, given the comment's URL: an
+  issue or PR conversation comment, an inline review comment (including one in your own unsubmitted
+  review), or a review summary. Commit comments and Discussions comments are not supported. The URL
+  can be written with or without `https://github.com/`, can carry a notification link's `?query`, and
+  can point at a comment shown in the Files, Changes, or commit view of a PR. `REFERENCE.md` lists
+  the exact forms.
+- `comment_edit` refuses to edit a submitted comment written by someone else unless you pass
+  `allow_other_author: true`, and refuses a comment that does not belong to the issue or PR named in
+  the URL. Every failure comes back as a tool error; an edit that GitHub
+  accepts but answers without a URL is also an error, and says the comment may already hold the new
+  body.
+- The `api` write tool (under `block_api_tool_write`) and raw `gh api` calls (under
+  `block_api_commands`) that edit a comment now redirect to `comment_edit`, and the block messages
+  for `gh pr comment` and `gh issue comment` name `comment_edit` for editing an existing comment.
 
 ## [5.0.1] - 2026-10-03
 
