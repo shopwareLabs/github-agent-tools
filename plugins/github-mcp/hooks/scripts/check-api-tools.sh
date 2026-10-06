@@ -166,6 +166,20 @@ if [[ "$IS_WRITE" == "true" ]]; then
         block_tool "issue_edit or issue_type_set" "Use issue_edit for title, body, labels, and assignees, or issue_type_set for the issue type."
     fi
 
+    # Edit an existing comment: issue/PR conversation comment, inline review comment,
+    # review body. The anchored comment URL is the tool's input.
+    if [[ "$METHOD" == "PATCH" ]] && echo "$ENDPOINT_PATH" | grep -qE '(^|/)repos/[^/]+/[^/]+/issues/comments/[0-9]+/?$'; then
+        block_tool "comment_edit" "Use comment_edit with the comment's url and the new body. Take the url from the comment's own url field in issue_view or pr_view with fields=comments, or from the one issue_comment or pr_comment returned."
+    fi
+
+    if [[ "$METHOD" == "PATCH" ]] && echo "$ENDPOINT_PATH" | grep -qE '(^|/)repos/[^/]+/[^/]+/pulls/comments/[0-9]+/?$'; then
+        block_tool "comment_edit" "Use comment_edit with the inline comment's url (the html_url from pr_comments, or the one pr_review_reply returned) and the new body."
+    fi
+
+    if [[ "$METHOD" == "PUT" ]] && echo "$ENDPOINT_PATH" | grep -qE '(^|/)repos/[^/]+/[^/]+/pulls/[0-9]+/reviews/[0-9]+/?$'; then
+        block_tool "comment_edit" "Use comment_edit with the review's html_url (from pr_reviews, ending in #pullrequestreview-ID) and the new body."
+    fi
+
     # PR review comment thread replies (POST)
     if [[ "$METHOD" == "POST" ]] && echo "$ENDPOINT" | grep -qE 'pulls/[0-9]+/comments/[0-9]+/replies$'; then
         block_tool "pr_review_reply" "Use pr_review_reply with number, comment_id, and body."

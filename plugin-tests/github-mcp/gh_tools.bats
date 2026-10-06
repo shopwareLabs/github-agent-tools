@@ -237,6 +237,34 @@ bats_test_function \
     "gh api repos/shopware/shopware/pulls/14642/reviews" \
     "pr_reviews"
 
+# comment_edit redirects: the method flag before or after the endpoint, and the
+# reviews/ID PUT must not fall through to pr_reviews.
+gh_api_edit_blocks() {
+    gh_api_hook_blocks "$1" "comment_edit"
+    refute_output --partial "pr_reviews"
+}
+
+bats_test_function \
+    --description "blocks gh api -X PATCH .../issues/comments/ID → suggests comment_edit" \
+    -- gh_api_edit_blocks \
+    "gh api -X PATCH repos/shopware/shopware/issues/comments/2001 -f body=x"
+
+bats_test_function \
+    --description "blocks gh api .../pulls/comments/ID --method PATCH → suggests comment_edit" \
+    -- gh_api_edit_blocks \
+    "gh api repos/shopware/shopware/pulls/comments/1234567 --method PATCH -f body=x"
+
+bats_test_function \
+    --description "blocks gh api -X PUT .../pulls/N/reviews/ID → suggests comment_edit, not pr_reviews" \
+    -- gh_api_edit_blocks \
+    "gh api -X PUT repos/shopware/shopware/pulls/14642/reviews/777 -f body=x"
+
+bats_test_function \
+    --description "blocks gh api .../pulls/N/reviews/ID -X GET → suggests pr_reviews" \
+    -- gh_api_hook_blocks \
+    "gh api repos/shopware/shopware/pulls/14642/reviews/777 -X GET" \
+    "pr_reviews"
+
 bats_test_function \
     --description "blocks gh api .../pulls/N/files → suggests pr_files" \
     -- gh_api_hook_blocks \

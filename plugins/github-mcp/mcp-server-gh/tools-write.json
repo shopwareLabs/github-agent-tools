@@ -756,6 +756,30 @@
       }
     },
     {
+      "name": "comment_edit",
+      "description": "Replace the body of an issue or pull request comment, an inline comment on a diff (including one in your own unsubmitted draft), or a summary of a submitted verdict. The new body replaces the whole text. Accepted url forms, with no prefix or with a leading https://github.com/, http://github.com/, or https://www.github.com/: OWNER/REPO/issues/N#issuecomment-ID, OWNER/REPO/pull/N#issuecomment-ID, OWNER/REPO/pull/N#discussion_rID, OWNER/REPO/pull/N/files#rID (or /changes#rID, /files/SHA#rID, /files/SHA..SHA#rID, /changes/SHA#rID, /changes/SHA..SHA#rID, /commits/SHA#rID), OWNER/REPO/pull/N#pullrequestreview-ID; a ?query before the # is ignored. Any other url, including any other host, is rejected before the request. A comment written by someone else is refused unless allow_other_author is true. Returns the edited comment's URL.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["url", "body"],
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "URL of the comment to edit, with its anchor, for example https://github.com/OWNER/REPO/pull/123#discussion_r456."
+          },
+          "body": {
+            "type": "string",
+            "description": "New comment text. Replaces the whole existing text."
+          },
+          "allow_other_author": {
+            "type": "boolean",
+            "description": "Editing a comment written by someone else, for example for moderation, requires true.",
+            "default": false
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "project_item_add",
       "description": "Add an issue or PR to a GitHub Project by project name. The server resolves the project name to its ID.",
       "inputSchema": {

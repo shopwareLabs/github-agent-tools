@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `comment_edit` write tool. Edits the body of an existing comment, given the comment's URL: an
+  issue or PR conversation comment, an inline review comment (including one in your own unsubmitted
+  review), or a review summary. Commit comments and Discussions comments are not supported. The URL
+  can be written with or without `https://github.com/`, can carry a notification link's `?query`, and
+  can point at a comment shown in the Files, Changes, or commit view of a PR. `REFERENCE.md` lists
+  the exact forms.
+- `comment_edit` refuses to edit a submitted comment written by someone else unless you pass
+  `allow_other_author: true`, and refuses a comment that does not belong to the issue or PR named in
+  the URL. Every failure comes back as a tool error; an edit that GitHub
+  accepts but answers without a URL is also an error, and says the comment may already hold the new
+  body.
+- The `api` write tool (under `block_api_tool_write`) and raw `gh api` calls (under
+  `block_api_commands`) that edit a comment now redirect to `comment_edit`, and the block messages
+  for `gh pr comment` and `gh issue comment` name `comment_edit` for editing an existing comment.
+
 ## [5.0.1] - 2026-10-03
 
 ### Fixed

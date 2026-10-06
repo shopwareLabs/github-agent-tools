@@ -575,7 +575,7 @@ Tools available via the `gh-tooling-write` MCP server. Requires `enable_write_se
 
 ### Shared Tool Parameters
 
-All gh-tooling-write MCP tools accept these parameters:
+All gh-tooling-write MCP tools except `comment_edit` accept these parameters. `comment_edit` declares neither, so a failed edit always returns an error:
 
 | Parameter         | Type    | Default | Description                                                             |
 |-------------------|---------|---------|-------------------------------------------------------------------------|
@@ -732,6 +732,39 @@ Use gh-tooling-write pr_review_reply with number 14642 and comment_id 1234567 an
 - `comment_id` (integer, required): ID of the parent review comment to reply to. Obtain from `pr_comments` or `pr_reviews`.
 - `body` (string, required): Reply body text.
 - `repo` (string, optional): Repository in `owner/repo` format.
+
+#### `comment_edit`
+
+Replace the body of one existing comment. Supported: a conversation comment on an issue or a PR, an inline review comment (including one in your own pending review), and a review's summary body. Commit comments and Discussions comments are not supported. The kind comes from the anchor of `url`, so pass the URL exactly as `issue_comment` or `pr_comment` returned it, as the `url` of a comment from `issue_view` or `pr_view` with `fields=comments`, or as the `html_url` from `pr_comments`, `pr_reviews`, or `pr_review_reply`. The body replaces the whole comment text; send the full new text, not a diff. Returns the updated comment's URL.
+
+```
+Use gh-tooling-write comment_edit with url "https://github.com/shopware/shopware/pull/14642#issuecomment-2001" and body "CI is green, ready to merge"
+Use gh-tooling-write comment_edit with url "shopware/shopware/pull/14642#discussion_r1234567" and body "Fixed in b8f9a8c."
+```
+
+Accepted `url` forms, each with or without a leading `https://github.com/` (`http://github.com/` and `https://www.github.com/` also work; the scheme and host match without regard to case, so `https://GitHub.com/` works too; any other scheme or host is rejected). A `?query` before the `#`, such as `?notification_referrer_id=NT_x`, is ignored. `OWNER` is letters, digits, `-`, and `_` (an Enterprise Managed User account such as `mona_octocorp` has one). `N` and `ID` are digits only. `SHA` is 7 to 40 hex characters:
+
+| `url` form                                             | Edits                           | Request                                         |
+|--------------------------------------------------------|---------------------------------|-------------------------------------------------|
+| `OWNER/REPO/issues/N#issuecomment-ID`                  | Issue conversation comment      | `PATCH repos/OWNER/REPO/issues/comments/ID`     |
+| `OWNER/REPO/pull/N#issuecomment-ID`                    | PR conversation comment         | `PATCH repos/OWNER/REPO/issues/comments/ID`     |
+| `OWNER/REPO/pull/N#discussion_rID`                     | Inline review comment           | `PATCH repos/OWNER/REPO/pulls/comments/ID` (see below) |
+| `OWNER/REPO/pull/N/files#rID`, `.../changes#rID`, `.../files/SHA#rID`, `.../files/SHA..SHA#rID`, `.../changes/SHA#rID`, `.../changes/SHA..SHA#rID`, or `.../commits/SHA#rID` | Inline review comment | `PATCH repos/OWNER/REPO/pulls/comments/ID` (see below) |
+| `OWNER/REPO/pull/N#pullrequestreview-ID`               | Review summary body             | `PUT repos/OWNER/REPO/pulls/N/reviews/ID`       |
+
+Before editing, the tool reads the comment (`GET`). For a conversation comment or an inline review comment it checks that the comment belongs to the issue or PR `N` in the URL: the comment's `issue_url` must end in `/issues/N` (PR conversation comments also use `/issues/N`), or its `pull_request_url` in `/pulls/N`. A comment of another issue or PR is an error naming both numbers, and nothing is edited. A review summary is read from `GET repos/OWNER/REPO/pulls/N/reviews/ID`, which carries the PR number in its path. A failed read, including a 404 on a conversation comment or a review summary, is an error with gh's message and no edit.
+
+For the two inline review comment forms, a 404 on that read means the comment is not a submitted one, or the token has no access to the repository. The comment can still be in your own unsubmitted (pending) review, which the REST endpoint does not return. The tool then reads the pending reviews of PR `N` through GraphQL (the first 100 reviews, each with its first 100 comments) and searches every returned review for the comment's `fullDatabaseId`. When none matches, it reads further comment pages of a review that reports more, up to 50 pages (5,000 comments) in all. It edits a match with the `updatePullRequestReviewComment` mutation and returns the comment's `url`. No author check runs for a match: GitHub refuses to edit another user's comment, and that refusal is the mutation's error. When the lookup finds no match or fails, the error states both facts: `Error: comment_edit: GET repos/OWNER/REPO/pulls/comments/ID returned 404 (not found, or no access to the repository); pending-review lookup on PR N: <the lookup's error, or "no matching comment in your pending review">`. A failed page and reaching the page limit are lookup errors. A mutation that fails is an error that starts with the same 404 statement, followed by `pending-review comment edit failed: ...`; a mutation that succeeds without a URL is the same 404 statement followed by the sent-but-no-URL message described below. A read that fails with anything other than a 404 is an error too. A failed read, lookup page, or mutation makes no further call.
+
+Author check: unless `allow_other_author` is `true`, the tool takes the `node_id` from the read of the comment or review summary and asks GitHub, in one GraphQL query (`node(id: ID) { ... on Comment { viewerDidAuthor } }`), whether the authenticated user wrote it. Any answer other than `viewerDidAuthor: true` (`false`, or no value) is an error that names the author (the read's `user.login`, or "a deleted user" when the read names no login) and says to pass `allow_other_author: true`, and nothing is edited. A read without a `node_id`, or a failed query, is an error and nothing is edited. With `allow_other_author: true` the tool sends no query and skips the check. A comment found through the pending-review lookup is not checked and sends no author query: the lookup searches every pending review it returns for the comment's ID, and GitHub's mutation refuses another author's comment.
+
+Every failure is returned as a tool error, and its message names what failed. When the edit request succeeds but GitHub's response holds no URL, the call is an error too: the message says the edit was sent and GitHub reported success but returned no URL, so the comment may already hold the new body. Output that a successful `gh` call writes to stderr, such as a warning, does not fail the edit.
+Any other URL fails before the request: no anchor, an unknown anchor, a non-numeric number or ID, `#discussion_rID`, `#rID`, or `#pullrequestreview-ID` on an `issues/N` URL, `#rID` without `/files`, `/changes`, `/files/SHA`, `/files/SHA..SHA`, `/changes/SHA`, `/changes/SHA..SHA`, or `/commits/SHA`, a malformed `SHA` segment, a query string after the `#`, and extra path segments. The repository comes from the URL, so the tool takes no `repo` parameter.
+
+**Parameters:**
+- `url` (string, required): URL of the comment to edit, with its anchor.
+- `body` (string, required): New comment text. Replaces the whole existing text.
+- `allow_other_author` (boolean, optional, default `false`): Editing a comment written by someone else, for example for moderation, requires `true`.
 
 ### Issue Write Tools
 

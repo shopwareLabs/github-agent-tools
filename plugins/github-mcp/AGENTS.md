@@ -54,7 +54,7 @@ plugins/github-mcp/
         ├── issue_schema.sh            # tool_issue_schema() (org issue types + issue fields, name filters)
         ├── issue_write.sh             # tool_issue_create/edit/close/reopen/comment()
         ├── issue_schema_write.sh      # tool_issue_type_set(), tool_issue_field_set() (name-to-ID resolution, PUT replace)
-        ├── review_write.sh            # tool_pr_review_submit(), tool_pr_comment(), tool_pr_review_reply()
+        ├── review_write.sh            # tool_pr_review_submit(), tool_pr_comment(), tool_pr_review_reply(), tool_comment_edit()
         ├── run.sh                     # tool_run_view(), tool_run_list(), tool_run_logs(), tool_workflow_jobs()
         ├── job.sh                     # tool_job_view(), tool_job_logs(), tool_job_annotations()
         ├── commit.sh                  # tool_commit_pulls()
@@ -125,7 +125,7 @@ Claude Code / Codex ← stdout ← JSON-RPC response ← formatted output
 Tools in `tools-read.json` and `tools-write.json` map to bash functions with `tool_` prefix:
 - Uses bash arrays (`local -a cmd=("gh" "pr" "view" "${number}")`) for injection-safe argument passing
 - `_gh_resolve_repo()` falls back to `GH_DEFAULT_REPO` from config
-- All tools support `suppress_errors` and `fallback` shared parameters
+- Shared parameters (`suppress_errors`, `fallback`): which tools take them is in `REFERENCE.md` §Shared Tool Parameters
 - Tools with JSON output support `jq_filter` with pre-execution syntax validation
 - Tools that accept `grep_pattern` validate it with `_gh_validate_grep_pattern()` before calling `gh`
 - Log/text tools support `max_lines`, `tail_lines`, and grep parameters
@@ -254,7 +254,7 @@ own unit tests are Node tests under `plugin-tests/github-mcp/pi/`:
 | `write_tools_issue_schema.bats` | `issue_type_set` and `issue_field_set` name resolution and value checks |
 | `write_tools_pr.bats` | `pr_create`/`edit`/`ready`/`merge`/`close`/`reopen` parameter handling |
 | `write_tools_project.bats` | `project_item_add` and `project_status_set` name-to-ID resolution |
-| `write_tools_review.bats` | `pr_review_submit`/`pr_comment`/`pr_review_reply` parameter handling and REST payloads |
+| `write_tools_review.bats` | `pr_review_submit`/`pr_comment`/`pr_review_reply`/`comment_edit` parameter handling and REST payloads, including `comment_edit`'s URL forms and rejections |
 | `pi/gate.test.ts` | `runGate()`/`runScript()`: exit codes, stderr capture, stdin handling, and the timeout that kills a gate's background children |
 | `pi/index.test.ts` | The extension's event handlers on a fake pi: the `github_mcp` section from session-start output (malformed output and non-zero exits add none), and which `bash` and `api_read` calls the gates block or let through |
 | `pi/tool-search-ranking.test.ts` | Exact-name ranking with pi's own ranker over the real tool catalogs, server descriptions, and server instructions; and that no server description or instructions term matches a tool-name term |

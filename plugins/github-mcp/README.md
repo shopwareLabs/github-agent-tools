@@ -22,7 +22,7 @@ GitHub CLI tools via MCP (Model Context Protocol). Wraps the `gh` CLI for pull r
 
 ### Write Server (gh-tooling-write)
 - **PR lifecycle** via `pr_create`, `pr_edit`, `pr_ready`, `pr_merge`, `pr_close`, `pr_reopen`
-- **Reviews** via `pr_review_submit`, `pr_comment`, `pr_review_reply`
+- **Reviews** via `pr_review_submit`, `pr_comment`, `pr_review_reply`, `comment_edit` (edits an issue or PR conversation comment, an inline review comment, or a review summary by its URL)
 - **Issue lifecycle** via `issue_create`, `issue_edit`, `issue_close`, `issue_reopen`, `issue_comment`
 - **Labels** via `label_add`, `label_remove`
 - **Assignees** via `assignee_add`, `assignee_remove`
@@ -129,7 +129,7 @@ With enforcement disabled:
 |------------------------|---------|---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `repo`                 | string  | --      | Default repository in `owner/repo` format. Used when `repo` is not passed to a tool call, and for `search_code` and `search_commits` only when `owner` is not passed either.                                                                                                                                                                             |
 | `enforce_mcp_tools`    | boolean | `true`  | Blocks high-level `gh` subcommands (`gh pr view`, `gh issue view`, `gh run view`, `gh search`, `gh pr create`, `gh label list`, `gh project view`, etc.) and redirects to MCP tools. Set to `false` to disable all gh hook enforcement.                                                                                                                  |
-| `block_api_commands`   | boolean | `false` | When `true` (and `enforce_mcp_tools` is also `true`), additionally blocks `gh api` calls for endpoints that have a dedicated MCP tool: `pulls/N/comments`, `pulls/N/reviews`, `pulls/N/files`, `pulls/N/commits`, `actions/jobs/N/logs`, `actions/jobs/N`, `check-runs/N/annotations`, `commits/SHA`, `releases`. Other `gh api` calls remain unblocked. |
+| `block_api_commands`   | boolean | `false` | When `true` (and `enforce_mcp_tools` is also `true`), additionally blocks `gh api` calls for endpoints that have a dedicated MCP tool: comment and review edits (`PATCH issues/comments/ID`, `PATCH pulls/comments/ID`, `PUT pulls/N/reviews/ID`), `pulls/N/comments`, `pulls/N/reviews`, `pulls/N/files`, `pulls/N/commits`, `actions/jobs/N/logs`, `actions/jobs/N`, `check-runs/N/annotations`, `commits/SHA`, `releases`. Other `gh api` calls remain unblocked. |
 | `enable_write_server`  | boolean | `false` | When `true`, the write MCP server exposes write tools (PR creation, issue editing, reviews, etc.). When `false` (default), the write server returns an empty tools list.                                                                                                                                                                                 |
 | `block_api_tool_read`  | boolean | `false` | When `true`, the read server's `api_read` tool blocks requests to endpoints that have a dedicated read MCP tool, suggesting the dedicated tool instead.                                                                                                                                                                                                  |
 | `block_api_tool_write` | boolean | `false` | When `true`, the write server's `api` tool blocks requests to endpoints that have a dedicated write MCP tool, suggesting the dedicated tool instead.                                                                                                                                                                                                     |
@@ -158,7 +158,7 @@ Configuration is loaded in the following priority order:
 
 ## Tools Reference
 
-31 read tools + 25 write tools organized by category. See [REFERENCE.md](./REFERENCE.md) for full parameter docs and examples.
+31 read tools + 26 write tools organized by category. See [REFERENCE.md](./REFERENCE.md) for full parameter docs and examples.
 
 ### Read Server (gh-tooling) -- 31 tools
 
@@ -177,12 +177,12 @@ Configuration is loaded in the following priority order:
 | Projects       | `project_list`, `project_view`                                                  |
 | Raw API        | `api_read` (GET only)                                                           |
 
-### Write Server (gh-tooling-write) -- 25 tools
+### Write Server (gh-tooling-write) -- 26 tools
 
 | Category     | Tools                                                                        |
 |--------------|------------------------------------------------------------------------------|
 | PR lifecycle | `pr_create`, `pr_edit`, `pr_ready`, `pr_merge`, `pr_close`, `pr_reopen`      |
-| Reviews      | `pr_review_submit`, `pr_comment`, `pr_review_reply`                          |
+| Reviews      | `pr_review_submit`, `pr_comment`, `pr_review_reply`, `comment_edit`          |
 | Issues       | `issue_create`, `issue_edit`, `issue_close`, `issue_reopen`, `issue_comment` |
 | Issue schema | `issue_type_set`, `issue_field_set`                                          |
 | Labels       | `label_add`, `label_remove`                                                  |
@@ -295,12 +295,12 @@ To allow direct CLI invocations, set `enforce_mcp_tools` to `false` in your conf
 | `gh pr close`            | `pr_close`           |
 | `gh pr reopen`           | `pr_reopen`          |
 | `gh pr review`           | `pr_review_submit`   |
-| `gh pr comment`          | `pr_comment`         |
+| `gh pr comment`          | `pr_comment` / `comment_edit` |
 | `gh issue create`        | `issue_create`       |
 | `gh issue edit`          | `issue_edit`         |
 | `gh issue close`         | `issue_close`        |
 | `gh issue reopen`        | `issue_reopen`       |
-| `gh issue comment`       | `issue_comment`      |
+| `gh issue comment`       | `issue_comment` / `comment_edit` |
 | `gh project item-add`    | `project_item_add`   |
 | `gh project item-edit`   | `project_status_set` |
 
@@ -310,6 +310,7 @@ With `block_api_commands: true`, additionally blocks `gh api` bash calls for end
 
 | Endpoint Pattern           | MCP Tool                  |
 |----------------------------|---------------------------|
+| `PATCH issues/comments/ID`, `PATCH pulls/comments/ID`, `PUT pulls/N/reviews/ID` | `comment_edit` |
 | `pulls/N/comments`         | `pr_comments`             |
 | `pulls/N/reviews`          | `pr_reviews`              |
 | `pulls/N/files`            | `pr_files`                |

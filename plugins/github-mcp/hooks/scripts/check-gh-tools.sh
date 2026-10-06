@@ -145,7 +145,7 @@ fi
 
 if echo "$COMMAND" | grep -qE '(^|;|&&|\|)\s*gh\s+pr\s+comment(\s|$)'; then
     block_tool "mcp__gh-tooling-write__pr_comment" \
-        "Use pr_comment with number and body parameters."
+        "Use pr_comment with number and body parameters. To edit an existing comment (gh pr comment --edit-last), use comment_edit with the comment's url and the new body."
 fi
 
 # ============================================================================
@@ -174,7 +174,7 @@ fi
 
 if echo "$COMMAND" | grep -qE '(^|;|&&|\|)\s*gh\s+issue\s+comment(\s|$)'; then
     block_tool "mcp__gh-tooling-write__issue_comment" \
-        "Use issue_comment with number and body parameters."
+        "Use issue_comment with number and body parameters. To edit an existing comment (gh issue comment --edit-last), use comment_edit with the comment's url and the new body."
 fi
 
 # ============================================================================
@@ -227,6 +227,21 @@ fi
 # ============================================================================
 
 if [[ "$BLOCK_API_COMMANDS" == "true" ]]; then
+
+    # Editing an existing comment or review body → comment_edit. Checked before
+    # the reads below, so PUT .../pulls/N/reviews/ID does not land on pr_reviews.
+    # The method flag may come before or after the endpoint.
+    if echo "$COMMAND" | grep -qE 'gh\s+api\s.*repos/[^/[:space:]]+/[^/[:space:]]+/(issues|pulls)/comments/[0-9]+([^0-9/]|$)' \
+        && echo "$COMMAND" | grep -qE '(-X|--method)(\s+|=)?PATCH([^A-Za-z]|$)'; then
+        block_tool "mcp__gh-tooling-write__comment_edit" \
+            "Use comment_edit with the comment's url and the new body."
+    fi
+
+    if echo "$COMMAND" | grep -qE 'gh\s+api\s.*repos/[^/[:space:]]+/[^/[:space:]]+/pulls/[0-9]+/reviews/[0-9]+([^0-9/]|$)' \
+        && echo "$COMMAND" | grep -qE '(-X|--method)(\s+|=)?PUT([^A-Za-z]|$)'; then
+        block_tool "mcp__gh-tooling-write__comment_edit" \
+            "Use comment_edit with the review's url and the new body."
+    fi
 
     # PR inline review comments → pr_comments
     if echo "$COMMAND" | grep -qE 'gh\s+api\s+repos/[^/[:space:]]+/[^/[:space:]]+/pulls/[0-9]+/comments'; then
