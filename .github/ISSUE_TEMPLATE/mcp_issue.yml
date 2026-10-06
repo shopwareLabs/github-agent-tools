@@ -79,7 +79,7 @@ body:
         - gh-tooling / label and project tools (label_list, project_list, project_view)
         - gh-tooling / api_read
         - gh-tooling-write / PR write tools (pr_create, pr_edit, pr_ready, pr_merge, pr_close, pr_reopen)
-        - gh-tooling-write / review tools (pr_review_submit, pr_comment, pr_review_reply)
+        - gh-tooling-write / review tools (pr_review_submit, pr_comment, pr_review_reply, comment_edit)
         - gh-tooling-write / issue write tools (issue_create, issue_edit, issue_close, issue_reopen, issue_comment)
         - gh-tooling-write / labels, assignees, sub-issues
         - gh-tooling-write / project writes (project_item_add, project_status_set)

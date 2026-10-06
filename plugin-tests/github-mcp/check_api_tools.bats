@@ -256,6 +256,62 @@ setup_write_blocking() {
     assert_output --partial "pr_review_reply"
 }
 
+@test "write api: blocks PATCH issues/comments/ID → suggests comment_edit" {
+    setup_write_blocking
+    run_api_hook "$WRITE_TOOL" "repos/shopware/shopware/issues/comments/456" "PATCH"
+    assert_failure 2
+    assert_output --partial "comment_edit"
+    refute_output --partial "issue_edit"
+}
+
+@test "write api: blocks PATCH pulls/comments/ID → suggests comment_edit" {
+    setup_write_blocking
+    run_api_hook "$WRITE_TOOL" "repos/shopware/shopware/pulls/comments/456" "PATCH"
+    assert_failure 2
+    assert_output --partial "comment_edit"
+}
+
+@test "write api: blocks PUT pulls/N/reviews/ID → suggests comment_edit" {
+    setup_write_blocking
+    run_api_hook "$WRITE_TOOL" "repos/shopware/shopware/pulls/123/reviews/456" "PUT"
+    assert_failure 2
+    assert_output --partial "comment_edit"
+    refute_output --partial "pr_review_submit"
+}
+
+@test "write api: a comment path only in the query string of another PATCH endpoint is not redirected to comment_edit" {
+    setup_write_blocking
+    run_api_hook "$WRITE_TOOL" "repos/shopware/shopware/labels/bug?next=repos/shopware/shopware/issues/comments/456" "PATCH"
+    assert_success
+}
+
+@test "write api: a review path only in the query string of another PUT endpoint is not redirected to comment_edit" {
+    setup_write_blocking
+    run_api_hook "$WRITE_TOOL" "repos/shopware/shopware/pulls/123/requested_reviewers?next=repos/shopware/shopware/pulls/123/reviews/456" "PUT"
+    assert_success
+}
+
+@test "write api: POST pulls/N/reviews still suggests pr_review_submit, not comment_edit" {
+    setup_write_blocking
+    run_api_hook "$WRITE_TOOL" "repos/shopware/shopware/pulls/123/reviews" "POST"
+    assert_failure 2
+    assert_output --partial "pr_review_submit"
+    refute_output --partial "comment_edit"
+}
+
+@test "write api: DELETE issues/comments/ID is not redirected to comment_edit" {
+    setup_write_blocking
+    run_api_hook "$WRITE_TOOL" "repos/shopware/shopware/issues/comments/456" "DELETE"
+    assert_success
+}
+
+@test "Codex write api: PATCH issues/comments/ID suggests comment_edit" {
+    setup_codex_config "gh-tooling" '{"block_api_tool_write": true}'
+    run_api_hook "$CODEX_WRITE_TOOL" "repos/shopware/shopware/issues/comments/456" "PATCH"
+    assert_failure 2
+    assert_output --partial "comment_edit"
+}
+
 @test "write api: allows unknown write endpoint" {
     setup_write_blocking
     run_api_hook "$WRITE_TOOL" "repos/shopware/shopware/releases" "POST"

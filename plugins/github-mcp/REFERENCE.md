@@ -575,7 +575,7 @@ Tools available via the `gh-tooling-write` MCP server. Requires `enable_write_se
 
 ### Shared Tool Parameters
 
-All gh-tooling-write MCP tools accept these parameters:
+All gh-tooling-write MCP tools except `comment_edit` accept these parameters. `comment_edit` declares neither, so a failed edit always returns an error:
 
 | Parameter         | Type    | Default | Description                                                             |
 |-------------------|---------|---------|-------------------------------------------------------------------------|
@@ -732,6 +732,33 @@ Use gh-tooling-write pr_review_reply with number 14642 and comment_id 1234567 an
 - `comment_id` (integer, required): ID of the parent review comment to reply to. Obtain from `pr_comments` or `pr_reviews`.
 - `body` (string, required): Reply body text.
 - `repo` (string, optional): Repository in `owner/repo` format.
+
+#### `comment_edit`
+
+Replace the body of one existing comment, whatever its kind: an issue or PR conversation comment, an inline review comment, or a review's summary body. The kind comes from the anchor of `url`, so pass the URL exactly as `issue_comment` or `pr_comment` returned it, or as the `html_url` from `pr_comments`, `pr_reviews`, or `pr_review_reply`. The body replaces the whole comment text; send the full new text, not a diff. Returns the updated comment's `html_url`.
+
+```
+Use gh-tooling-write comment_edit with url "https://github.com/shopware/shopware/pull/14642#issuecomment-2001" and body "CI is green, ready to merge"
+Use gh-tooling-write comment_edit with url "shopware/shopware/pull/14642#discussion_r1234567" and body "Fixed in b8f9a8c."
+```
+
+Accepted `url` forms, each with or without a leading `https://github.com/` (`http://github.com/` and `https://www.github.com/` also work; any other scheme or host is rejected). `N` and `ID` are digits only:
+
+| `url` form                                             | Edits                           | Request                                         |
+|--------------------------------------------------------|---------------------------------|-------------------------------------------------|
+| `OWNER/REPO/issues/N#issuecomment-ID`                  | Issue conversation comment      | `PATCH repos/OWNER/REPO/issues/comments/ID`     |
+| `OWNER/REPO/pull/N#issuecomment-ID`                    | PR conversation comment         | `PATCH repos/OWNER/REPO/issues/comments/ID`     |
+| `OWNER/REPO/pull/N#discussion_rID`                     | Inline review comment           | `PATCH repos/OWNER/REPO/pulls/comments/ID` (see below) |
+| `OWNER/REPO/pull/N/files#rID` or `.../changes#rID`     | Inline review comment           | `PATCH repos/OWNER/REPO/pulls/comments/ID` (see below) |
+| `OWNER/REPO/pull/N#pullrequestreview-ID`               | Review summary body             | `PUT repos/OWNER/REPO/pulls/N/reviews/ID`       |
+
+The two inline review comment forms also cover a comment in your own unsubmitted (pending) review, which the REST endpoint answers with 404. The tool first looks up your pending review on the PR through GraphQL. If the comment is in it, the tool edits it with the `updatePullRequestReviewComment` mutation and returns the comment's `url`. If you have no pending review, or the comment is not in it, the tool sends the `PATCH` shown. Every failure is returned as an error: a failed lookup, a failed mutation, or a pending review of more than 100 comments in which the comment is not found. None of these falls back to the `PATCH`.
+
+Any other URL fails before the request: no anchor, an unknown anchor, a non-numeric number or ID, `#discussion_rID`, `#rID`, or `#pullrequestreview-ID` on an `issues/N` URL, `#rID` without `/files` or `/changes`, and extra path segments or a query string. The repository comes from the URL, so the tool takes no `repo` parameter.
+
+**Parameters:**
+- `url` (string, required): URL of the comment to edit, with its anchor.
+- `body` (string, required): New comment text. Replaces the whole existing text.
 
 ### Issue Write Tools
 

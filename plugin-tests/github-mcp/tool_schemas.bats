@@ -159,6 +159,15 @@ load_validator_for() {
     assert_output --partial "Unknown parameter(s): body_file"
 }
 
+@test "comment_edit refuses fallback, which would report a failed edit as a success" {
+    load_validator_for "$WRITE_TOOLS"
+
+    run validate_tool_arguments "comment_edit" '{"url": "o/r/issues/1#issuecomment-2", "body": "x", "fallback": "ok"}'
+
+    assert_failure
+    assert_output --partial "Unknown parameter(s): fallback"
+}
+
 @test "a paging limit sent as a string is refused, naming the parameter" {
     # The counterpart to the identifier union: limit and max_lines are
     # integer-only on purpose, so the string form must fail rather than reach

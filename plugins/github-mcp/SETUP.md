@@ -104,11 +104,12 @@
 ### PR reviews and comments
 - **Recommended**: ask
 - **Optional**: Yes (skip if `enable_write_server` is `false` or the user declined to enable the write server in Phase 3)
-- **Description**: Posting PR reviews (with optional inline code comments), top-level PR comments, and threaded replies to review comments. Lower-risk than PR lifecycle changes but still visible to other contributors.
+- **Description**: Posting PR reviews (with optional inline code comments), top-level PR comments, threaded replies to review comments, and editing an existing comment. Lower-risk than PR lifecycle changes but still visible to other contributors.
 - **Patterns**:
   - `mcp__plugin_github-mcp_gh-tooling-write__pr_review_submit`
   - `mcp__plugin_github-mcp_gh-tooling-write__pr_comment`
   - `mcp__plugin_github-mcp_gh-tooling-write__pr_review_reply`
+  - `mcp__plugin_github-mcp_gh-tooling-write__comment_edit`
 
 ### Issue write tools
 - **Recommended**: ask

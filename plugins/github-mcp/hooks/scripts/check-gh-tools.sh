@@ -145,7 +145,7 @@ fi
 
 if echo "$COMMAND" | grep -qE '(^|;|&&|\|)\s*gh\s+pr\s+comment(\s|$)'; then
     block_tool "mcp__gh-tooling-write__pr_comment" \
-        "Use pr_comment with number and body parameters."
+        "Use pr_comment with number and body parameters. To edit an existing comment (gh pr comment --edit-last), use comment_edit with the comment's url and the new body."
 fi
 
 # ============================================================================
@@ -174,7 +174,7 @@ fi
 
 if echo "$COMMAND" | grep -qE '(^|;|&&|\|)\s*gh\s+issue\s+comment(\s|$)'; then
     block_tool "mcp__gh-tooling-write__issue_comment" \
-        "Use issue_comment with number and body parameters."
+        "Use issue_comment with number and body parameters. To edit an existing comment (gh issue comment --edit-last), use comment_edit with the comment's url and the new body."
 fi
 
 # ============================================================================

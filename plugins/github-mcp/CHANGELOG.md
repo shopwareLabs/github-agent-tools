@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `comment_edit` write tool. Replaces the body of one existing comment, whatever its kind, from the
+  comment's URL: `issues/N#issuecomment-ID` and `pull/N#issuecomment-ID` (conversation comments),
+  `pull/N#discussion_rID` and `pull/N/files#rID` or `pull/N/changes#rID` (inline review comments),
+  and `pull/N#pullrequestreview-ID` (a review's summary body). The URL may carry a leading
+  `https://github.com/`; a URL on another host, without an anchor, with an unknown anchor, or with a
+  non-numeric ID or number is rejected before any `gh` call. The two inline review comment forms
+  also edit a comment in the caller's own unsubmitted (pending) review, which the REST endpoint
+  rejects with 404: the tool looks up the pending review through GraphQL and edits a matching
+  comment with the `updatePullRequestReviewComment` mutation. Every failure is returned as an
+  error and never falls back to another route. It returns the updated comment's `html_url`, or the
+  `url` for a comment in a pending review.
+- `check-api-tools.sh` redirects `PATCH repos/O/R/issues/comments/ID`,
+  `PATCH repos/O/R/pulls/comments/ID`, and `PUT repos/O/R/pulls/N/reviews/ID` on the `api` write tool
+  to `comment_edit`, under `block_api_tool_write`. The block messages for `gh pr comment` and
+  `gh issue comment` now also name `comment_edit` for editing an existing comment, which covers
+  `--edit-last`.
+
 ## [5.0.1] - 2026-10-03
 
 ### Fixed
