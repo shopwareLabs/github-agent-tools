@@ -168,8 +168,12 @@ if [[ "$IS_WRITE" == "true" ]]; then
 
     # Edit an existing comment: issue/PR conversation comment, inline review comment,
     # review body. The anchored comment URL is the tool's input.
-    if [[ "$METHOD" == "PATCH" ]] && echo "$ENDPOINT_PATH" | grep -qE '(^|/)repos/[^/]+/[^/]+/(issues|pulls)/comments/[0-9]+/?$'; then
-        block_tool "comment_edit" "Use comment_edit with the comment's url (the one issue_comment or pr_comment returned, or the html_url from pr_comments or pr_reviews) and the new body."
+    if [[ "$METHOD" == "PATCH" ]] && echo "$ENDPOINT_PATH" | grep -qE '(^|/)repos/[^/]+/[^/]+/issues/comments/[0-9]+/?$'; then
+        block_tool "comment_edit" "Use comment_edit with the comment's url and the new body. Take the url from the comment's own url field in issue_view or pr_view with fields=comments, or from the one issue_comment or pr_comment returned."
+    fi
+
+    if [[ "$METHOD" == "PATCH" ]] && echo "$ENDPOINT_PATH" | grep -qE '(^|/)repos/[^/]+/[^/]+/pulls/comments/[0-9]+/?$'; then
+        block_tool "comment_edit" "Use comment_edit with the inline comment's url (the html_url from pr_comments, or the one pr_review_reply returned) and the new body."
     fi
 
     if [[ "$METHOD" == "PUT" ]] && echo "$ENDPOINT_PATH" | grep -qE '(^|/)repos/[^/]+/[^/]+/pulls/[0-9]+/reviews/[0-9]+/?$'; then

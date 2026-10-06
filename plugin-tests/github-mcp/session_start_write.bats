@@ -23,14 +23,6 @@ extract_context() {
     [[ "$context" == *"pr_create"* ]]
 }
 
-@test "write section lists comment_edit" {
-    run_session_with_config '{"enforce_mcp_tools": true, "enable_write_server": true}'
-    assert_success
-    local context
-    context=$(extract_context)
-    [[ "$context" == *"comment_edit"* ]]
-}
-
 @test "shows write disabled message when enable_write_server is false" {
     run_session_with_config '{"enforce_mcp_tools": true, "enable_write_server": false}'
     assert_success

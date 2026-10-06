@@ -231,22 +231,59 @@ tool_pr_review_reply() {
     echo "${__raw}"
 }
 
+#######################################
+# Run one gh api graphql call for comment_edit and classify the result. A
+# non-zero exit, an empty stdout, an `errors` field, or stdout that is not
+# JSON each count as a failure. stdout alone is parsed; stderr only explains a
+# failed call, so a warning on a successful call never fails it.
+# Arguments:
+#   $1 name of the caller's variable that receives the result,
+#   $2 label for the error message (for example "pending-review lookup"),
+#   $3... the gh command and its arguments.
+# Outputs:
+#   Nothing on stdout; the result goes to the variable named by $1.
+# Returns:
+#   0 with the response JSON in the variable. Otherwise gh's exit status (1
+#   when gh exited 0) with an "Error: ..." message in the variable.
+#######################################
+_comment_edit_graphql() {
+    local __ceg_var="$1" __ceg_label="$2"
+    shift 2
+    local __ceg_out __ceg_err __ceg_exit=0 __ceg_problem=""
+
+    _gh_capture_split __ceg_out __ceg_err "$@" || __ceg_exit=$?
+    if [[ ${__ceg_exit} -ne 0 ]]; then
+        __ceg_problem="${__ceg_err:-${__ceg_out:-gh api graphql failed with exit ${__ceg_exit} and no output}}"
+    elif [[ -z "${__ceg_out}" ]]; then
+        __ceg_problem="GitHub returned no output"
+    elif ! __ceg_problem=$(printf '%s' "${__ceg_out}" | jq -r 'if (.errors // empty) then "GraphQL errors: \(.errors | tostring)" else empty end' 2>/dev/null); then
+        __ceg_problem="unparseable response: ${__ceg_out}"
+    fi
+
+    if [[ -n "${__ceg_problem}" ]]; then
+        [[ ${__ceg_exit} -ne 0 ]] || __ceg_exit=1
+        printf -v "${__ceg_var}" '%s' "Error: comment_edit: ${__ceg_label} failed: ${__ceg_problem}"
+        return "${__ceg_exit}"
+    fi
+    printf -v "${__ceg_var}" '%s' "${__ceg_out}"
+}
+
+#######################################
 # Replace the body of one existing comment, whatever its kind. The kind comes
-# from the URL anchor, and a URL that matches none of the forms below fails
-# before any gh call:
-#   OWNER/REPO/issues/N#issuecomment-ID        → PATCH repos/O/R/issues/comments/ID
-#   OWNER/REPO/pull/N#issuecomment-ID          → PATCH repos/O/R/issues/comments/ID
-#   OWNER/REPO/pull/N#discussion_rID           → PATCH repos/O/R/pulls/comments/ID
-#   OWNER/REPO/pull/N/files|changes#rID        → PATCH repos/O/R/pulls/comments/ID
-#   OWNER/REPO/pull/N#pullrequestreview-ID     → PUT   repos/O/R/pulls/N/reviews/ID
-# For the two review-comment forms, the caller's own pending (unsubmitted)
-# review is looked up first, because REST answers 404 for a comment inside it.
-# A match is edited with the updatePullRequestReviewComment GraphQL mutation;
-# no match falls through to the PATCH above. A failed lookup, a failed
-# mutation, or a pending review of more than 100 comments with no match is an
-# error and makes no further call.
-# A leading https://github.com/, http://github.com/, or https://www.github.com/
-# is stripped; any other scheme or host is rejected.
+# from the anchor of the URL; REFERENCE.md lists the accepted URL forms. A URL
+# that matches none fails before any gh call. A conversation or inline comment
+# is read first and edited only when it belongs to the issue or PR number in
+# the URL. An inline comment the REST API reports as 404 may sit in the
+# caller's own pending review, so it is looked up there and edited through
+# GraphQL. Every other failure ends the call without a write.
+# Arguments:
+#   $1 JSON arguments: url (required) and body (required).
+# Outputs:
+#   The edited comment's URL on success, otherwise an "Error: ..." message.
+# Returns:
+#   0 when the comment was edited; otherwise gh's exit status, or 1 when the
+#   failure did not come from a gh exit.
+#######################################
 tool_comment_edit() {
     local args="$1"
 
@@ -289,17 +326,25 @@ tool_comment_edit() {
         return 1
     fi
 
-    local endpoint method review_comment_id=""
+    # owner_field names the field of the GET response that holds the issue or
+    # PR the comment belongs to; owner_path is how that URL must end.
+    local endpoint method owner_field="" owner_path="" review_comment_id=""
     if [[ "${anchor}" =~ ^issuecomment-([0-9]+)$ && -z "${suffix}" ]]; then
         endpoint="repos/${repo}/issues/comments/${BASH_REMATCH[1]}"
         method="PATCH"
+        owner_field="issue_url"
+        owner_path="issues/${number}"
     elif [[ "${kind}" == "pull" && -z "${suffix}" && "${anchor}" =~ ^discussion_r([0-9]+)$ ]]; then
         endpoint="repos/${repo}/pulls/comments/${BASH_REMATCH[1]}"
         method="PATCH"
+        owner_field="pull_request_url"
+        owner_path="pulls/${number}"
         review_comment_id="${BASH_REMATCH[1]}"
     elif [[ "${kind}" == "pull" && -n "${suffix}" && "${anchor}" =~ ^r([0-9]+)$ ]]; then
         endpoint="repos/${repo}/pulls/comments/${BASH_REMATCH[1]}"
         method="PATCH"
+        owner_field="pull_request_url"
+        owner_path="pulls/${number}"
         review_comment_id="${BASH_REMATCH[1]}"
     elif [[ "${kind}" == "pull" && -z "${suffix}" && "${anchor}" =~ ^pullrequestreview-([0-9]+)$ ]]; then
         endpoint="repos/${repo}/pulls/${number}/reviews/${BASH_REMATCH[1]}"
@@ -309,82 +354,100 @@ tool_comment_edit() {
         return 1
     fi
 
-    local __raw __exit=0
+    local __out __err __exit=0
+    local in_pending_review=false
 
-    if [[ -n "${review_comment_id}" ]]; then
-        local owner="${repo%%/*}" name="${repo##*/}"
-        local -a lookup_cmd=("gh" "api" "graphql"
-            "-f" "query=query(\$owner: String!, \$name: String!, \$number: Int!) { repository(owner: \$owner, name: \$name) { pullRequest(number: \$number) { reviews(states: [PENDING], first: 1) { nodes { comments(first: 100) { nodes { id databaseId } pageInfo { hasNextPage } } } } } } }"
-            "-f" "owner=${owner}" "-f" "name=${name}" "-F" "number=${number}"
-        )
-
-        log "INFO" "comment_edit: pending-review lookup: ${lookup_cmd[*]}"
-        __raw=$("${lookup_cmd[@]}" 2>&1) || __exit=$?
-        local lookup_error=""
+    if [[ -n "${owner_field}" ]]; then
+        log "INFO" "comment_edit: GET ${endpoint}"
+        _gh_capture_split __out __err gh api "${endpoint}" || __exit=$?
         if [[ ${__exit} -ne 0 ]]; then
-            lookup_error="${__raw:-gh api graphql failed with exit ${__exit} and no output}"
-        elif [[ -z "${__raw}" ]]; then
-            lookup_error="GitHub returned no output"
-        elif ! lookup_error=$(printf '%s' "${__raw}" | jq -r 'if (.errors // empty) then "GraphQL errors: \(.errors | tostring)" elif (.data.repository.pullRequest | type) != "object" then "response has no pull request data" else empty end' 2>&1); then
-            lookup_error="unparseable response: ${__raw}"
-        fi
-        if [[ -n "${lookup_error}" || ${__exit} -ne 0 ]]; then
-            [[ "${__exit}" -ne 0 ]] || __exit=1
-            echo "Error: pending-review lookup failed: ${lookup_error}"
-            return ${__exit}
-        fi
-
-        local node_id has_next
-        node_id=$(printf '%s' "${__raw}" | jq -r --argjson id "${review_comment_id}" \
-            '[.data.repository.pullRequest.reviews.nodes[0].comments.nodes[]? | select(.databaseId == $id) | .id][0] // empty')
-        has_next=$(printf '%s' "${__raw}" | jq -r '.data.repository.pullRequest.reviews.nodes[0].comments.pageInfo.hasNextPage // false')
-
-        if [[ -n "${node_id}" ]]; then
-            local -a mutation_cmd=("gh" "api" "graphql"
-                "-f" "query=mutation(\$id: ID!, \$body: String!) { updatePullRequestReviewComment(input: {pullRequestReviewCommentId: \$id, body: \$body}) { pullRequestReviewComment { url } } }"
-                "-f" "id=${node_id}" "-f" "body=${body}"
-            )
-            log "INFO" "comment_edit: pending-review mutation: ${mutation_cmd[*]}"
-            __exit=0
-            __raw=$("${mutation_cmd[@]}" 2>&1) || __exit=$?
-            local mutation_error="" mutation_url=""
-            if [[ ${__exit} -ne 0 ]]; then
-                mutation_error="${__raw:-gh api graphql failed with exit ${__exit} and no output}"
-            elif [[ -z "${__raw}" ]]; then
-                mutation_error="GitHub returned no URL for the edited comment"
-            elif ! mutation_error=$(printf '%s' "${__raw}" | jq -r 'if (.errors // empty) then "GraphQL errors: \(.errors | tostring)" else empty end' 2>&1); then
-                mutation_error="unparseable response: ${__raw}"
-            elif [[ -z "${mutation_error}" ]]; then
-                mutation_url=$(printf '%s' "${__raw}" | jq -r '.data.updatePullRequestReviewComment.pullRequestReviewComment.url // empty')
-                [[ -n "${mutation_url}" && "${mutation_url}" != "null" ]] || mutation_error="GitHub returned no URL for the edited comment: ${__raw}"
+            # Only an inline comment can still be edited: REST answers 404 for
+            # a comment inside the caller's unsubmitted review.
+            if [[ -n "${review_comment_id}" && "${__err}" == *"(HTTP 404)"* ]]; then
+                in_pending_review=true
+                __exit=0
+            else
+                echo "Error: comment_edit: GET ${endpoint} failed: ${__err:-${__out:-gh exited with status ${__exit} and no output}}"
+                return "${__exit}"
             fi
-            if [[ -n "${mutation_error}" ]]; then
-                [[ "${__exit}" -ne 0 ]] || __exit=1
-                echo "Error: pending-review comment edit failed: ${mutation_error}"
-                return ${__exit}
+        else
+            local owner_url
+            if ! owner_url=$(printf '%s' "${__out}" | jq -r --arg field "${owner_field}" '.[$field] // empty' 2>/dev/null) || [[ -z "${owner_url}" ]]; then
+                echo "Error: comment_edit: GET ${endpoint} returned no ${owner_field}: ${__out}"
+                return 1
             fi
-            echo "${mutation_url}"
-            return 0
+            if [[ "${owner_url}" != */"${owner_path}" ]]; then
+                echo "Error: comment_edit: the comment belongs to #${owner_url##*/}, not to #${number} named in the URL; nothing was edited"
+                return 1
+            fi
         fi
+    fi
 
-        if [[ "${has_next}" == "true" ]]; then
-            echo "Error: the pending review has more than 100 comments and comment ${review_comment_id} could not be located"
+    if [[ "${in_pending_review}" == "true" ]]; then
+        local owner="${repo%%/*}" name="${repo##*/}"
+        local lookup
+        log "INFO" "comment_edit: pending-review lookup for comment ${review_comment_id} on PR ${number}"
+        _comment_edit_graphql lookup "pending-review lookup" gh api graphql \
+            -f "query=query(\$owner: String!, \$name: String!, \$number: Int!) { repository(owner: \$owner, name: \$name) { pullRequest(number: \$number) { reviews(states: [PENDING], first: 100) { pageInfo { hasNextPage } nodes { viewerDidAuthor comments(first: 100) { nodes { id fullDatabaseId } pageInfo { hasNextPage } } } } } } }" \
+            -f "owner=${owner}" -f "name=${name}" -F "number=${number}" || __exit=$?
+        if [[ ${__exit} -ne 0 ]]; then
+            echo "${lookup}"
+            return "${__exit}"
+        fi
+        if [[ "$(printf '%s' "${lookup}" | jq -r '.data.repository.pullRequest | type')" != "object" ]]; then
+            echo "Error: comment_edit: pending-review lookup failed: response has no pull request data: ${lookup}"
             return 1
         fi
-        __exit=0
+
+        # Only the caller's own pending review counts; GitHub allows one per PR.
+        # fullDatabaseId is a BigInt that GitHub serializes as a string.
+        local node_id has_next reviews_next own_count
+        own_count=$(printf '%s' "${lookup}" | jq -r '[.data.repository.pullRequest.reviews.nodes[]? | select(.viewerDidAuthor == true)] | length')
+        reviews_next=$(printf '%s' "${lookup}" | jq -r '.data.repository.pullRequest.reviews.pageInfo.hasNextPage // false')
+        if [[ "${own_count}" == "0" && "${reviews_next}" == "true" ]]; then
+            echo "Error: comment_edit: comment ${review_comment_id} is not a submitted review comment on ${repo}, and your pending review on PR ${number} could not be located among more than 100 pending reviews"
+            return 1
+        fi
+        node_id=$(printf '%s' "${lookup}" | jq -r --arg id "${review_comment_id}" \
+            '[.data.repository.pullRequest.reviews.nodes[]? | select(.viewerDidAuthor == true) | .comments.nodes[]? | select(.fullDatabaseId == $id) | .id][0] // empty')
+        has_next=$(printf '%s' "${lookup}" | jq -r '[.data.repository.pullRequest.reviews.nodes[]? | select(.viewerDidAuthor == true) | .comments.pageInfo.hasNextPage][0] // false')
+
+        if [[ -z "${node_id}" ]]; then
+            if [[ "${has_next}" == "true" ]]; then
+                echo "Error: comment_edit: comment ${review_comment_id} is not a submitted review comment on ${repo}, and your pending review on PR ${number} has more than 100 comments, so it could not be searched in full"
+                return 1
+            fi
+            echo "Error: comment_edit: comment ${review_comment_id} is not a submitted review comment on ${repo}, and it is not in your pending review on PR ${number}"
+            return 1
+        fi
+
+        local mutation mutation_url
+        log "INFO" "comment_edit: pending-review mutation for ${node_id}"
+        _comment_edit_graphql mutation "pending-review comment edit" gh api graphql \
+            -f "query=mutation(\$id: ID!, \$body: String!) { updatePullRequestReviewComment(input: {pullRequestReviewCommentId: \$id, body: \$body}) { pullRequestReviewComment { url } } }" \
+            -f "id=${node_id}" -f "body=${body}" || __exit=$?
+        if [[ ${__exit} -ne 0 ]]; then
+            echo "${mutation}"
+            return "${__exit}"
+        fi
+        mutation_url=$(printf '%s' "${mutation}" | jq -r '.data.updatePullRequestReviewComment.pullRequestReviewComment.url // empty')
+        if [[ -z "${mutation_url}" ]]; then
+            echo "Error: comment_edit: pending-review comment edit failed: GitHub returned no URL for the edited comment: ${mutation}"
+            return 1
+        fi
+        echo "${mutation_url}"
+        return 0
     fi
 
-    local -a cmd=("gh" "api" "${endpoint}" "-X" "${method}" "-f" "body=${body}" "--jq" ".html_url // empty")
-
-    log "INFO" "comment_edit: ${cmd[*]}"
-    __raw=$("${cmd[@]}" 2>&1) || __exit=$?
+    log "INFO" "comment_edit: ${method} ${endpoint}"
+    _gh_capture_split __out __err gh api "${endpoint}" -X "${method}" -f "body=${body}" --jq ".html_url // empty" || __exit=$?
     if [[ ${__exit} -ne 0 ]]; then
-        echo "${__raw:-comment_edit: gh api ${endpoint} failed with exit ${__exit} and no output}"
-        return ${__exit}
+        echo "Error: comment_edit: ${method} ${endpoint} failed: ${__err:-${__out:-gh exited with status ${__exit} and no output}}"
+        return "${__exit}"
     fi
-    if [[ -z "${__raw}" || "${__raw}" == "null" ]]; then
+    if [[ -z "${__out}" || "${__out}" == "null" ]]; then
         echo "Error: comment_edit: GitHub returned no URL for the edited comment"
         return 1
     fi
-    echo "${__raw}"
+    echo "${__out}"
 }

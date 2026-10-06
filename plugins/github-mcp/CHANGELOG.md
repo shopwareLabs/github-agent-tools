@@ -14,17 +14,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `pull/N#discussion_rID` and `pull/N/files#rID` or `pull/N/changes#rID` (inline review comments),
   and `pull/N#pullrequestreview-ID` (a review's summary body). The URL may carry a leading
   `https://github.com/`; a URL on another host, without an anchor, with an unknown anchor, or with a
-  non-numeric ID or number is rejected before any `gh` call. The two inline review comment forms
-  also edit a comment in the caller's own unsubmitted (pending) review, which the REST endpoint
-  rejects with 404: the tool looks up the pending review through GraphQL and edits a matching
-  comment with the `updatePullRequestReviewComment` mutation. Every failure is returned as an
-  error and never falls back to another route. It returns the updated comment's `html_url`, or the
-  `url` for a comment in a pending review.
+  non-numeric ID or number is rejected before any `gh` call. A conversation or inline comment is read
+  first and edited only when it belongs to the issue or PR `N` in the URL; a comment of another
+  issue or PR is an error and nothing is edited. When the read of an inline comment answers 404, the
+  comment may sit in the caller's own unsubmitted (pending) review: the tool looks the review up
+  through GraphQL, matching `fullDatabaseId`, and edits a matching comment with the
+  `updatePullRequestReviewComment` mutation. No match is an error. Every failure is returned as an
+  error that starts with `Error:`, and a warning that `gh` writes to stderr on a successful call does
+  not fail the edit. It returns the updated comment's `html_url`, or the `url` for a comment in a
+  pending review.
 - `check-api-tools.sh` redirects `PATCH repos/O/R/issues/comments/ID`,
   `PATCH repos/O/R/pulls/comments/ID`, and `PUT repos/O/R/pulls/N/reviews/ID` on the `api` write tool
-  to `comment_edit`, under `block_api_tool_write`. The block messages for `gh pr comment` and
-  `gh issue comment` now also name `comment_edit` for editing an existing comment, which covers
-  `--edit-last`.
+  to `comment_edit`, under `block_api_tool_write`. The message for a conversation comment points to
+  `issue_view` or `pr_view` with `fields=comments` for the comment's URL. The block messages for
+  `gh pr comment` and `gh issue comment` now also name `comment_edit` for editing an existing
+  comment, which covers `--edit-last`.
 
 ## [5.0.1] - 2026-10-03
 

@@ -735,7 +735,7 @@ Use gh-tooling-write pr_review_reply with number 14642 and comment_id 1234567 an
 
 #### `comment_edit`
 
-Replace the body of one existing comment, whatever its kind: an issue or PR conversation comment, an inline review comment, or a review's summary body. The kind comes from the anchor of `url`, so pass the URL exactly as `issue_comment` or `pr_comment` returned it, or as the `html_url` from `pr_comments`, `pr_reviews`, or `pr_review_reply`. The body replaces the whole comment text; send the full new text, not a diff. Returns the updated comment's `html_url`.
+Replace the body of one existing comment, whatever its kind: an issue or PR conversation comment, an inline review comment, or a review's summary body. The kind comes from the anchor of `url`, so pass the URL exactly as `issue_comment` or `pr_comment` returned it, as the `url` of a comment from `issue_view` or `pr_view` with `fields=comments`, or as the `html_url` from `pr_comments`, `pr_reviews`, or `pr_review_reply`. The body replaces the whole comment text; send the full new text, not a diff. Returns the updated comment's URL.
 
 ```
 Use gh-tooling-write comment_edit with url "https://github.com/shopware/shopware/pull/14642#issuecomment-2001" and body "CI is green, ready to merge"
@@ -752,7 +752,11 @@ Accepted `url` forms, each with or without a leading `https://github.com/` (`htt
 | `OWNER/REPO/pull/N/files#rID` or `.../changes#rID`     | Inline review comment           | `PATCH repos/OWNER/REPO/pulls/comments/ID` (see below) |
 | `OWNER/REPO/pull/N#pullrequestreview-ID`               | Review summary body             | `PUT repos/OWNER/REPO/pulls/N/reviews/ID`       |
 
-The two inline review comment forms also cover a comment in your own unsubmitted (pending) review, which the REST endpoint answers with 404. The tool first looks up your pending review on the PR through GraphQL. If the comment is in it, the tool edits it with the `updatePullRequestReviewComment` mutation and returns the comment's `url`. If you have no pending review, or the comment is not in it, the tool sends the `PATCH` shown. Every failure is returned as an error: a failed lookup, a failed mutation, or a pending review of more than 100 comments in which the comment is not found. None of these falls back to the `PATCH`.
+Before editing a conversation comment or an inline review comment, the tool reads it (`GET`) and checks that it belongs to the issue or PR `N` in the URL: the comment's `issue_url` must end in `/issues/N` (PR conversation comments also use `/issues/N`), or its `pull_request_url` in `/pulls/N`. A comment of another issue or PR is an error naming both numbers, and nothing is edited. A failed read, including a 404 on a conversation comment, is an error with gh's message and no edit.
+
+For the two inline review comment forms, a 404 on that read means the comment is not a submitted one. It can still be in your own unsubmitted (pending) review, which the REST endpoint does not return. The tool then looks up your pending review on PR `N` through GraphQL (among up to 100 pending reviews, only the one you wrote), matching the comment's `fullDatabaseId`, and edits a match with the `updatePullRequestReviewComment` mutation. It returns the comment's `url`. No match is an error: the comment is not a submitted review comment on the repository and not in your pending review on PR `N`. A pending review of more than 100 comments in which the comment is not found is an error too. So is a PR with more than 100 pending reviews none of which is yours. A read that fails with anything other than a 404, a failed lookup, and a failed mutation are each an error, and none makes a further call. The review summary form sends its `PUT` without a read.
+
+Every failure is an error: the output starts with `Error:` and the call fails. Output that a successful `gh` call writes to stderr, such as a warning, does not fail the edit. A failed `gh` call returns its stderr message in the error.
 
 Any other URL fails before the request: no anchor, an unknown anchor, a non-numeric number or ID, `#discussion_rID`, `#rID`, or `#pullrequestreview-ID` on an `issues/N` URL, `#rID` without `/files` or `/changes`, and extra path segments or a query string. The repository comes from the URL, so the tool takes no `repo` parameter.
 

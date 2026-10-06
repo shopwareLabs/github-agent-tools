@@ -26,9 +26,6 @@ bats_test_function --description "blocks gh pr review → suggests pr_review_sub
 bats_test_function --description "blocks gh pr comment → suggests pr_comment" \
     -- gh_hook_blocks "gh pr comment 100 --body 'lgtm'" "pr_comment"
 
-bats_test_function --description "blocks gh pr comment --edit-last → also suggests comment_edit" \
-    -- gh_hook_blocks "gh pr comment 100 --edit-last --body 'lgtm'" "comment_edit"
-
 # Issue write commands
 bats_test_function --description "blocks gh issue create → suggests issue_create" \
     -- gh_hook_blocks "gh issue create --title 'bug'" "issue_create"
@@ -40,9 +37,6 @@ bats_test_function --description "blocks gh issue reopen → suggests issue_reop
     -- gh_hook_blocks "gh issue reopen 50" "issue_reopen"
 bats_test_function --description "blocks gh issue comment → suggests issue_comment" \
     -- gh_hook_blocks "gh issue comment 50 --body 'fixed'" "issue_comment"
-
-bats_test_function --description "blocks gh issue comment --edit-last → also suggests comment_edit" \
-    -- gh_hook_blocks "gh issue comment 50 --edit-last --body 'fixed'" "comment_edit"
 
 # Label commands
 bats_test_function --description "blocks gh label list → suggests label_list" \

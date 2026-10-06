@@ -264,11 +264,20 @@ setup_write_blocking() {
     refute_output --partial "issue_edit"
 }
 
+@test "write api: the PATCH issues/comments/ID block takes the url from issue_view or pr_view comments, not pr_comments" {
+    setup_write_blocking
+    run_api_hook "$WRITE_TOOL" "repos/shopware/shopware/issues/comments/456" "PATCH"
+    assert_failure 2
+    assert_output --partial "issue_view or pr_view with fields=comments"
+    refute_output --partial "pr_comments"
+}
+
 @test "write api: blocks PATCH pulls/comments/ID → suggests comment_edit" {
     setup_write_blocking
     run_api_hook "$WRITE_TOOL" "repos/shopware/shopware/pulls/comments/456" "PATCH"
     assert_failure 2
     assert_output --partial "comment_edit"
+    assert_output --partial "pr_comments"
 }
 
 @test "write api: blocks PUT pulls/N/reviews/ID → suggests comment_edit" {
